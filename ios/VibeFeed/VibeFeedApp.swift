@@ -20,8 +20,10 @@ struct ContentView: View {
             })
             .ignoresSafeArea()
 
+            // The webview lives INSIDE the safe area (iOS supplies the insets
+            // natively per device); the background above fills the notch and
+            // home-indicator strips in the matching color.
             WebView(model: model)
-                .ignoresSafeArea()
 
             if model.failed {
                 VStack(spacing: 14) {

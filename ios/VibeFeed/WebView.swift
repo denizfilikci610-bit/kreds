@@ -13,6 +13,12 @@ final class WebViewModel: ObservableObject {
     }
 }
 
+// Reports zero safe-area insets to the web content, so the page never
+// double-pads: the native layer (SwiftUI) owns the safe areas exclusively.
+final class InsetFreeWebView: WKWebView {
+    override var safeAreaInsets: UIEdgeInsets { .zero }
+}
+
 struct WebView: UIViewRepresentable {
     @ObservedObject var model: WebViewModel
 
@@ -22,7 +28,7 @@ struct WebView: UIViewRepresentable {
         // persistent store: login/session survives app restarts
         config.websiteDataStore = .default()
 
-        let webView = WKWebView(frame: .zero, configuration: config)
+        let webView = InsetFreeWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
