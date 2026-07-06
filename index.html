@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15202B" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="kreds">
 <!-- CSP: script-src bruger 'unsafe-inline' indtil koden er stabil — skift til 'sha256-<hash>' af inline-scripts for fuld beskyttelse (hash skal genberegnes ved hver redigering). -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' blob: https://iduotqxkohuezxkveawc.supabase.co; connect-src https://iduotqxkohuezxkveawc.supabase.co wss://iduotqxkohuezxkveawc.supabase.co; base-uri 'self'; form-action 'self'; object-src 'none'">
 <title>Kreds</title>
@@ -52,9 +57,8 @@
   body{
     font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     color:var(--ink);
-    background:#0A0A0A;
+    background:var(--bg);
     min-height:100dvh;
-    display:flex;justify-content:center;align-items:center;
   }
   button{font:inherit;cursor:pointer;background:none;border:none;color:inherit;-webkit-tap-highlight-color:transparent}
   input,textarea{font:inherit;color:inherit}
@@ -64,63 +68,36 @@
   .stroke{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
   .fillic{fill:currentColor;stroke:none}
 
-  /* ================= Telefon ================= */
+  /* ================= App-ramme ================= */
   .phone{
     position:relative;
-    width:100%;max-width:430px;
+    width:100%;
     height:100dvh;
     overflow:hidden;
     background:var(--bg);
   }
-  @media(min-width:500px){
-    body{padding:24px}
+  @media(min-width:700px){
     .phone{
-      height:min(932px,94vh);
-      border-radius:54px;
-      border:11px solid #0B0B0B;
-      box-shadow:0 0 0 2px #2a2a2a,0 50px 100px rgba(0,0,0,.65);
+      max-width:680px;margin:0 auto;
+      border-left:1px solid var(--line);
+      border-right:1px solid var(--line);
     }
   }
-  .island{display:none}
-  @media(min-width:500px){
-    .island{
-      display:block;
-      position:absolute;top:11px;left:50%;transform:translateX(-50%);
-      width:122px;height:34px;border-radius:20px;background:#0B0B0B;z-index:130;
-    }
-  }
-  .app{height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:var(--bg)}
-
-  /* ================= Statusbar (kun i ramme) ================= */
-  .statusbar{
-    display:none;
-    position:sticky;top:0;z-index:60;
-    height:52px;
-    background:var(--glass);
-    -webkit-backdrop-filter:blur(22px) saturate(1.8);
-    backdrop-filter:blur(22px) saturate(1.8);
-    align-items:center;justify-content:space-between;
-    padding:14px 30px 0;
-    font-size:15px;font-weight:600;
-    color:var(--ink);
-  }
-  @media(min-width:500px){.statusbar{display:flex}}
-  .statusbar .sicons{display:flex;align-items:center;gap:6px}
-  .statusbar svg{display:block}
+  .app{height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:var(--bg);display:flex;flex-direction:column}
 
   /* ================= Topbar ================= */
   .topbar{
     position:sticky;top:0;z-index:50;
+    flex-shrink:0;
     display:flex;align-items:center;justify-content:space-between;
-    height:52px;
-    padding:0 16px;
+    height:calc(52px + env(safe-area-inset-top));
+    padding:env(safe-area-inset-top) 16px 0;
     background:var(--glass);
     -webkit-backdrop-filter:blur(22px) saturate(1.8);
     backdrop-filter:blur(22px) saturate(1.8);
     border-bottom:1px solid var(--glass-edge);
     box-shadow:inset 0 1px 0 var(--glass-hi);
   }
-  @media(min-width:500px){.topbar{top:52px}}
   .wordmark{
     font-family:Georgia,"Times New Roman",serif;
     font-weight:700;font-size:27px;letter-spacing:-.5px;
@@ -169,7 +146,7 @@
 
   /* ================= Kreds-vælger ================= */
   .feedbar{
-    position:sticky;top:52px;z-index:45;
+    position:sticky;top:calc(52px + env(safe-area-inset-top));z-index:45;
     display:flex;gap:8px;align-items:center;
     padding:9px 12px;
     overflow-x:auto;scrollbar-width:none;
@@ -178,7 +155,6 @@
     backdrop-filter:blur(22px) saturate(1.8);
     border-bottom:1px solid var(--glass-edge);
   }
-  @media(min-width:500px){.feedbar{top:104px}}
   .feedbar::-webkit-scrollbar{display:none}
   .fpill{
     flex:0 0 auto;
@@ -214,7 +190,7 @@
 
   /* ================= Views ================= */
   .view{display:none}
-  .view.active{display:block}
+  .view.active{display:block;flex:1 0 auto}
 
   /* ================= Timeline-post (X-anatomi) ================= */
   .post{
@@ -319,13 +295,12 @@
 
   /* ================= Søg ================= */
   .searchhead{
-    padding:10px 16px 8px;position:sticky;top:52px;z-index:40;
+    padding:10px 16px 8px;position:sticky;top:calc(52px + env(safe-area-inset-top));z-index:40;
     background:var(--glass);
     -webkit-backdrop-filter:blur(22px) saturate(1.8);
     backdrop-filter:blur(22px) saturate(1.8);
     border-bottom:1px solid var(--glass-edge);
   }
-  @media(min-width:500px){.searchhead{top:104px}}
   .searchbox{
     display:flex;align-items:center;gap:9px;
     background:var(--glass-strong);
@@ -409,6 +384,7 @@
   /* ================= Tabbar ================= */
   .tabbar{
     position:sticky;bottom:14px;z-index:50;
+    flex-shrink:0;
     display:flex;align-items:center;justify-content:space-around;
     height:62px;
     margin:12px 16px calc(14px + env(safe-area-inset-bottom));
@@ -560,9 +536,9 @@
   .compose.on{transform:translateY(0)}
   .compose-head{
     display:flex;align-items:center;justify-content:space-between;
-    height:52px;padding:0 16px;
+    height:calc(52px + env(safe-area-inset-top));
+    padding:env(safe-area-inset-top) 16px 0;
   }
-  @media(min-width:500px){.compose-head{margin-top:44px}}
   .compose-head .cancel{font-size:15px;color:var(--ink)}
   .compose-head .postbtn{
     background:var(--red);color:#fff;
@@ -639,11 +615,11 @@
   .profileview.on{transform:translateX(0)}
   .pv-head{
     display:flex;align-items:center;gap:16px;
-    height:52px;padding:0 12px;
+    height:calc(52px + env(safe-area-inset-top));
+    padding:env(safe-area-inset-top) 12px 0;
     border-bottom:1px solid var(--line);
     flex:0 0 auto;
   }
-  @media(min-width:500px){.pv-head{margin-top:44px}}
   .pv-head .back{padding:6px;color:var(--ink)}
   .pv-head .back svg{width:22px;height:22px}
   .pv-head .t1{font-size:16px;font-weight:800;color:var(--ink);line-height:1.15}
@@ -691,10 +667,9 @@
   .story-textslide span{color:#fff;font-size:26px;font-weight:700;line-height:1.4;text-shadow:0 1px 4px rgba(0,0,0,.25);white-space:pre-wrap}
   .story-top{
     position:absolute;top:0;left:0;right:0;z-index:5;
-    padding:14px 12px 0;
+    padding:calc(14px + env(safe-area-inset-top)) 12px 0;
     background:linear-gradient(rgba(0,0,0,.55),transparent);
   }
-  @media(min-width:500px){.story-top{padding-top:52px}}
   .bars{display:flex;gap:4px}
   .bars .bar{flex:1;height:2.5px;border-radius:2px;background:rgba(255,255,255,.35);overflow:hidden}
   .bars .bar i{display:block;height:100%;width:0;background:#fff}
@@ -731,7 +706,7 @@
 
   /* ---- Toast ---- */
   .toast{
-    position:absolute;left:50%;bottom:76px;z-index:110;
+    position:absolute;left:50%;bottom:76px;z-index:210;
     transform:translateX(-50%) translateY(6px);
     background:var(--toastbg);color:var(--toastink);
     -webkit-backdrop-filter:blur(16px) saturate(1.6);
@@ -751,18 +726,20 @@
     position:absolute;inset:0;z-index:200;
     background:var(--bg);
     display:none;
-    flex-direction:column;justify-content:center;
-    padding:34px 30px calc(30px + env(safe-area-inset-bottom));
+    flex-direction:column;
+    align-items:center;
+    padding:calc(34px + env(safe-area-inset-top)) 30px calc(30px + env(safe-area-inset-bottom));
     overflow-y:auto;
   }
   .authview.on{display:flex}
+  .authview .auth-inner{margin:auto;width:100%;max-width:420px}
   .authview .wordmark{font-size:46px;text-align:center}
   .auth-tag{text-align:center;color:var(--gray);font-size:14.5px;margin-top:6px}
   .auth-form{display:flex;flex-direction:column;gap:10px;margin-top:30px}
   .auth-form input{
     width:100%;
-    background:var(--glass-strong);
-    border:1px solid var(--glass-edge);
+    background:var(--chip);
+    border:1px solid var(--line2);
     box-shadow:inset 0 1px 0 var(--glass-hi);
     border-radius:14px;
     padding:13px 15px;
@@ -780,6 +757,10 @@
   .auth-btn:disabled{opacity:.5;box-shadow:none;cursor:default}
   .auth-alt{text-align:center;color:var(--gray);font-size:14px;margin-top:18px}
   .auth-alt button{color:var(--red);font-weight:700}
+  .auth-forgot{align-self:flex-end;color:var(--gray);font-size:13.5px;font-weight:600;padding:2px 2px;margin-top:-2px}
+  .auth-note{text-align:center;color:var(--gray);font-size:14.5px;line-height:1.45;margin-bottom:4px}
+  .auth-back{color:var(--gray);font-size:14px;font-weight:600;margin-top:10px}
+  .auth-err.ok{color:var(--gray)}
   .profbtns{display:flex;gap:8px}
 
   @media(prefers-reduced-motion:reduce){
@@ -793,18 +774,7 @@
 <body>
 
 <div class="phone">
-  <div class="island"></div>
-
   <div class="app" id="app">
-
-    <div class="statusbar">
-      <span>9:41</span>
-      <span class="sicons">
-        <svg width="18" height="12" viewBox="0 0 18 12"><g fill="currentColor"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></g></svg>
-        <svg width="17" height="12" viewBox="0 0 17 12"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M1.5 4.2a10.5 10.5 0 0 1 14 0"/><path d="M4 7a7 7 0 0 1 9 0"/><path d="M6.6 9.7a3.4 3.4 0 0 1 3.8 0"/></g><circle cx="8.5" cy="11" r="1.1" fill="currentColor"/></svg>
-        <svg width="25" height="12" viewBox="0 0 25 12"><rect x="0.5" y="0.5" width="21" height="11" rx="3" fill="none" stroke="currentColor" stroke-opacity=".4"/><rect x="2" y="2" width="15" height="8" rx="1.6" fill="currentColor"/><rect x="22.5" y="4" width="2" height="4" rx="1" fill="currentColor" fill-opacity=".4"/></svg>
-      </span>
-    </div>
 
     <!-- Topbar -->
     <header class="topbar">
@@ -1030,14 +1000,33 @@
 
   <!-- Auth -->
   <div class="authview" id="authview">
+    <div class="auth-inner">
     <div class="wordmark">kreds<span class="prik">.</span></div>
     <div class="auth-tag">Ingen algoritme. Bare din kreds.</div>
 
     <form class="auth-form" id="auth-login" autocomplete="on">
       <input type="email" id="li-email" placeholder="E-mail" autocomplete="email" required>
       <input type="password" id="li-pass" placeholder="Adgangskode" autocomplete="current-password" required>
+      <button type="button" class="auth-forgot" id="li-forgot">Glemt adgangskode?</button>
       <div class="auth-err" id="li-err"></div>
       <button class="auth-btn" id="li-btn" type="submit">Log ind</button>
+    </form>
+
+    <form class="auth-form" id="auth-reset" style="display:none">
+      <div class="auth-note">Skriv din e-mail, så sender vi dig et link til at vælge en ny adgangskode.</div>
+      <input type="email" id="fp-email" placeholder="E-mail" autocomplete="email" required>
+      <div class="auth-err" id="fp-err" aria-live="polite"></div>
+      <button class="auth-btn" id="fp-btn" type="submit">Send link</button>
+      <button type="button" class="auth-back" id="fp-back">Tilbage til log ind</button>
+    </form>
+
+    <form class="auth-form" id="auth-recover" style="display:none">
+      <div class="auth-note">Vælg ny adgangskode</div>
+      <input type="password" id="rc-pass1" placeholder="Ny adgangskode" autocomplete="new-password" required>
+      <input type="password" id="rc-pass2" placeholder="Gentag adgangskode" autocomplete="new-password" required>
+      <div class="auth-err" id="rc-err" aria-live="polite"></div>
+      <button class="auth-btn" id="rc-btn" type="submit">Gem adgangskode</button>
+      <button type="button" class="auth-back" id="rc-back">Tilbage til log ind</button>
     </form>
 
     <form class="auth-form" id="auth-signup" style="display:none" autocomplete="on">
@@ -1049,7 +1038,8 @@
       <button class="auth-btn" id="su-btn" type="submit">Opret profil</button>
     </form>
 
-    <div class="auth-alt"><span id="auth-alt-txt">Har du ikke en profil?</span> <button type="button" id="auth-toggle">Opret en</button></div>
+    <div class="auth-alt" id="auth-alt"><span id="auth-alt-txt">Har du ikke en profil?</span> <button type="button" id="auth-toggle">Opret en</button></div>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -1071,6 +1061,11 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 </script>
 <script type="module">
 const { createClient } = window.supabase;
+
+/* Aflæs hash FØR klienten oprettes — supabase-js fjerner den under detectSessionInUrl */
+const initialHash = window.location.hash || "";
+let recoveryMode = initialHash.indexOf("type=recovery") !== -1;
+const recoveryLinkError = initialHash.indexOf("error_code=otp_expired") !== -1 || initialHash.indexOf("error=access_denied") !== -1;
 
 const SB_URL = 'https://iduotqxkohuezxkveawc.supabase.co';
 const SB_KEY = 'sb_publishable_SHYSpCyVKFwf4jOwg8eSXA_9GzDcf5j';
@@ -2244,26 +2239,130 @@ const SIGNUP_ERRORS = {
   signup_failed: "Noget gik galt. Prøv igen."
 };
 let authMode = "login";
+function setAuthMode(mode){
+  authMode = mode;
+  el("auth-login").style.display = mode === "login" ? "flex" : "none";
+  el("auth-signup").style.display = mode === "signup" ? "flex" : "none";
+  el("auth-reset").style.display = mode === "reset" ? "flex" : "none";
+  el("auth-recover").style.display = mode === "recover" ? "flex" : "none";
+  el("auth-alt").style.display = (mode === "login" || mode === "signup") ? "" : "none";
+  el("auth-alt-txt").textContent = mode === "login" ? "Har du ikke en profil?" : "Har du allerede en profil?";
+  el("auth-toggle").textContent = mode === "login" ? "Opret en" : "Log ind";
+  el("li-err").textContent = "";
+  el("su-err").textContent = "";
+  el("fp-err").textContent = "";
+  el("fp-err").classList.remove("ok");
+  el("rc-err").textContent = "";
+}
 function showAuth(msg){
+  setAuthMode("login");
   el("authview").classList.add("on");
   el("li-err").textContent = msg || "";
   el("su-err").textContent = "";
+}
+function showRecovery(){
+  setAuthMode("recover");
+  el("authview").classList.add("on");
 }
 function hideAuth(){
   el("authview").classList.remove("on");
   el("li-pass").value = "";
   el("su-pass").value = "";
+  el("rc-pass1").value = "";
+  el("rc-pass2").value = "";
+  el("fp-email").value = "";
   el("li-err").textContent = "";
   el("su-err").textContent = "";
+  el("fp-err").textContent = "";
+  el("fp-err").classList.remove("ok");
+  el("rc-err").textContent = "";
 }
 el("auth-toggle").addEventListener("click", function(){
-  authMode = authMode === "login" ? "signup" : "login";
-  el("auth-login").style.display = authMode === "login" ? "flex" : "none";
-  el("auth-signup").style.display = authMode === "signup" ? "flex" : "none";
-  el("auth-alt-txt").textContent = authMode === "login" ? "Har du ikke en profil?" : "Har du allerede en profil?";
-  el("auth-toggle").textContent = authMode === "login" ? "Opret en" : "Log ind";
-  el("li-err").textContent = "";
-  el("su-err").textContent = "";
+  setAuthMode(authMode === "login" ? "signup" : "login");
+});
+el("li-forgot").addEventListener("click", function(){
+  setAuthMode("reset");
+  el("fp-email").value = el("li-email").value.trim();
+});
+el("fp-back").addEventListener("click", function(){
+  setAuthMode("login");
+});
+el("rc-back").addEventListener("click", function(){
+  recoveryMode = false;
+  history.replaceState(null, "", location.pathname);
+  setAuthMode("login");
+});
+el("auth-reset").addEventListener("submit", async function(e){
+  e.preventDefault();
+  const email = el("fp-email").value.trim();
+  if(!email) return;
+  const btn = el("fp-btn");
+  btn.disabled = true;
+  el("fp-err").textContent = "";
+  el("fp-err").classList.remove("ok");
+  try{
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    if(error){
+      if(error.code === "email_address_invalid" || /invalid/i.test(error.message || "")){
+        el("fp-err").textContent = "Det ligner ikke en gyldig e-mailadresse.";
+      } else if(error.status === 429 || /rate|429/i.test(error.message || "")){
+        el("fp-err").textContent = "Vent lidt og prøv igen.";
+      } else {
+        el("fp-err").textContent = GENERIC_ERR;
+      }
+      return;
+    }
+    el("fp-err").classList.add("ok");
+    el("fp-err").textContent = "Hvis der findes en profil med den e-mail, har vi sendt et link. Tjek din indbakke.";
+  }catch(err){
+    console.error(err);
+    el("fp-err").textContent = GENERIC_ERR;
+  }finally{
+    btn.disabled = false;
+  }
+});
+el("auth-recover").addEventListener("submit", async function(e){
+  e.preventDefault();
+  const p1 = el("rc-pass1").value;
+  const p2 = el("rc-pass2").value;
+  el("rc-err").textContent = "";
+  if(p1.length < 6){ el("rc-err").textContent = "Adgangskoden skal være mindst 6 tegn."; return; }
+  if(p1 !== p2){ el("rc-err").textContent = "Adgangskoderne er ikke ens."; return; }
+  const btn = el("rc-btn");
+  btn.disabled = true;
+  try{
+    const { error } = await sb.auth.updateUser({ password: p1 });
+    if(error){
+      if(error.code === "same_password" || /different from the old/i.test(error.message || ""))
+        el("rc-err").textContent = "Den nye adgangskode skal være forskellig fra den gamle.";
+      else if(error.code === "weak_password" || /at least|weak/i.test(error.message || ""))
+        el("rc-err").textContent = "Adgangskoden skal være mindst 6 tegn.";
+      else if(error.name === "AuthSessionMissingError" || /auth session missing/i.test(error.message || "")){
+        recoveryMode = false;
+        history.replaceState(null, "", location.pathname);
+        setAuthMode("login");
+        showAuth('Linket er udløbet. Prøv "Glemt adgangskode?" igen.');
+      }
+      else
+        el("rc-err").textContent = GENERIC_ERR;
+      return;
+    }
+    recoveryMode = false;
+    history.replaceState(null, "", location.pathname);
+    toast("Din adgangskode er opdateret");
+    const { data } = await sb.auth.getSession();
+    if(data && data.session){
+      await boot(data.session);
+    }else{
+      setAuthMode("login");
+      showAuth();
+    }
+  }catch(err){
+    console.error(err);
+    el("rc-err").textContent = GENERIC_ERR;
+  }finally{
+    btn.disabled = false;
+  }
 });
 el("su-handle").addEventListener("input", function(){
   const v = this.value.toLowerCase().trim();
@@ -2329,6 +2428,7 @@ el("auth-signup").addEventListener("submit", async function(e){
 
 /* ================= Boot ================= */
 async function boot(session){
+  if(recoveryMode){ showRecovery(); return; }
   if(!session){ showAuth(); return; }
   const { data:prof, error } = await sb.from("profiles").select("*").eq("id", session.user.id).maybeSingle();
   if(error){
@@ -2394,22 +2494,39 @@ function resetApp(){
   el("su-name").value = "";
   el("su-handle").value = "";
   el("su-email").value = "";
-  authMode = "login";
-  el("auth-login").style.display = "flex";
-  el("auth-signup").style.display = "none";
-  el("auth-alt-txt").textContent = "Har du ikke en profil?";
-  el("auth-toggle").textContent = "Opret en";
+  el("fp-email").value = "";
+  el("rc-pass1").value = "";
+  el("rc-pass2").value = "";
+  setAuthMode("login");
 }
 sb.auth.onAuthStateChange(function(event){
   if(event === "SIGNED_OUT"){
+    recoveryMode = false;
     resetApp();
     showAuth();
+  }
+  if(event === "PASSWORD_RECOVERY"){
+    recoveryMode = true;
+    showRecovery();
   }
 });
 
 /* ================= Init ================= */
+window.addEventListener("hashchange", function(){
+  if(/type=recovery|error_code=|access_token=/.test(location.hash)) location.reload();
+});
 setTabIcons("feed");
 (async function init(){
+  if(recoveryLinkError){
+    history.replaceState(null, "", location.pathname);
+    setAuthMode("login");
+    showAuth('Linket er udløbet eller allerede brugt. Prøv "Glemt adgangskode?" igen.');
+    return;
+  }
+  if(recoveryMode){
+    showRecovery();
+    return;
+  }
   try{
     const { data } = await sb.auth.getSession();
     if(data && data.session) await boot(data.session);
