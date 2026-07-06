@@ -1,10 +1,11 @@
 import { sb, GENERIC_ERR, BLOCKED_MSG, recoveryMode, setRecoveryMode } from "./config.js";
 import { me, setMe, state, FRIEND_SINCE, pv, expandedCmts, clearComposers, setCfilePid } from "./store.js";
 import { el, registerProfile, toast } from "./helpers.js";
-import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu, closeReportMenu } from "./feed.js";
+import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu, closeReportMenu, resetFeedbarSearch, resetTapState } from "./feed.js";
 import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPost, resetPoll } from "./compose.js";
 import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile } from "./profile.js";
 import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
+import { closeLightbox } from "./lightbox.js";
 import { subscribeRealtime, unsubscribeRealtime } from "./realtime.js";
 import { resetSearch } from "./search.js";
 
@@ -118,6 +119,9 @@ export function resetApp(){
   closeReportMenu();
   closeCompose();
   closeProfile();
+  closeLightbox();
+  resetTapState(); // annullerer et afventende enkelt-tryk, så lightboxen ikke genåbner efter logout
+  resetFeedbarSearch(); // kreds-søgningen i feedbaren nulstilles ved logout
   clearPendingImg();
   ta.value = "";
   resetPoll();

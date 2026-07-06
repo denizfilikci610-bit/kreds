@@ -157,6 +157,32 @@
   .fpill.on{background:var(--ink);color:var(--bg)}
   .fpill.new{color:var(--red)}
 
+  /* ---- Kreds-søgning i feedbaren ---- */
+  .fbseek{
+    flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;
+    width:31px;height:31px;border-radius:50%;
+    background:var(--chip);color:var(--gray);
+  }
+  .fbseek svg{width:16px;height:16px}
+  .fbseek:active{opacity:.65}
+  .feedbar.searching{flex-wrap:wrap;overflow-x:visible}
+  .fbsearch{
+    flex:1 1 100%;
+    display:flex;align-items:center;gap:8px;
+    background:var(--inputbg);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:7px 12px;
+  }
+  .fbsearch>svg{width:15px;height:15px;color:var(--gray);flex:0 0 auto}
+  .fbsearch input{flex:1;min-width:0;border:none;background:transparent;font-size:16px}
+  .fbsearch input:focus{outline:none}
+  .fbsearch .fbx{display:flex;padding:2px;color:var(--gray)}
+  .fbsearch .fbx svg{width:14px;height:14px}
+  .fbpills{display:contents}
+  .fbnone{font-size:13px;color:var(--gray);padding:3px 2px}
+
   .kredshead{
     display:flex;align-items:center;gap:11px;
     padding:12px 16px;
@@ -213,18 +239,6 @@
     -webkit-touch-callout:none;
     -webkit-user-select:none;user-select:none;
   }
-  .vsound{
-    position:absolute;right:10px;bottom:10px;
-    width:30px;height:30px;border-radius:50%;
-    background:rgba(0,0,0,.6);color:#fff;
-    display:flex;align-items:center;justify-content:center;
-    pointer-events:none;
-  }
-  .vsound svg{width:16px;height:16px}
-  .vsound .v-off{display:none}
-  .vsound.muted .v-on{display:none}
-  .vsound.muted .v-off{display:block}
-
   .bigheart{
     position:absolute;inset:0;
     display:flex;align-items:center;justify-content:center;
@@ -385,6 +399,8 @@
   .searchbox input{flex:1;min-width:0;border:none;background:transparent;font-size:16px}
   .searchbox input:focus{outline:none}
   .listrow{display:flex;align-items:center;gap:12px;padding:11px 16px}
+  .listrow.tap{cursor:pointer}
+  .listrow.tap:active{opacity:.7}
   .listrow .grow{flex:1;min-width:0;line-height:1.3}
   .listrow .l1{font-weight:700;font-size:14.5px;color:var(--ink);display:flex;align-items:center;gap:4px}
   .listrow .l1 svg{width:14px;height:14px}
@@ -436,6 +452,16 @@
   .pinfo .h{font-size:13.5px;color:var(--gray)}
   .pinfo .bio{font-size:14.5px;color:var(--ink);margin-top:6px;white-space:pre-wrap}
   .pinfo .since{font-size:14px;color:var(--gray);margin-top:6px}
+  .pv-add{
+    display:inline-flex;align-items:center;
+    margin-top:10px;
+    background:var(--red);color:#fff;
+    border-radius:999px;
+    padding:7px 16px;
+    font-size:13px;font-weight:700;
+  }
+  .pv-add:active{opacity:.8}
+  .pv-add.done,.pv-add:disabled{background:var(--chip);color:var(--gray);cursor:default;opacity:1}
   .niksaldo{margin-top:8px}
   .niksaldo .nik1{font-size:14px;color:var(--ink)}
   .niksaldo .nik1 b{font-weight:700}
@@ -519,6 +545,15 @@
   .fs-name textarea{flex:1;min-width:0;border:none;background:transparent;font-size:16px;resize:none;line-height:1.35}
   .fs-name textarea:focus{outline:none}
   .fs-label{font-size:12.5px;font-weight:700;color:var(--gray);padding:14px 18px 2px;text-transform:uppercase;letter-spacing:.05em}
+  .fs-labelrow{display:flex;align-items:flex-end;justify-content:space-between;padding-right:16px}
+  .fs-all{
+    flex:0 0 auto;
+    background:var(--chip);color:var(--ink);
+    border-radius:999px;
+    padding:5px 12px;
+    font-size:12.5px;font-weight:700;
+  }
+  .fs-all:active{opacity:.7}
   .fs-list{flex:1;overflow-y:auto;min-height:120px}
   .mcheck{
     width:24px;height:24px;border-radius:50%;
@@ -735,9 +770,38 @@
   .pv-head .t2{font-size:12.5px;color:var(--gray)}
   .pv-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 
+  /* ---- Fuldskærms-lightbox (billede/video) ---- */
+  .lightbox{
+    position:fixed;inset:0;z-index:300; /* over alt — også tabbar og sheets */
+    background:#000;
+    display:none;
+  }
+  .lightbox.on{display:block}
+  .lb-stage{
+    position:absolute;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }
+  .lb-stage img{
+    max-width:100%;max-height:100%;object-fit:contain;
+    will-change:transform;
+    touch-action:none; /* gestures håndteres selv med Pointer Events */
+    -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
+  }
+  .lb-stage video{max-width:100%;max-height:100%;object-fit:contain}
+  .lb-close{
+    position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;z-index:2;
+    width:38px;height:38px;border-radius:50%;
+    background:rgba(0,0,0,.55);color:#fff;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .lb-close svg{width:18px;height:18px}
+  .lb-close:active{opacity:.7}
+  .lb-lock{overflow:hidden !important} /* låser app/body-scroll mens lightboxen er åben */
+
   /* ---- Toast ---- */
   .toast{
-    position:absolute;left:50%;bottom:calc(64px + env(safe-area-inset-bottom));z-index:210;
+    position:absolute;left:50%;bottom:calc(64px + env(safe-area-inset-bottom));z-index:310; /* over lightboxen (300), så feedback ikke skjules */
     transform:translateX(-50%) translateY(6px);
     background:var(--toastbg);color:var(--toastink);
     font-size:14px;font-weight:600;

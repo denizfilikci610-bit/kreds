@@ -1,9 +1,9 @@
-import { sb, GENERIC_ERR, BLOCKED_MSG } from "./config.js";
+import { sb, GENERIC_ERR, BLOCKED_MSG, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab } from "./store.js";
 import { el, esc, avaHTML, user, toast, uuid, registerProfile } from "./helpers.js";
-import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos } from "./feed.js";
+import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts } from "./feed.js";
 import { openCompose } from "./compose.js";
-import { renderSearch } from "./search.js";
+import { renderSearch, refreshSearchAfterFriendAdd } from "./search.js";
 import { resetApp, showAuth } from "./auth.js";
 
 /* ================= Bobler-række ================= */
@@ -66,8 +66,36 @@ export function resetDeleteUI(){
   el("del-btn").disabled = true;
 }
 
-/* ================= Ven-profil ================= */
+/* ================= Ven-profil (og ikke-ven-profil) ================= */
+function pvIsFriend(h){
+  return !!(me && (h === me.handle || h === OFFICIAL_HANDLE || state.friends.indexOf(h) >= 0));
+}
+/* Relations-linjen: venner (og botten) ser "I din kreds siden …";
+   ikke-venner ser en rød "Tilføj til din kreds"-chip i stedet */
+function renderPvRelation(h){
+  const since = el("pv-since"), add = el("pv-add");
+  if(pvIsFriend(h)){
+    since.style.display = "";
+    since.textContent = "I din kreds siden "+(FRIEND_SINCE[h] || user(h).since || "i dag")+" · Gensidig ven";
+    add.style.display = "none";
+  } else {
+    since.style.display = "none";
+    add.style.display = "";
+    add.disabled = false;
+    add.classList.remove("done");
+    add.textContent = "Tilføj til din kreds";
+  }
+}
+function pvEmptyNote(h){
+  return '<div class="emptynote">'+(pvIsFriend(h) ? "Ingen opslag endnu." : "Bliv venner for at se opslag")+'</div>';
+}
 export async function openProfile(h){
+  if(!user(h).id){
+    // Ikke-ven: profilen er måske ikke registreret endnu — hent den på handle
+    const r = await sb.from("profiles").select("*").eq("handle", h).maybeSingle();
+    if(r.error) console.error(r.error);
+    if(r.data) registerProfile(r.data);
+  }
   const u = user(h);
   if(!u.id){ toast("Kunne ikke finde profilen"); return; }
   pv.u = h;
@@ -83,7 +111,7 @@ export async function openProfile(h){
   el("pv-stat-friends").textContent = "–";
   el("pv-stat-kredse").textContent = "–";
   el("pv-ava").innerHTML = avaHTML(h, 86);
-  el("pv-since").textContent = "I din kreds siden "+(FRIEND_SINCE[h] || u.since || "i dag")+" · Gensidig ven";
+  renderPvRelation(h);
   el("pv-posts").innerHTML = '<div class="emptynote">Henter …</div>';
   el("pv-body").scrollTop = 0;
   el("profileview").classList.add("on");
@@ -115,7 +143,7 @@ export async function loadPvPosts(){
   const vsnap = snapVideos(el("pv-posts"));
   el("pv-posts").innerHTML = pv.posts.length
     ? pv.posts.map(postHTML).join("")
-    : '<div class="emptynote">Ingen opslag endnu.</div>';
+    : pvEmptyNote(h); // RLS giver tom liste for ikke-venner
   restoreVideos(el("pv-posts"), vsnap);
 }
 export function closeProfile(){
@@ -128,7 +156,7 @@ export function refreshPv(){
     const vsnap = snapVideos(el("pv-posts"));
     el("pv-posts").innerHTML = pv.posts.length
       ? pv.posts.map(postHTML).join("")
-      : '<div class="emptynote">Ingen opslag endnu.</div>';
+      : pvEmptyNote(pv.u);
     restoreVideos(el("pv-posts"), vsnap);
     el("pv-ava").innerHTML = avaHTML(pv.u, 86);
   }
@@ -261,6 +289,39 @@ el("logoutbtn").addEventListener("click", async function(){
   if(error){ console.error(error); toast(GENERIC_ERR); }
 });
 el("pv-back").addEventListener("click", closeProfile);
+/* ---- Ikke-ven: "Tilføj til din kreds" (optimistisk ✓, derefter refetch) ---- */
+el("pv-add").addEventListener("click", async function(){
+  const h = pv.u;
+  if(!me || !h || this.disabled) return;
+  const btn = this;
+  btn.disabled = true;
+  btn.classList.add("done");
+  btn.textContent = "I din kreds ✓";
+  const { data, error } = await sb.rpc("add_friend", { friend_handle: h });
+  if(error){
+    console.error(error);
+    if(pv.u === h){
+      btn.disabled = false;
+      btn.classList.remove("done");
+      btn.textContent = "Tilføj til din kreds";
+    }
+    const m = String(error.message || "");
+    if(m.indexOf("not_found") >= 0) toast("Ingen bruger med det navn");
+    else if(m.indexOf("self") >= 0) toast("Det er dig selv 😄");
+    else toast(GENERIC_ERR);
+    return;
+  }
+  if(data) registerProfile(data);
+  await loadFriends();
+  refreshSearchAfterFriendAdd(h); // Søg-listen bag panelet: fjern stale "Tilføj …"-knap og vis den nye ven
+  renderStories();
+  loadPosts();
+  if(pv.u === h){
+    renderPvRelation(h); // nu ven: viser "I din kreds siden …"
+    loadPvPosts();       // RLS åbner for opslagene
+  }
+  toast(user(h).name + " er nu i din kreds");
+});
 /* ================= Bobler: klik ================= */
 el("stories").addEventListener("click", function(e){
   const s = e.target.closest(".story");

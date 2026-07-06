@@ -10,6 +10,7 @@ export function openFeedSheet(){
   fsSelected = {};
   el("fs-name").value = "";
   renderFsList();
+  renderFsAll();
   fsCan();
   el("scrim").classList.add("on");
   el("fsheet").classList.add("on");
@@ -36,6 +37,16 @@ function renderFsList(){
 function fsCan(){
   const any = Object.keys(fsSelected).some(function(k){ return fsSelected[k]; });
   el("fs-create").disabled = !(el("fs-name").value.trim() && any);
+}
+/* ---- "Vælg alle"/"Fravælg alle" (kun menneskelige venner listes) ---- */
+function fsAllSelected(){
+  return state.humanFriends.length > 0 && state.humanFriends.every(function(h){ return !!fsSelected[h]; });
+}
+function renderFsAll(){
+  const b = el("fs-all");
+  if(!state.humanFriends.length){ b.style.display = "none"; return; }
+  b.style.display = "";
+  b.textContent = fsAllSelected() ? "Fravælg alle" : "Vælg alle";
 }
 
 /* ================= Medlemmer (sheet, åbnes fra kredshead) ================= */
@@ -153,6 +164,15 @@ el("fs-list").addEventListener("click", function(e){
   if(!r || !r.dataset.h) return;
   fsSelected[r.dataset.h] = !fsSelected[r.dataset.h];
   r.classList.toggle("sel", !!fsSelected[r.dataset.h]);
+  renderFsAll();
+  fsCan();
+});
+el("fs-all").addEventListener("click", function(){
+  const all = fsAllSelected();
+  fsSelected = {};
+  if(!all) state.humanFriends.forEach(function(h){ fsSelected[h] = true; });
+  renderFsList();
+  renderFsAll();
   fsCan();
 });
 el("fs-name").addEventListener("input", fsCan);

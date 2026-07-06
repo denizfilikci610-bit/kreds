@@ -25,6 +25,9 @@ struct WebView: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
+        // Allow autoplay (incl. unmuted lightbox video) without a direct user gesture;
+        // safe because the webview only loads vibefeed.dk's own content.
+        config.mediaTypesRequiringUserActionForPlayback = []
         // persistent store: login/session survives app restarts
         config.websiteDataStore = .default()
 

@@ -8,6 +8,7 @@ import { renderSearch } from "./search.js";
 import { loadNotifs } from "./notifications.js";
 import { scheduleRefetch } from "./realtime.js";
 import { mapPoll, pollHTML, votePoll } from "./polls.js";
+import { openLightbox } from "./lightbox.js";
 
 export const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id), poll_options(*, poll_votes(user_id))";
 
@@ -105,11 +106,6 @@ export function setTabIcons(active){
 
 /* ================= Timeline (X-anatomi: avatar-kolonne + indholdskolonne) ================= */
 const BIGHEART = '<div class="bigheart"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>';
-const VSOUND =
-  '<span class="vsound muted" aria-hidden="true">'+
-    '<svg class="v-on" viewBox="0 0 24 24"><g class="stroke"><path d="M11 5 6.5 9H3v6h3.5L11 19V5Z"/><path d="M15.5 8.8a4.5 4.5 0 0 1 0 6.4M18 6.3a8 8 0 0 1 0 11.4"/></g></svg>'+
-    '<svg class="v-off" viewBox="0 0 24 24"><g class="stroke"><path d="M11 5 6.5 9H3v6h3.5L11 19V5Z"/><path d="m16 9.5 5 5m0-5-5 5"/></g></svg>'+
-  '</span>';
 function cntHTML(n){
   return '<span class="cnt"'+(n > 0 ? '' : ' style="display:none"')+'>'+n+'</span>';
 }
@@ -118,7 +114,7 @@ export function postHTML(p){
   if(p.video){
     media = '<div class="pmedia" data-id="'+p.id+'">'+
         '<video src="'+esc(p.video.src)+'" playsinline muted loop autoplay preload="metadata"></video>'+
-        VSOUND+BIGHEART+
+        BIGHEART+
       '</div>';
   } else if(p.img){
     media = '<div class="pmedia" data-id="'+p.id+'">'+
@@ -218,13 +214,14 @@ async function requestJoin(f){
   toast(m.indexOf("not_allowed") >= 0 ? "Du kan ikke anmode om at være med i den kreds" : GENERIC_ERR);
 }
 
-/* Bevar video-tilstand (lyd + position) hen over re-render af timeline-HTML */
+/* Bevar video-position hen over re-render af timeline-HTML
+   (feed-videoer er altid lydløse — lyd hører til i lightboxen) */
 export function snapVideos(container){
   const snap = new Map();
   container.querySelectorAll(".pmedia video").forEach(function(vid){
     const m = vid.closest(".pmedia");
     if(!m || !m.dataset.id) return;
-    snap.set(m.dataset.id, { muted: vid.muted, time: vid.currentTime });
+    snap.set(m.dataset.id, { time: vid.currentTime });
   });
   return snap;
 }
@@ -235,12 +232,6 @@ export function restoreVideos(container, snap){
     const saved = m && m.dataset.id ? snap.get(m.dataset.id) : null;
     if(!saved) return;
     try{ vid.currentTime = saved.time; }catch(_){}
-    if(saved.muted === false){
-      vid.muted = false;
-      const s = m.querySelector(".vsound");
-      if(s) s.classList.toggle("muted", false);
-      vid.play().catch(function(){});
-    }
   });
 }
 
@@ -367,13 +358,53 @@ export function feedById(id){
   for(let i = 0; i < state.feeds.length; i++) if(state.feeds[i].id === id) return state.feeds[i];
   return null;
 }
-export function renderFeedbar(){
+/* ---- Kreds-søgning i feedbaren (lup ved venstre kant) ---- */
+const kseek = { on:false, q:"" };
+export function resetFeedbarSearch(){
+  kseek.on = false;
+  kseek.q = "";
+  el("feedbar").classList.remove("searching");
+}
+const SEEK_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></g></svg>';
+const FBX_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><path d="M6 6l12 12M18 6 6 18"/></g></svg>';
+function fbPillsHTML(){
   let html = '<button class="fpill'+(state.currentFeed === "all" ? " on" : "")+'" data-feed="all">Hele kredsen</button>';
+  const q = kseek.q.trim().toLowerCase();
+  const matches = state.feeds.filter(function(f){ return f.name.toLowerCase().indexOf(q) >= 0; });
+  matches.forEach(function(f){
+    html += '<button class="fpill'+(state.currentFeed === f.id ? " on" : "")+'" data-feed="'+esc(f.id)+'">'+esc(f.name)+'</button>';
+  });
+  if(q && !matches.length) html += '<span class="fbnone">Ingen kredse matcher</span>';
+  return html;
+}
+export function renderFeedbar(){
+  const bar = el("feedbar");
+  bar.classList.toggle("searching", kseek.on);
+  if(kseek.on){
+    // Skriver brugeren i feltet (fx under en realtime-refetch), så bevar
+    // fokus/caret og opdater kun pillerne
+    const cur = el("fb-input");
+    if(cur && document.activeElement === cur){
+      el("fb-pills").innerHTML = fbPillsHTML();
+      return;
+    }
+    bar.innerHTML =
+      '<div class="fbsearch">'+SEEK_SVG+
+        '<input id="fb-input" type="text" placeholder="Søg i dine kredse ..." autocomplete="off" autocapitalize="none">'+
+        '<button class="fbx" id="fb-cancel" aria-label="Annuller søgning">'+FBX_SVG+'</button>'+
+      '</div>'+
+      '<span class="fbpills" id="fb-pills"></span>';
+    el("fb-input").value = kseek.q;
+    el("fb-pills").innerHTML = fbPillsHTML();
+    return;
+  }
+  let html = '<button class="fbseek" aria-label="Søg i dine kredse">'+SEEK_SVG+'</button>';
+  html += '<button class="fpill'+(state.currentFeed === "all" ? " on" : "")+'" data-feed="all">Hele kredsen</button>';
   state.feeds.forEach(function(f){
     html += '<button class="fpill'+(state.currentFeed === f.id ? " on" : "")+'" data-feed="'+esc(f.id)+'">'+esc(f.name)+'</button>';
   });
   html += '<button class="fpill new" data-feed="__new">+ Ny kreds</button>';
-  el("feedbar").innerHTML = html;
+  bar.innerHTML = html;
 }
 export function renderKredshead(){
   const kh = el("kredshead");
@@ -395,6 +426,7 @@ export function renderKredshead(){
 export function setFeed(id){
   state.currentFeed = id;
   expandedCmts.clear();
+  resetFeedbarSearch(); // kreds-søgningen lukkes/nulstilles ved feed-skift
   renderFeedbar();
   renderKredshead();
   el("feed").innerHTML = '<div class="emptynote" style="text-align:center">Henter …</div>';
@@ -667,6 +699,12 @@ export function sharePost(id){
 
 /* ---- Klik i timeline ---- */
 let lastTap = { id:null, t:0 };
+let tapTimer = null; // afventende enkelt-tryk (åbn lightbox efter dobbelttryk-vinduet)
+export function resetTapState(){
+  clearTimeout(tapTimer);
+  tapTimer = null;
+  lastTap = { id:null, t:0 };
+}
 function timelineClick(e){
   const tq = e.target.closest(".treq");
   if(tq){ if(!tq.disabled) requestJoin(tq.dataset.f); return; }
@@ -725,17 +763,12 @@ function timelineClick(e){
   }
   const media = e.target.closest(".pmedia");
   if(media && media.dataset.id){
-    const vid = media.querySelector("video");
-    if(vid){
-      // Tryk = slå lyd til/fra. Ved dobbelttryk slås den to gange (netto uændret) + like.
-      vid.muted = !vid.muted;
-      const s = media.querySelector(".vsound");
-      if(s) s.classList.toggle("muted", vid.muted);
-      if(vid.paused) vid.play().catch(function(){});
-    }
     const id = media.dataset.id;
     const now = Date.now();
     if(lastTap.id === id && now - lastTap.t < 320){
+      // Dobbelttryk = like — det afventende enkelt-tryk (lightbox) annulleres
+      clearTimeout(tapTimer);
+      tapTimer = null;
       setLike(id, true);
       const bh = media.querySelector(".bigheart");
       bh.classList.remove("go");
@@ -744,16 +777,45 @@ function timelineClick(e){
       lastTap = { id:null, t:0 };
     } else {
       lastTap = { id:id, t:now };
+      // Enkelt-tryk = fuldskærm — men først når dobbelttryk-vinduet er udløbet
+      const vid = media.querySelector("video");
+      const img = media.querySelector("img");
+      clearTimeout(tapTimer);
+      tapTimer = setTimeout(function(){
+        tapTimer = null;
+        if(vid) openLightbox("video", vid.currentSrc || vid.src);
+        else if(img) openLightbox("img", img.currentSrc || img.src);
+      }, 330);
     }
   }
 }
 
 export function initFeed(){
 el("feedbar").addEventListener("click", function(e){
+  if(e.target.closest(".fbseek")){
+    kseek.on = true;
+    kseek.q = "";
+    renderFeedbar();
+    const i = el("fb-input");
+    if(i) i.focus();
+    return;
+  }
+  if(e.target.closest("#fb-cancel")){
+    resetFeedbarSearch();
+    renderFeedbar();
+    return;
+  }
   const p = e.target.closest(".fpill");
   if(!p) return;
   if(p.dataset.feed === "__new"){ openFeedSheet(); return; }
-  setFeed(p.dataset.feed);
+  setFeed(p.dataset.feed); // nulstiller også søgetilstanden (alle piller tilbage)
+});
+el("feedbar").addEventListener("input", function(e){
+  if(e.target && e.target.id === "fb-input"){
+    kseek.q = e.target.value;
+    const fp = el("fb-pills");
+    if(fp) fp.innerHTML = fbPillsHTML();
+  }
 });
 el("qchip").addEventListener("click", function(){
   const n = parseInt(el("qchip-n").textContent, 10) || 0;

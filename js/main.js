@@ -7,6 +7,7 @@ import { initCompose } from "./compose.js";
 import { initSearch } from "./search.js";
 import { initProfile, closeEditSheet } from "./profile.js";
 import { initNotifs } from "./notifications.js";
+import { initLightbox } from "./lightbox.js";
 import { initRealtime } from "./realtime.js";
 import { initAuth, boot, showAuth, showRecovery, setAuthMode } from "./auth.js";
 
@@ -18,6 +19,7 @@ initCompose();
 initSearch();
 initProfile();
 initNotifs();
+initLightbox();
 initRealtime();
 initAuth();
 

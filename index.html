@@ -123,7 +123,10 @@
     <div class="fs-name">
       <input id="fs-name" placeholder="Hvad skal kredsen hedde?" maxlength="30">
     </div>
-    <div class="fs-label">Vælg venner</div>
+    <div class="fs-labelrow">
+      <div class="fs-label">Vælg venner</div>
+      <button class="fs-all" id="fs-all" type="button" style="display:none">Vælg alle</button>
+    </div>
     <div class="fs-list" id="fs-list"></div>
     <div class="fs-foot">
       <button class="fs-create" id="fs-create" disabled>Opret kreds</button>
@@ -211,6 +214,7 @@
         <div class="h" id="pv-handle"></div>
         <div class="bio" id="pv-bio" style="display:none"></div>
         <div class="since" id="pv-since"></div>
+        <button class="pv-add" id="pv-add" style="display:none">Tilføj til din kreds</button>
       </div>
       <div class="ptl">Opslag</div>
       <div id="pv-posts"></div>
@@ -370,6 +374,14 @@
   </div>
 
   <input type="file" id="cfile" accept="image/*" style="display:none">
+
+  <!-- Fuldskærms-lightbox (billede med pinch-zoom / video med lyd og controls) -->
+  <div class="lightbox" id="lightbox" role="dialog" aria-label="Medie i fuld skærm" aria-hidden="true">
+    <div class="lb-stage" id="lb-stage"></div>
+    <button class="lb-close" id="lb-close" aria-label="Luk">
+      <svg viewBox="0 0 24 24"><g class="stroke"><path d="M6 6l12 12M18 6 6 18"/></g></svg>
+    </button>
+  </div>
 
   <div class="toast" id="toast"></div>
 </div>

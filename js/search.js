@@ -2,7 +2,7 @@ import { sb, GENERIC_ERR } from "./config.js";
 import { me, state } from "./store.js";
 import { el, esc, avaHTML, user, toast, registerProfile, BADGE } from "./helpers.js";
 import { loadFriends, loadPosts } from "./feed.js";
-import { renderStories } from "./profile.js";
+import { renderStories, openProfile } from "./profile.js";
 
 /* ================= Søg ================= */
 let globalResults = [], globalQ = "", searchTimer = null;
@@ -14,15 +14,16 @@ function matchFriends(q){
 export function renderSearch(){
   const q = (el("search-input").value || "").trim().toLowerCase();
   const list = matchFriends(q);
+  /* Hele rækken kan tappes (åbner profilen) — som notifikations-rækkerne */
   let html = list.map(function(h){
-    return '<div class="listrow">'+
+    return '<div class="listrow tap" data-open="'+esc(h)+'">'+
              avaHTML(h, 44)+
              '<div class="grow"><div class="l1">'+esc(user(h).name)+' '+BADGE+'</div><div class="l2">@'+esc(h)+'</div></div>'+
            '</div>';
   }).join("");
   if(q && q === globalQ && globalResults.length){
     globalResults.forEach(function(p){
-      html += '<div class="listrow">'+
+      html += '<div class="listrow tap" data-open="'+esc(p.handle)+'">'+
                 avaHTML(p.handle, 44)+
                 '<div class="grow"><div class="l1">'+esc(p.name || p.handle)+'</div>'+
                 '<button class="addaction" data-add="'+esc(p.handle)+'">Tilføj @'+esc(p.handle)+' til din kreds</button></div>'+
@@ -51,6 +52,12 @@ async function runGlobalSearch(q){
   renderSearch();
 }
 export function resetSearch(){ globalResults = []; globalQ = ""; }
+/* Efter et ven-tilføj uden for søgevisningen (fx profilpanelets chip):
+   fjern den nye ven fra de globale resultater og gentegn listen */
+export function refreshSearchAfterFriendAdd(h){
+  globalResults = globalResults.filter(function(p){ return p.handle !== h; });
+  renderSearch();
+}
 
 export function initSearch(){
 el("search-input").addEventListener("input", function(){
@@ -63,26 +70,33 @@ el("search-input").addEventListener("input", function(){
   }
 });
 el("search-list").addEventListener("click", async function(e){
+  /* "Tilføj …"-knappen håndteres FØRST og åbner IKKE profilen */
   const a = e.target.closest(".addaction");
-  if(!a || !me) return;
-  const h = a.dataset.add;
-  a.disabled = true;
-  const { data, error } = await sb.rpc("add_friend", { friend_handle:h });
-  if(error){
-    a.disabled = false;
-    const m = String(error.message || "");
-    if(m.indexOf("not_found") >= 0) toast("Ingen bruger med det navn");
-    else if(m.indexOf("self") >= 0) toast("Det er dig selv 😄");
-    else toast(GENERIC_ERR);
+  if(a){
+    if(!me) return;
+    const h = a.dataset.add;
+    a.disabled = true;
+    const { data, error } = await sb.rpc("add_friend", { friend_handle:h });
+    if(error){
+      a.disabled = false;
+      const m = String(error.message || "");
+      if(m.indexOf("not_found") >= 0) toast("Ingen bruger med det navn");
+      else if(m.indexOf("self") >= 0) toast("Det er dig selv 😄");
+      else toast(GENERIC_ERR);
+      return;
+    }
+    if(data) registerProfile(data);
+    el("search-input").value = "";
+    globalResults = []; globalQ = "";
+    await loadFriends();
+    renderSearch();
+    renderStories();
+    loadPosts();
+    toast(user(h).name + " er nu i din kreds");
     return;
   }
-  if(data) registerProfile(data);
-  el("search-input").value = "";
-  globalResults = []; globalQ = "";
-  await loadFriends();
-  renderSearch();
-  renderStories();
-  loadPosts();
-  toast(user(h).name + " er nu i din kreds");
+  /* Tap på selve rækken: åbn profilpanelet (venner OG globale resultater) */
+  const r = e.target.closest(".listrow[data-open]");
+  if(r && me) openProfile(r.dataset.open);
 });
 }
