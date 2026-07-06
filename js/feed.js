@@ -1,0 +1,441 @@
+import { sb, GENERIC_ERR } from "./config.js";
+import { me, state, expandedCmts, pv, cstate, setCurTab, setCfilePid, ID2H, FRIEND_SINCE } from "./store.js";
+import { el, esc, avaHTML, user, likesLabel, toast, fmtTime, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
+import { threadHTML, composerHTML, rerenderPostCmts, rerenderComposer, sendComment, toggleCmtLike, cInput, cKey, clearReply, clearCImg } from "./comments.js";
+import { openFeedSheet } from "./kredse.js";
+import { openProfile, closeProfile, renderMyPosts, renderStories } from "./profile.js";
+import { renderSearch } from "./search.js";
+import { loadNotifs } from "./notifications.js";
+import { scheduleRefetch } from "./realtime.js";
+
+export const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id)";
+
+export function mapComment(c){
+  if(c.author_profile) registerProfile(c.author_profile);
+  const ls = c.comment_likes || [];
+  return {
+    id: c.id,
+    u: c.author_profile ? c.author_profile.handle : (ID2H[c.author] || "?"),
+    text: c.text || "",
+    img: c.image_path ? imgUrl(c.image_path) : null,
+    parent: c.parent_id != null ? c.parent_id : null,
+    t: fmtTime(c.created_at),
+    liked: !!(me && ls.some(function(l){ return l.user_id === me.id; })),
+    likeCount: ls.length
+  };
+}
+export function mapPost(row){
+  if(row.author_profile) registerProfile(row.author_profile);
+  const h = row.author_profile ? row.author_profile.handle : (ID2H[row.author] || "?");
+  const likes = row.likes || [];
+  const cmts = (row.comments || []).slice()
+    .sort(function(a,b){ return new Date(a.created_at) - new Date(b.created_at); })
+    .map(mapComment);
+  return {
+    id: row.id,
+    u: h,
+    created: row.created_at,
+    t: fmtTime(row.created_at),
+    ts: fmtTime(row.created_at),
+    text: row.text || undefined,
+    img: row.image_path ? { src: imgUrl(row.image_path), alt: "Billede" } : undefined,
+    liked: !!(me && likes.some(function(l){ return l.user_id === me.id; })),
+    likeCount: likes.length,
+    feed: row.feed_id || undefined,
+    cmts: cmts
+  };
+}
+
+/* ================= Ikoner (tabbar) ================= */
+const IC = {
+  homeO:'<path class="stroke" d="M3.9 10.7 12 3.6l8.1 7.1V20a1 1 0 0 1-1 1h-4.7v-6.4H9.6V21H4.9a1 1 0 0 1-1-1Z"/>',
+  homeF:'<path class="fillic" d="M3.9 10.7 12 3.6l8.1 7.1V20a1 1 0 0 1-1 1h-4.7v-6.4H9.6V21H4.9a1 1 0 0 1-1-1Z"/>',
+  searchO:'<g class="stroke"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></g>',
+  searchF:'<g class="stroke" stroke-width="2.9"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></g>',
+  heartO:'<path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
+  heartF:'<path class="fillic" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
+  userO:'<g class="stroke"><circle cx="12" cy="8" r="3.7"/><path d="M5 20c.8-3.7 3.6-5.6 7-5.6s6.2 1.9 7 5.6"/></g>',
+  userF:'<circle class="fillic" cx="12" cy="8" r="4"/><path class="fillic" d="M4.4 20.5c.8-4 3.9-6.1 7.6-6.1s6.8 2.1 7.6 6.1Z"/>'
+};
+export function setTabIcons(active){
+  el("ic-home").innerHTML   = active === "feed"   ? IC.homeF   : IC.homeO;
+  el("ic-search").innerHTML = active === "search" ? IC.searchF : IC.searchO;
+  el("ic-bell").innerHTML   = active === "akt"    ? IC.heartF  : IC.heartO;
+  el("ic-user").innerHTML   = active === "profil" ? IC.userF   : IC.userO;
+  const av = el("tab-ava"), fallbackIc = el("ic-user");
+  if(me){
+    av.style.display = "flex";
+    fallbackIc.style.display = "none";
+    av.innerHTML = avaHTML(me.handle, 18);
+    av.classList.toggle("on", active === "profil");
+  } else {
+    av.style.display = "none";
+    fallbackIc.style.display = "";
+  }
+}
+
+/* ================= Timeline ================= */
+export function postHTML(p){
+  const big = (!p.img && p.text && p.text.length <= 64) ? " big" : "";
+  const media = p.img
+    ? '<div class="pmedia" data-id="'+p.id+'">'+
+        '<img src="'+esc(p.img.src)+'" alt="'+esc(p.img.alt||"")+'" draggable="false">'+
+        '<div class="bigheart"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>'+
+      '</div>'
+    : '';
+  const likeLine = '<div class="plikes"'+(p.likeCount > 0 ? '' : ' style="display:none"')+'>'+likesLabel(p.likeCount)+'</div>';
+  const cap = (p.img && p.text) ? '<div class="pcap"><b>'+esc(p.u)+'</b> '+esc(p.text)+'</div>' : '';
+
+  return (
+    '<article class="post" data-id="'+p.id+'">'+
+      '<div class="phead">'+
+        '<button class="pavab" data-u="'+esc(p.u)+'" aria-label="Profil">'+
+          avaHTML(p.u, 32)+
+        '</button>'+
+        '<span class="nm">'+esc(user(p.u).name)+'</span>'+
+        '<span class="badge">'+BADGE+'</span>'+
+        '<span class="ptime">· '+esc(p.t)+'</span>'+
+        '<button class="dots" data-id="'+p.id+'" aria-label="Mere">'+
+          '<svg viewBox="0 0 24 24"><g class="fillic"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></g></svg>'+
+        '</button>'+
+      '</div>'+
+      (!p.img && p.text ? '<div class="ptext'+big+'">'+esc(p.text)+'</div>' : '')+
+      media+
+      '<div class="pactions">'+
+        '<button class="like-btn'+(p.liked ? " on" : "")+'" data-id="'+p.id+'" aria-pressed="'+p.liked+'" aria-label="Like">'+
+          HEART_SVG+
+        '</button>'+
+        '<button class="cmt-btn" data-id="'+p.id+'" aria-label="Kommentér">'+
+          '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>'+
+        '</button>'+
+        '<button class="share-btn" aria-label="Del">'+
+          '<svg viewBox="0 0 24 24"><path class="stroke" d="M21.5 2.5 10.8 13.2M21.5 2.5l-6.8 19-3.9-8.3-8.3-3.9Z"/></svg>'+
+        '</button>'+
+      '</div>'+
+      likeLine+
+      cap+
+      threadHTML(p)+
+      '<div class="pts">'+esc(p.t)+'</div>'+
+      composerHTML(p.id)+
+    '</article>'
+  );
+}
+
+export function renderFeed(){
+  let html = "";
+  if(state.currentFeed === "all" && me && !state.friends.length){
+    html += '<div class="emptynote" style="padding:24px 20px;text-align:center">Din kreds er tom endnu.<br>Find dine venner under Søg 🔍</div>';
+  }
+  if(state.posts.length){
+    html += state.posts.map(postHTML).join("");
+  } else if(!(state.currentFeed === "all" && me && !state.friends.length)){
+    html += '<div class="emptynote" style="padding:36px 20px;text-align:center">Ingen opslag i denne kreds endnu.<br>Vær den første ✍️</div>';
+  }
+  const f = document.activeElement && document.activeElement.closest ? document.activeElement.closest("#feed .cfield") : null;
+  const fpid = f ? f.dataset.id : null, selS = f ? f.selectionStart : 0, selE = f ? f.selectionEnd : 0;
+  el("feed").innerHTML = html;
+  if(fpid){
+    const nf = el("feed").querySelector('.cbox[data-id="'+fpid+'"] .cfield');
+    if(nf){ nf.focus(); try{ nf.setSelectionRange(selS, selE); }catch(_){} }
+  }
+}
+
+/* ================= Data-hentning ================= */
+export function postQuery(){
+  return sb.from("posts").select(POST_SELECT)
+    .order("created_at", { ascending:false })
+    .order("created_at", { ascending:true, referencedTable:"comments" })
+    .limit(100);
+}
+export async function loadPosts(){
+  if(!me) return;
+  try{
+    const reqs = [ postQuery().is("feed_id", null) ];
+    const cur = state.currentFeed;
+    if(cur !== "all") reqs.push(postQuery().eq("feed_id", cur));
+    const res = await Promise.all(reqs);
+    if(state.currentFeed !== cur) return;
+    for(const r of res){ if(r.error) throw r.error; }
+    state.wholePosts = (res[0].data || []).map(mapPost);
+    state.posts = cur === "all" ? state.wholePosts : (res[1].data || []).map(mapPost);
+    renderFeed();
+    renderStories();
+    if(el("view-profil").classList.contains("active")) renderMyPosts();
+  }catch(err){
+    console.error(err);
+    toast("Kunne ikke hente opslag. Prøv igen.");
+  }
+}
+export async function loadFriends(){
+  if(!me) return;
+  const { data, error } = await sb.from("friendships")
+    .select("created_at, friend_profile:profiles!friend_id(*)")
+    .eq("user_id", me.id);
+  if(error){ console.error(error); toast(GENERIC_ERR); return; }
+  const hs = [];
+  (data || []).forEach(function(r){
+    if(r.friend_profile){
+      registerProfile(r.friend_profile);
+      FRIEND_SINCE[r.friend_profile.handle] = new Date(r.created_at).getFullYear();
+      hs.push(r.friend_profile.handle);
+    }
+  });
+  hs.sort();
+  state.friends = hs;
+  el("stat-friends").textContent = hs.length;
+}
+export async function loadFeeds(){
+  if(!me) return;
+  const { data, error } = await sb.from("feeds").select("*, feed_members(user_id)");
+  if(error){ console.error(error); toast(GENERIC_ERR); return; }
+  const feeds = (data || []).map(function(f){
+    return { id:f.id, name:f.name, created:f.created_at, memberIds:(f.feed_members||[]).map(function(m){ return m.user_id; }) };
+  });
+  feeds.sort(function(a,b){ return new Date(a.created) - new Date(b.created); });
+  const unknown = [];
+  feeds.forEach(function(f){
+    f.memberIds.forEach(function(id){
+      if(!ID2H[id] && unknown.indexOf(id) < 0) unknown.push(id);
+    });
+  });
+  if(unknown.length){
+    const r = await sb.from("profiles").select("*").in("id", unknown);
+    if(!r.error) (r.data || []).forEach(registerProfile);
+  }
+  feeds.forEach(function(f){
+    f.members = f.memberIds.map(function(id){ return ID2H[id]; }).filter(Boolean);
+  });
+  state.feeds = feeds;
+}
+
+/* ================= Kredse (egne feeds) ================= */
+export function feedById(id){
+  for(let i = 0; i < state.feeds.length; i++) if(state.feeds[i].id === id) return state.feeds[i];
+  return null;
+}
+export function renderFeedbar(){
+  let html = '<button class="fpill'+(state.currentFeed === "all" ? " on" : "")+'" data-feed="all">Hele kredsen</button>';
+  state.feeds.forEach(function(f){
+    html += '<button class="fpill'+(state.currentFeed === f.id ? " on" : "")+'" data-feed="'+esc(f.id)+'">'+esc(f.name)+'</button>';
+  });
+  html += '<button class="fpill new" data-feed="__new">+ Ny kreds</button>';
+  el("feedbar").innerHTML = html;
+}
+export function renderKredshead(){
+  const kh = el("kredshead");
+  if(state.currentFeed === "all"){
+    kh.style.display = "none";
+    el("stories").style.display = "flex";
+    return;
+  }
+  const f = feedById(state.currentFeed);
+  if(!f){ kh.style.display = "none"; el("stories").style.display = "flex"; return; }
+  el("stories").style.display = "none";
+  const avs = f.members.map(function(m){
+    return avaHTML(m, 30, "mav");
+  }).join("");
+  kh.innerHTML = '<div class="mstack">'+avs+'</div>'+
+    '<div class="ktxt"><b>'+f.members.length+' medlemmer</b><br>Privat kreds — kun jer kan se og skrive her.</div>';
+  kh.style.display = "flex";
+}
+export function setFeed(id){
+  state.currentFeed = id;
+  expandedCmts.clear();
+  renderFeedbar();
+  renderKredshead();
+  el("feed").innerHTML = '<div class="emptynote" style="text-align:center">Henter …</div>';
+  loadPosts();
+  el("app").scrollTop = 0;
+}
+
+/* ================= Like-saldo (chip + profil, én datakilde) ================= */
+export async function fetchLikeBalance(){
+  if(!me) return null;
+  const res = await Promise.all([
+    sb.from("likes").select("*", { count:"exact", head:true }).eq("user_id", me.id),
+    sb.from("likes").select("*, posts!inner(author)", { count:"exact", head:true }).eq("posts.author", me.id)
+  ]);
+  for(const r of res){ if(r.error) throw r.error; }
+  const given = res[0].count || 0;
+  const received = res[1].count || 0;
+  return { given: given, received: received, room: Math.max(0, given + 1 - received) };
+}
+let quotaSeq = 0;
+export async function loadQuota(){
+  if(!me){ el("qchip").classList.remove("on"); return; }
+  const t = ++quotaSeq;
+  try{
+    const b = await fetchLikeBalance();
+    if(t !== quotaSeq || !me || !b) return;
+    el("qchip-n").textContent = b.room;
+    el("qchip").classList.add("on");
+    el("nik-saldo").innerHTML =
+      '<div class="nik1">Likes: givet <b>'+b.given+'</b> · modtaget <b>'+b.received+'</b> · plads til <b>'+b.room+'</b></div>'+
+      '<div class="nik2">Du kan modtage ét like mere, end du selv har givet.</div>';
+  }catch(err){
+    console.error(err);
+  }
+}
+
+/* ================= Tabs ================= */
+export function switchTab(name){
+  setCurTab(name);
+  document.querySelectorAll(".view").forEach(function(v){ v.classList.remove("active"); });
+  el("view-"+name).classList.add("active");
+  document.querySelectorAll(".tabbar [data-view]").forEach(function(b){
+    b.classList.toggle("active", b.dataset.view === name);
+  });
+  setTabIcons(name);
+  if(name === "search") renderSearch();
+  if(name === "akt") loadNotifs();
+  if(name === "profil") renderMyPosts();
+  el("app").scrollTop = 0;
+}
+
+/* ================= Likes ================= */
+export function allPostArrays(){ return [state.posts, state.wholePosts, pv.posts]; }
+export function findPost(id){
+  id = Number(id);
+  const arrs = allPostArrays();
+  for(let a = 0; a < arrs.length; a++){
+    for(let i = 0; i < arrs[a].length; i++){
+      if(Number(arrs[a][i].id) === id) return arrs[a][i];
+    }
+  }
+  return null;
+}
+export function findPostAll(id){
+  id = Number(id);
+  const out = [];
+  allPostArrays().forEach(function(arr){
+    arr.forEach(function(p){
+      if(Number(p.id) === id && out.indexOf(p) < 0) out.push(p);
+    });
+  });
+  return out;
+}
+export function applyLikeUI(id, on){
+  const p = findPost(id);
+  document.querySelectorAll('.post[data-id="'+id+'"]').forEach(function(node){
+    const btn = node.querySelector(".like-btn");
+    if(btn){ btn.classList.toggle("on", on); btn.setAttribute("aria-pressed", on); }
+    if(p){
+      const lc = node.querySelector(".plikes");
+      if(lc){
+        lc.textContent = likesLabel(p.likeCount);
+        lc.style.display = p.likeCount > 0 ? "" : "none";
+      }
+    }
+  });
+}
+export async function setLike(id, force){
+  if(!me) return;
+  const objs = findPostAll(id);
+  if(!objs.length) return;
+  const cur = objs[0].liked;
+  const on = (force === undefined) ? !cur : !!force;
+  if(on === cur) return;
+  objs.forEach(function(p){ p.liked = on; p.likeCount = Math.max(0, (p.likeCount||0) + (on ? 1 : -1)); });
+  applyLikeUI(id, on);
+  let error = null;
+  if(on){
+    const r = await sb.from("likes").insert({ post_id:Number(id), user_id:me.id });
+    error = (r.error && r.error.code !== "23505") ? r.error : null;
+  } else {
+    const r = await sb.from("likes").delete().eq("post_id", Number(id)).eq("user_id", me.id);
+    error = r.error;
+  }
+  if(error){
+    console.error(error);
+    objs.forEach(function(p){ p.liked = cur; p.likeCount = Math.max(0, p.likeCount + (on ? -1 : 1)); });
+    applyLikeUI(id, cur);
+    if(on && String(error.message || "").indexOf("like_quota") >= 0){
+      const fname = (user(objs[0].u).name || objs[0].u).trim().split(/\s+/)[0];
+      toast(fname + " kan ikke modtage flere likes lige nu — de skal selv give likes for at få plads 😉");
+    } else {
+      toast(GENERIC_ERR);
+    }
+  }
+  loadQuota();
+}
+
+/* ---- Klik i timeline ---- */
+let lastTap = { id:null, t:0 };
+function timelineClick(e){
+  const like = e.target.closest(".like-btn");
+  if(like){ setLike(like.dataset.id); return; }
+  const lk = e.target.closest(".likec");
+  if(lk){ toggleCmtLike(lk.dataset.cid); return; }
+  const sv = e.target.closest(".csvar");
+  if(sv){
+    const node = sv.closest(".post");
+    if(!node) return;
+    const pid = node.dataset.id;
+    cstate(pid).replyTo = { id:Number(sv.dataset.cid), u:sv.dataset.u };
+    rerenderComposer(pid);
+    const f = node.querySelector(".cfield");
+    if(f) f.focus();
+    return;
+  }
+  const cx = e.target.closest(".cchip-x");
+  if(cx){ clearReply(cx.dataset.id); return; }
+  const px = e.target.closest(".cprev-x");
+  if(px){ clearCImg(px.dataset.id); return; }
+  const ib = e.target.closest(".cimgb");
+  if(ib){ setCfilePid(Number(ib.dataset.id)); el("cfile").click(); return; }
+  const sd = e.target.closest(".csend");
+  if(sd){ sendComment(sd.dataset.id); return; }
+  const more = e.target.closest(".cmore");
+  if(more){ expandedCmts.add(Number(more.dataset.id)); rerenderPostCmts(more.dataset.id); return; }
+  const cmt = e.target.closest(".cmt-btn");
+  if(cmt){
+    const node = cmt.closest(".post");
+    const f = node && node.querySelector(".cfield");
+    if(f) f.focus();
+    return;
+  }
+  const sh = e.target.closest(".share-btn");
+  if(sh){ toast("Bliver i kredsen — ingen deling udenfor"); return; }
+  const d = e.target.closest(".dots");
+  if(d){ toast("Intet skjult her — feedet er altid kronologisk"); return; }
+  const pr = e.target.closest(".pavab");
+  if(pr && pr.dataset.u){
+    if(me && pr.dataset.u === me.handle){ closeProfile(); switchTab("profil"); }
+    else openProfile(pr.dataset.u);
+    return;
+  }
+  const media = e.target.closest(".pmedia");
+  if(media){
+    const id = media.dataset.id;
+    const now = Date.now();
+    if(lastTap.id === id && now - lastTap.t < 320){
+      setLike(id, true);
+      const bh = media.querySelector(".bigheart");
+      bh.classList.remove("go");
+      void bh.offsetWidth;
+      bh.classList.add("go");
+      lastTap = { id:null, t:0 };
+    } else {
+      lastTap = { id:id, t:now };
+    }
+  }
+}
+
+export function initFeed(){
+el("feedbar").addEventListener("click", function(e){
+  const p = e.target.closest(".fpill");
+  if(!p) return;
+  if(p.dataset.feed === "__new"){ openFeedSheet(); return; }
+  setFeed(p.dataset.feed);
+});
+el("qchip").addEventListener("click", function(){
+  const n = parseInt(el("qchip-n").textContent, 10) || 0;
+  toast("Du kan modtage "+likesLabel(n)+" mere. Giv likes til andre for at få plads til flere.");
+});
+["feed","myposts","pv-posts"].forEach(function(id){
+  el(id).addEventListener("click", timelineClick);
+  el(id).addEventListener("input", cInput);
+  el(id).addEventListener("keydown", cKey);
+  el(id).addEventListener("focusout", function(e){ if(e.target.closest(".cfield") && me) scheduleRefetch(); });
+});
+}
