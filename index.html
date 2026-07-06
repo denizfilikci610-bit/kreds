@@ -58,6 +58,15 @@
   .stroke{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
   .fillic{fill:currentColor;stroke:none}
 
+  /* ================= Avatar (fælles helper) ================= */
+  .av{
+    display:inline-flex;align-items:center;justify-content:center;
+    border-radius:50%;overflow:hidden;
+    object-fit:cover;
+    color:#fff;font-weight:700;line-height:1;
+    flex:0 0 auto;
+  }
+
   /* ================= App-ramme ================= */
   .phone{
     position:relative;
@@ -93,6 +102,18 @@
   .wordmark .prik{color:var(--red)}
   .nosparkle{padding:6px 2px;color:var(--ink)}
   .nosparkle svg{width:23px;height:23px;display:block}
+  .tright{display:flex;align-items:center;gap:10px}
+  .qchip{
+    display:none;align-items:center;gap:5px;
+    background:var(--chip);
+    border-radius:999px;
+    padding:5px 10px;
+    font-size:12px;font-weight:700;color:var(--ink);
+  }
+  .qchip.on{display:flex}
+  .qchip svg{width:13px;height:13px;display:block}
+  .qchip svg path{fill:var(--red);stroke:none}
+  .qchip:active{opacity:.65}
 
   /* ================= Stories ================= */
   .stories{
@@ -104,18 +125,10 @@
   }
   .stories::-webkit-scrollbar{display:none}
   .story{flex:0 0 auto;width:66px;text-align:center}
-  .story .ring{
+  .story .bub{
     width:62px;height:62px;margin:0 auto;border-radius:50%;
-    padding:2.5px;
-    background:linear-gradient(45deg,#FF9A3E,#E0402F,#B8288F);
-  }
-  .story .ring.seen{background:var(--line2)}
-  .story .ring.none{background:var(--line)}
-  .story .ava{
-    width:100%;height:100%;border-radius:50%;
-    border:2.5px solid var(--bg);
+    border:1px solid var(--line);
     display:flex;align-items:center;justify-content:center;
-    color:#fff;font-weight:700;font-size:19px;
   }
   .story .lbl{
     display:block;
@@ -161,12 +174,7 @@
     border-bottom:1px solid var(--line);
   }
   .mstack{display:flex}
-  .mav{
-    width:30px;height:30px;border-radius:50%;
-    border:2px solid var(--bg);
-    display:flex;align-items:center;justify-content:center;
-    color:#fff;font-weight:700;font-size:11px;
-  }
+  .mav{border:2px solid var(--bg)}
   .mav+.mav{margin-left:-9px}
   .kredshead .ktxt{font-size:13px;color:var(--gray);line-height:1.35}
   .kredshead .ktxt b{color:var(--ink);font-weight:700;font-size:13.5px}
@@ -181,21 +189,7 @@
     border-bottom:1px solid var(--line);
   }
   .phead{display:flex;align-items:center;gap:9px;padding:9px 12px;min-width:0}
-  .pring{
-    flex:0 0 auto;
-    width:38px;height:38px;
-    border-radius:50%;padding:2px;
-    background:linear-gradient(45deg,#FF9A3E,#E0402F,#B8288F);
-  }
-  .pring.seen{background:var(--line2)}
-  .pring.none{background:transparent;padding:0;width:32px;height:32px}
-  .pava{
-    width:100%;height:100%;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    color:#fff;font-weight:700;font-size:12px;
-    border:2px solid var(--bg);
-  }
-  .pring.none .pava{border:none}
+  .pavab{flex:0 0 auto;display:flex;padding:0}
   .phead .nm{font-weight:700;font-size:14px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   .phead .badge{flex:0 0 auto;display:flex}
   .phead .badge svg{width:14px;height:14px}
@@ -247,8 +241,49 @@
   .plikes{padding:7px 12px 0;font-size:14px;font-weight:700;color:var(--ink)}
   .pcap{padding:4px 12px 0;font-size:14px;color:var(--ink);white-space:pre-wrap;overflow-wrap:break-word}
   .pcap b{font-weight:700}
-  .pcmts{display:block;padding:4px 12px 0;font-size:14px;color:var(--gray);text-align:left}
   .pts{padding:5px 12px 0;font-size:11px;color:var(--gray)}
+
+  /* ---------- Kommentartråd (inline, Reddit-stil) ---------- */
+  .cthread{padding:2px 12px 0}
+  .crow{display:flex;gap:9px;padding:6px 0;align-items:flex-start}
+  .crow.cnest{border-left:1px solid var(--line);padding-left:10px}
+  .crow .cbody{flex:1;min-width:0}
+  .crow .ctext{font-size:14px;color:var(--ink);overflow-wrap:break-word}
+  .crow .ctext b{font-weight:700;font-size:13px;margin-right:5px}
+  .crow .ctext .cat{color:var(--red);font-weight:600}
+  .cimg{display:block;margin-top:5px;max-height:180px;max-width:70%;border-radius:8px;object-fit:cover}
+  .cmeta{display:flex;align-items:center;gap:12px;margin-top:3px;font-size:12px;color:var(--gray)}
+  .cmeta .csvar{font-size:12px;font-weight:700;color:var(--gray);padding:0}
+  .cmeta .likec{margin-left:auto;padding:2px;color:var(--gray)}
+  .likec svg{width:14px;height:14px;display:block}
+  .likec.on{color:var(--red)}
+  .likec.on svg path{fill:var(--red);stroke:var(--red)}
+  .cmore{display:block;font-size:13px;font-weight:600;color:var(--gray);padding:8px 0 2px;text-align:left}
+  .cbox{padding:8px 12px 0}
+  .cchiprow{padding:0 0 6px}
+  .cchip{
+    display:inline-flex;align-items:center;gap:7px;
+    background:var(--chip);border-radius:999px;
+    padding:4px 10px;font-size:12px;font-weight:600;color:var(--ink);
+  }
+  .cchip .cchip-x{padding:0 2px;color:var(--gray);font-size:13px;line-height:1}
+  .cprevrow{padding:2px 0 8px}
+  .cprev{position:relative;display:inline-block}
+  .cprev img{display:block;width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+  .cprev .cprev-x{
+    position:absolute;top:-6px;right:-6px;
+    width:18px;height:18px;border-radius:50%;
+    background:var(--toastbg);color:var(--toastink);
+    font-size:11px;line-height:1;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .ccomposer{display:flex;align-items:center;gap:9px}
+  .ccomposer .cfield{flex:1;min-width:0;border:none;background:transparent;font-size:14px;padding:4px 0}
+  .ccomposer .cfield:focus{outline:none}
+  .ccomposer .cimgb{color:var(--gray);display:flex;padding:2px}
+  .ccomposer .cimgb svg{width:20px;height:20px}
+  .ccomposer .csend{color:var(--red);font-weight:800;font-size:14px}
+  .ccomposer .csend:disabled{opacity:.35;cursor:default}
 
   /* ---------- Du er helt opdateret ---------- */
   .caughtup{
@@ -287,11 +322,6 @@
   .searchbox input{flex:1;min-width:0;border:none;background:transparent;font-size:15px}
   .searchbox input:focus{outline:none}
   .listrow{display:flex;align-items:center;gap:12px;padding:11px 16px}
-  .ava44{
-    width:44px;height:44px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    color:#fff;font-weight:700;font-size:16px;flex:0 0 auto;
-  }
   .listrow .grow{flex:1;min-width:0;line-height:1.3}
   .listrow .l1{font-weight:700;font-size:14.5px;color:var(--ink);display:flex;align-items:center;gap:4px}
   .listrow .l1 svg{width:14px;height:14px}
@@ -305,12 +335,6 @@
   .notif{
     display:flex;align-items:center;gap:12px;
     padding:11px 16px;
-  }
-  .ava32{
-    width:32px;height:32px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    color:#fff;font-weight:700;font-size:12px;
-    flex:0 0 auto;
   }
   .notif .grow{flex:1;min-width:0}
   .notif .ntext{font-size:14px;color:var(--ink);line-height:1.4}
@@ -326,12 +350,6 @@
 
   /* ================= Profil ================= */
   .phead-own{display:flex;align-items:center;gap:24px;padding:16px 16px 10px}
-  .ava86{
-    width:86px;height:86px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    color:#fff;font-weight:800;font-size:30px;
-    flex:0 0 auto;
-  }
   .pstats{display:flex;flex:1;justify-content:space-around;text-align:center}
   .pstats .stat b{display:block;font-size:18px;font-weight:800;color:var(--ink);line-height:1.2}
   .pstats .stat span{font-size:13px;color:var(--gray)}
@@ -379,7 +397,7 @@
   .tabava{
     width:18px;height:18px;border-radius:50%;
     display:flex;align-items:center;justify-content:center;
-    color:#fff;font-weight:700;font-size:8px;line-height:1;
+    overflow:hidden;
   }
   .tabava.on{box-shadow:0 0 0 2px var(--ink)}
 
@@ -392,49 +410,12 @@
   }
   .scrim.on{opacity:1;pointer-events:auto}
 
-  /* ---- Kommentarer ---- */
-  .cmtsheet{
-    position:absolute;left:0;right:0;bottom:0;z-index:85;
-    height:74%;
-    background:var(--surface);
-    border:1px solid var(--line);
-    border-bottom:none;
-    border-radius:16px 16px 0 0;
-    transform:translateY(105%);
-    transition:transform .28s cubic-bezier(.32,.72,.25,1);
-    display:flex;flex-direction:column;
-  }
-  .cmtsheet.on{transform:translateY(0)}
+  /* ---- Sheet-fælles ---- */
   .cmt-grab{width:38px;height:4px;border-radius:2px;background:var(--line2);margin:8px auto 6px}
   .cmt-title{
     text-align:center;font-weight:700;font-size:15px;color:var(--ink);
     padding-bottom:10px;border-bottom:1px solid var(--line);
   }
-  .cmt-list{flex:1;overflow-y:auto;padding:4px 0}
-  .cmt-row{display:flex;gap:11px;padding:11px 16px;align-items:flex-start}
-  .ava34{
-    width:34px;height:34px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    color:#fff;font-weight:700;font-size:13px;flex:0 0 auto;
-  }
-  .cmt-row .body{flex:1;min-width:0;font-size:14px;line-height:1.4;color:var(--ink)}
-  .cmt-row .body b{font-weight:700}
-  .cmt-row .body .t{color:var(--gray);font-weight:400;font-size:13px;margin-left:5px}
-  .cmt-row .body .txt{margin-top:1px}
-  .cmt-row .likec{padding:6px 2px;color:var(--gray)}
-  .cmt-row .likec svg{width:14px;height:14px}
-  .cmt-row .likec.on{color:var(--red)}
-  .cmt-row .likec.on svg path{fill:var(--red);stroke:var(--red)}
-  .cmt-cap{border-bottom:1px solid var(--line);margin-bottom:2px}
-  .cmt-input{
-    display:flex;align-items:center;gap:10px;
-    padding:10px 14px calc(12px + env(safe-area-inset-bottom));
-    border-top:1px solid var(--line);
-  }
-  .cmt-input input{flex:1;min-width:0;border:none;font-size:14.5px;background:transparent}
-  .cmt-input input:focus{outline:none}
-  .cmt-post{color:var(--red);font-weight:800;font-size:14px}
-  .cmt-post:disabled{opacity:.35;cursor:default}
 
   /* ---- Ny kreds / Rediger profil (sheets) ---- */
   .fsheet{
@@ -562,6 +543,14 @@
   }
   .charring.warn .left{opacity:1}
 
+  /* ---- Rediger profil: avatar + slet konto ---- */
+  .ep-avarow{display:flex;align-items:center;gap:14px;padding:12px 16px 0}
+  .ep-avarow .pic{font-size:14px;font-weight:700;color:var(--red);text-align:left;padding:4px 0}
+  .delzone{border-top:1px solid var(--line);margin-top:14px;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+  .del-open{color:var(--red);font-size:14px;font-weight:700;text-align:left;padding:0}
+  .del-warn{font-size:13.5px;color:var(--ink);line-height:1.45}
+  .del-cancel{display:block;width:100%;text-align:center;color:var(--gray);font-weight:700;font-size:14px;margin-top:10px;padding:8px 0}
+
   /* ---- Ven-profil ---- */
   .profileview{
     position:absolute;inset:0;z-index:70;
@@ -584,79 +573,6 @@
   .pv-head .t1{font-size:16px;font-weight:700;color:var(--ink);line-height:1.15}
   .pv-head .t2{font-size:12.5px;color:var(--gray)}
   .pv-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
-  .pv-ava{
-    width:86px;height:86px;border-radius:50%;
-    padding:3px;
-    background:linear-gradient(45deg,#FF9A3E,#E0402F,#B8288F);
-    flex:0 0 auto;
-  }
-  .pv-ava.seen{background:var(--line2)}
-  .pv-ava .in{
-    width:100%;height:100%;border-radius:50%;
-    border:3px solid var(--bg);
-    display:flex;align-items:center;justify-content:center;
-    color:#fff;font-weight:800;font-size:26px;
-  }
-  .storybtn{
-    display:flex;align-items:center;justify-content:center;gap:7px;
-    margin:0 16px 14px;
-    width:calc(100% - 32px);
-    background:var(--chip);
-    border-radius:8px;
-    padding:8px 0;
-    font-weight:700;font-size:14px;
-    color:var(--ink);
-  }
-  .storybtn:active{opacity:.7}
-  .storybtn svg{width:14px;height:14px}
-
-  /* ---- Historier ---- */
-  .storyview{position:absolute;inset:0;z-index:100;background:#000;display:none}
-  .storyview.on{display:block}
-  .story-media{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
-  .story-media img{width:100%;height:100%;object-fit:cover}
-  .story-textslide{
-    width:100%;height:100%;
-    display:flex;align-items:center;justify-content:center;
-    padding:44px 34px;text-align:center;
-  }
-  .story-textslide span{color:#fff;font-size:26px;font-weight:700;line-height:1.4;text-shadow:0 1px 4px rgba(0,0,0,.25);white-space:pre-wrap}
-  .story-top{
-    position:absolute;top:0;left:0;right:0;z-index:5;
-    padding:calc(14px + env(safe-area-inset-top)) 12px 0;
-    background:linear-gradient(rgba(0,0,0,.55),transparent);
-  }
-  .bars{display:flex;gap:4px}
-  .bars .bar{flex:1;height:2.5px;border-radius:2px;background:rgba(255,255,255,.35);overflow:hidden}
-  .bars .bar i{display:block;height:100%;width:0;background:#fff}
-  .story-user{display:flex;align-items:center;gap:10px;margin-top:12px;padding-bottom:14px}
-  .story-user .ava34{border:none}
-  .story-user .n{color:#fff;font-weight:700;font-size:14px}
-  .story-user .t{color:rgba(255,255,255,.75);font-size:13px;margin-left:2px}
-  .story-user .x{margin-left:auto;color:#fff;padding:4px}
-  .story-user .x svg{width:24px;height:24px}
-  .story-bottom{
-    position:absolute;left:0;right:0;bottom:0;z-index:5;
-    display:flex;align-items:center;gap:14px;
-    padding:14px 14px calc(18px + env(safe-area-inset-bottom));
-    background:linear-gradient(transparent,rgba(0,0,0,.5));
-  }
-  .story-msg{
-    flex:1;
-    border:1px solid rgba(255,255,255,.4);
-    border-radius:999px;
-    padding:11px 16px;
-    color:#fff;font-size:14px;
-    background:rgba(255,255,255,.16);
-  }
-  .story-msg::placeholder{color:rgba(255,255,255,.8)}
-  .story-bottom button{color:#fff}
-  .story-bottom svg{width:25px;height:25px}
-  .story-bottom .sheart.on{color:var(--red)}
-  .story-bottom .sheart.on svg path{fill:var(--red);stroke:var(--red)}
-  .tapzone{position:absolute;top:84px;bottom:90px;z-index:4}
-  .tapzone.l{left:0;width:32%}
-  .tapzone.r{right:0;width:68%}
 
   /* ---- Toast ---- */
   .toast{
@@ -711,10 +627,9 @@
   .auth-err.ok{color:var(--gray)}
 
   @media(prefers-reduced-motion:reduce){
-    .cmtsheet,.compose,.scrim,.toast{transition:none}
+    .fsheet,.compose,.profileview,.scrim,.toast{transition:none}
     .bigheart.go svg,.like-btn.on svg{animation:none}
     .bigheart.go svg{opacity:0}
-    .bars .bar i{transition:none !important}
   }
 </style>
 </head>
@@ -726,9 +641,15 @@
     <!-- Topbar -->
     <header class="topbar">
       <div class="wordmark">VibeFeed<span class="prik">.</span></div>
-      <button class="nosparkle" id="nosparkle" aria-label="Feed-indstillinger" title="Altid kronologisk">
-        <svg viewBox="0 0 24 24"><g class="stroke"><path d="M12 3.5 13.8 8.2 18.5 10 13.8 11.8 12 16.5 10.2 11.8 5.5 10 10.2 8.2Z"/><path d="M18.5 15.5 19.3 17.7 21.5 18.5 19.3 19.3 18.5 21.5 17.7 19.3 15.5 18.5 17.7 17.7Z"/><path d="M3.5 3.5 20.5 20.5" stroke-width="2.2"/></g></svg>
-      </button>
+      <div class="tright">
+        <button class="qchip" id="qchip" aria-label="Likes du kan modtage">
+          <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <span id="qchip-n">0</span>
+        </button>
+        <button class="nosparkle" id="nosparkle" aria-label="Feed-indstillinger" title="Altid kronologisk">
+          <svg viewBox="0 0 24 24"><g class="stroke"><path d="M12 3.5 13.8 8.2 18.5 10 13.8 11.8 12 16.5 10.2 11.8 5.5 10 10.2 8.2Z"/><path d="M18.5 15.5 19.3 17.7 21.5 18.5 19.3 19.3 18.5 21.5 17.7 19.3 15.5 18.5 17.7 17.7Z"/><path d="M3.5 3.5 20.5 20.5" stroke-width="2.2"/></g></svg>
+        </button>
+      </div>
     </header>
 
     <!-- HJEM -->
@@ -767,7 +688,7 @@
     <!-- PROFIL -->
     <section class="view" id="view-profil">
       <div class="phead-own">
-        <div class="ava86" id="own-ava" style="background:linear-gradient(140deg,#FF6A4D,#E0402F)"></div>
+        <div id="own-ava" style="display:flex;flex:0 0 auto"></div>
         <div class="pstats">
           <div class="stat"><b id="stat-posts">0</b><span>Opslag</span></div>
           <div class="stat"><b id="stat-friends">0</b><span>Venner</span></div>
@@ -811,18 +732,7 @@
     </nav>
   </div>
 
-  <!-- Kommentarer -->
   <div class="scrim" id="scrim"></div>
-  <div class="cmtsheet" id="cmtsheet" role="dialog" aria-label="Svar">
-    <div class="cmt-grab"></div>
-    <div class="cmt-title">Svar</div>
-    <div class="cmt-list" id="cmt-list"></div>
-    <div class="cmt-input">
-      <div class="ava34" id="cmt-me-ava"></div>
-      <input id="cmt-field" placeholder="Skriv dit svar ..." maxlength="280">
-      <button class="cmt-post" id="cmt-send" disabled>Svar</button>
-    </div>
-  </div>
 
   <!-- Ny kreds -->
   <div class="fsheet" id="fsheet" role="dialog" aria-label="Ny kreds">
@@ -847,7 +757,7 @@
     </div>
     <div class="compose-dest" id="compose-dest"></div>
     <div class="compose-body">
-      <div class="ava44" id="compose-me-ava"></div>
+      <div id="compose-me-ava" style="display:flex;flex:0 0 auto;align-self:flex-start"></div>
       <div class="col">
         <label for="compose-field" style="position:absolute;left:-9999px">Skriv et opslag</label>
         <textarea id="compose-field" placeholder="Hvad sker der?" maxlength="280"></textarea>
@@ -888,7 +798,7 @@
     </div>
     <div class="pv-body" id="pv-body">
       <div class="phead-own">
-        <button class="pv-ava" id="pv-ava-ring" aria-label="Se historie"><span class="in" id="pv-ava"></span></button>
+        <span id="pv-ava" style="display:flex;flex:0 0 auto"></span>
         <div class="pstats">
           <div class="stat"><b id="pv-stat-posts">0</b><span>Opslag</span></div>
         </div>
@@ -900,40 +810,9 @@
         <div class="h" id="pv-handle"></div>
         <div class="since" id="pv-since"></div>
       </div>
-      <button class="storybtn" id="pv-story">
-        <svg viewBox="0 0 24 24"><path class="fillic" d="M8 5.2v13.6L19 12Z"/></svg>
-        Se historie
-      </button>
       <div class="ptl">Opslag</div>
       <div id="pv-posts"></div>
       <div style="height:40px"></div>
-    </div>
-  </div>
-
-  <!-- Historie-viewer -->
-  <div class="storyview" id="storyview">
-    <div class="story-media" id="story-media"></div>
-    <div class="tapzone l" id="tap-l"></div>
-    <div class="tapzone r" id="tap-r"></div>
-    <div class="story-top">
-      <div class="bars" id="story-bars"></div>
-      <div class="story-user">
-        <div class="ava34" id="story-ava"></div>
-        <span class="n" id="story-name"></span>
-        <span class="t" id="story-time"></span>
-        <button class="x" id="story-close" aria-label="Luk">
-          <svg viewBox="0 0 24 24"><g class="stroke"><path d="M5.5 5.5l13 13M18.5 5.5l-13 13"/></g></svg>
-        </button>
-      </div>
-    </div>
-    <div class="story-bottom">
-      <input class="story-msg" placeholder="Svar direkte" readonly>
-      <button class="sheart" id="story-heart" aria-label="Nik">
-        <svg viewBox="0 0 24 24"><path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-      </button>
-      <button aria-label="Del">
-        <svg viewBox="0 0 24 24"><path class="stroke" d="M21.5 2.5 10.8 13.2M21.5 2.5l-6.8 19-3.9-8.3-8.3-3.9Z"/></svg>
-      </button>
     </div>
   </div>
 
@@ -941,13 +820,31 @@
   <div class="fsheet" id="esheet" role="dialog" aria-label="Rediger profil">
     <div class="cmt-grab"></div>
     <div class="cmt-title">Rediger profil</div>
-    <div class="fs-label">Dit navn</div>
-    <div class="fs-name">
-      <input id="ep-name" placeholder="Dit navn" maxlength="40">
+    <div style="flex:1;overflow-y:auto;min-height:0">
+      <div class="ep-avarow">
+        <span id="ep-ava" style="display:flex;flex:0 0 auto"></span>
+        <button class="pic" id="ep-pic">Skift profilbillede</button>
+      </div>
+      <div class="fs-label">Dit navn</div>
+      <div class="fs-name">
+        <input id="ep-name" placeholder="Dit navn" maxlength="40">
+      </div>
+      <div class="fs-foot" style="padding-bottom:4px">
+        <button class="fs-create" id="ep-save" disabled>Gem</button>
+      </div>
+      <div class="delzone">
+        <button class="del-open" id="del-open">Slet konto</button>
+        <div id="del-confirm" style="display:none">
+          <p class="del-warn">Dette sletter din profil, dine opslag, kommentarer og billeder permanent. Det kan ikke fortrydes. Skriv SLET for at bekræfte.</p>
+          <div class="fs-name" style="margin:10px 0 12px">
+            <input id="del-input" placeholder="SLET" autocomplete="off" autocapitalize="characters">
+          </div>
+          <button class="fs-create" id="del-btn" disabled>Slet min konto permanent</button>
+          <button class="del-cancel" id="del-cancel">Annuller</button>
+        </div>
+      </div>
     </div>
-    <div class="fs-foot">
-      <button class="fs-create" id="ep-save" disabled>Gem</button>
-    </div>
+    <input type="file" id="ep-file" accept="image/*" style="display:none">
   </div>
 
   <!-- Auth -->
@@ -994,6 +891,8 @@
     </div>
   </div>
 
+  <input type="file" id="cfile" accept="image/*" style="display:none">
+
   <div class="toast" id="toast"></div>
 </div>
 
@@ -1032,12 +931,6 @@ function esc(s){
 function el(id){ return document.getElementById(id); }
 
 const FALLBACK = [["#5C7CF0","#8E5CF0"],["#F05C9E","#F08E5C"],["#2EB2A4","#5CCB7A"],["#E0708F","#B84DD6"]];
-const TXT_GRADS = [
-  ["#E0402F","#B8288F","#5C2FBF"],
-  ["#F09A3E","#E0402F","#B8288F"],
-  ["#2E9BF0","#7A5CF0","#B84DD6"],
-  ["#2EB273","#2E9BF0","#5C2FBF"]
-];
 
 let me = null;            // own profile row from DB
 const USERS = {};         // handle -> { name, g:[c1,c2], since, id }
@@ -1049,19 +942,19 @@ const state = {
   posts: [],              // posts in current view (view-model shape)
   wholePosts: [],         // whole-kreds posts (feed_id null)
   feeds: [],              // { id, name, memberIds:[uuid], members:[handle] }
-  currentFeed: "all",
-  seen: {}
+  currentFeed: "all"
 };
 
-function seenKey(){ return "kreds_seen_v1:" + (me ? me.id : ""); }
-function loadSeen(){
-  if(!me){ state.seen = {}; return; }
-  try{ state.seen = JSON.parse(localStorage.getItem(seenKey()) || "{}") || {}; }
-  catch(e){ state.seen = {}; }
+const expandedCmts = new Set();   // post ids med fuldt udfoldet kommentartråd
+const composers = new Map();      // post id -> { text, replyTo:{id,u}|null, img:{blob,url}|null }
+function cstate(pid){
+  pid = Number(pid);
+  if(!composers.has(pid)) composers.set(pid, { text:"", replyTo:null, img:null });
+  return composers.get(pid);
 }
-function saveSeen(){
-  if(!me) return;
-  try{ localStorage.setItem(seenKey(), JSON.stringify(state.seen)); }catch(e){}
+function clearComposers(){
+  composers.forEach(function(s){ if(s.img && s.img.url) URL.revokeObjectURL(s.img.url); });
+  composers.clear();
 }
 
 function fallbackGrad(h){
@@ -1073,11 +966,13 @@ function registerProfile(p){
   if(!p || !p.handle) return;
   let g = [p.color1, p.color2];
   if(!g[0] || !g[1]) g = fallbackGrad(p.handle);
+  const prev = USERS[p.handle];
   USERS[p.handle] = {
     name: p.name || p.handle,
     g: g,
     since: p.created_at ? new Date(p.created_at).getFullYear() : "",
-    id: p.id
+    id: p.id,
+    avatar_path: p.avatar_path !== undefined ? p.avatar_path : (prev ? prev.avatar_path : null)
   };
   if(p.id) ID2H[p.id] = p.handle;
 }
@@ -1091,10 +986,17 @@ function ini(h){
   const a = (n[0] && n[0][0]) || (h && h[0]) || "?";
   return (a + (n[1] ? n[1][0] : "")).toUpperCase().replace(/[^\p{L}\p{M}\p{N}]/gu, "") || "?";
 }
-function tgrad(id){
-  const g = TXT_GRADS[Math.abs(Number(id) || 0) % TXT_GRADS.length];
-  return "linear-gradient(135deg,"+g[0]+","+g[1]+","+g[2]+")";
+function avaHTML(h, size, cls){
+  const u = user(h);
+  const c = "av" + (cls ? " " + cls : "");
+  const style = "width:" + size + "px;height:" + size + "px;";
+  if(u.avatar_path){
+    return '<img class="'+c+'" src="'+esc(imgUrl(u.avatar_path))+'" alt="" style="'+style+'">';
+  }
+  const fs = Math.max(8, Math.round(size * 0.38));
+  return '<span class="'+c+'" style="'+style+'font-size:'+fs+'px;background:'+grad(h)+'">'+ini(h)+'</span>';
 }
+function likesLabel(n){ return n + (n === 1 ? " like" : " likes"); }
 
 const MONTHS = ["januar","februar","marts","april","maj","juni","juli","august","september","oktober","november","december"];
 function fmtTime(iso){
@@ -1117,17 +1019,20 @@ function uuid(){
   });
 }
 
-const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*)), likes(user_id)";
+const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id)";
 
 function mapComment(c){
   if(c.author_profile) registerProfile(c.author_profile);
+  const ls = c.comment_likes || [];
   return {
     id: c.id,
     u: c.author_profile ? c.author_profile.handle : (ID2H[c.author] || "?"),
-    text: c.text,
+    text: c.text || "",
+    img: c.image_path ? imgUrl(c.image_path) : null,
+    parent: c.parent_id != null ? c.parent_id : null,
     t: fmtTime(c.created_at),
-    liked: false,
-    likeCount: 0
+    liked: !!(me && ls.some(function(l){ return l.user_id === me.id; })),
+    likeCount: ls.length
   };
 }
 function mapPost(row){
@@ -1183,8 +1088,7 @@ function setTabIcons(active){
   if(me){
     av.style.display = "flex";
     fallbackIc.style.display = "none";
-    av.style.background = grad(me.handle);
-    av.textContent = ini(me.handle);
+    av.innerHTML = avaHTML(me.handle, 18);
     av.classList.toggle("on", active === "profil");
   } else {
     av.style.display = "none";
@@ -1192,49 +1096,109 @@ function setTabIcons(active){
   }
 }
 
-/* ================= Historie-afledning ================= */
-function storyItems(h){
-  const cut = Date.now() - 24*3600*1000;
-  return state.wholePosts
-    .filter(function(p){ return p.u === h && new Date(p.created).getTime() >= cut; })
-    .slice(0, 4)
-    .slice()
-    .reverse(); // ældste først
-}
-function latestStoryId(h){
-  const it = storyItems(h);
-  return it.length ? it[it.length-1].id : null;
-}
-function hasStory(h){ return storyItems(h).length > 0; }
-function isSeen(h){
-  const l = latestStoryId(h);
-  return l != null && state.seen[h] === l;
-}
-
-/* ================= Stories-række ================= */
+/* ================= Bobler-række ================= */
 function renderStories(){
   if(!me){ el("stories").innerHTML = ""; return; }
-  const myRing = hasStory(me.handle) ? (isSeen(me.handle) ? "seen" : "") : "none";
   let html =
     '<button class="story" data-u="'+esc(me.handle)+'" data-me="1">'+
-      '<div class="ringwrap"><div class="ring '+myRing+'"><div class="ava" style="background:'+grad(me.handle)+'">'+ini(me.handle)+'</div></div>'+
+      '<div class="ringwrap"><div class="bub">'+avaHTML(me.handle, 56)+'</div>'+
       '<span class="plusb">+</span></div>'+
       '<span class="lbl">Dig</span>'+
     '</button>';
   state.friends.forEach(function(h){
-    const ring = !hasStory(h) ? "none" : (isSeen(h) ? "seen" : "");
     html +=
       '<button class="story" data-u="'+esc(h)+'">'+
-        '<div class="ringwrap"><div class="ring '+ring+'"><div class="ava" style="background:'+grad(h)+'">'+ini(h)+'</div></div></div>'+
+        '<div class="bub">'+avaHTML(h, 56)+'</div>'+
         '<span class="lbl">'+esc(user(h).name.split(" ")[0])+'</span>'+
       '</button>';
   });
   el("stories").innerHTML = html;
 }
 
+/* ================= Kommentartråd (inline) ================= */
+const CMT_PREVIEW = 10;
+const HEART_SVG = '<svg viewBox="0 0 24 24"><path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+
+function buildThread(p){
+  const byId = {};
+  p.cmts.forEach(function(c){ byId[c.id] = c; });
+  const roots = [], kids = {};
+  p.cmts.forEach(function(c){
+    if(c.parent != null && byId[c.parent]){
+      (kids[c.parent] = kids[c.parent] || []).push(c);
+    } else {
+      roots.push(c); // forældreløse (parent udenfor sættet) vises som top-niveau
+    }
+  });
+  const flat = [], visited = new Set();
+  function walk(c, lvl){
+    if(visited.has(c.id)) return;
+    visited.add(c.id);
+    flat.push({ c:c, lvl:lvl, parentU: (c.parent != null && byId[c.parent]) ? byId[c.parent].u : null });
+    (kids[c.id] || []).forEach(function(k){ walk(k, lvl + 1); });
+  }
+  roots.forEach(function(r){ walk(r, 0); });
+  // Cyklisk/selv-refererende parent_id (dårlige data): vis som top-niveau i stedet for at skjule
+  p.cmts.forEach(function(c){
+    if(!visited.has(c.id)) walk(c, 0);
+  });
+  return flat;
+}
+function cmtRowHTML(item){
+  const c = item.c;
+  const lvl = Math.min(item.lvl, 3);
+  const deep = item.lvl > 3 && item.parentU;
+  const ind = lvl * 26;
+  const prefix = deep ? '<span class="cat">@'+esc(item.parentU)+'</span> ' : '';
+  return '<div class="crow'+(lvl > 0 ? " cnest" : "")+'"'+(ind ? ' style="margin-left:'+ind+'px"' : '')+' data-cid="'+c.id+'">'+
+    avaHTML(c.u, 28)+
+    '<div class="cbody">'+
+      '<div class="ctext"><b>'+esc(c.u)+'</b>'+prefix+(c.text ? esc(c.text) : '')+'</div>'+
+      (c.img ? '<img class="cimg" src="'+esc(c.img)+'" alt="Billede i kommentar">' : '')+
+      '<div class="cmeta">'+
+        '<span>'+esc(c.t)+'</span>'+
+        '<span class="clc"'+(c.likeCount > 0 ? '' : ' style="display:none"')+'>'+likesLabel(c.likeCount)+'</span>'+
+        '<button class="csvar" data-cid="'+c.id+'" data-u="'+esc(c.u)+'">Svar</button>'+
+        '<button class="likec'+(c.liked ? " on" : "")+'" data-cid="'+c.id+'" aria-label="Like">'+HEART_SVG+'</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+function threadHTML(p){
+  const flat = buildThread(p);
+  if(!flat.length) return '<div class="cthread" data-id="'+p.id+'"></div>';
+  const expanded = expandedCmts.has(Number(p.id));
+  const show = expanded ? flat : flat.slice(0, CMT_PREVIEW);
+  let html = show.map(cmtRowHTML).join("");
+  if(!expanded && flat.length > CMT_PREVIEW){
+    html += '<button class="cmore" data-id="'+p.id+'">Se '+(flat.length - CMT_PREVIEW)+' kommentarer mere</button>';
+  }
+  return '<div class="cthread" data-id="'+p.id+'">'+html+'</div>';
+}
+function composerHTML(pid){
+  if(!me) return "";
+  const s = cstate(pid);
+  const chip = s.replyTo
+    ? '<div class="cchiprow"><span class="cchip">Svarer @'+esc(s.replyTo.u)+'<button class="cchip-x" data-id="'+pid+'" aria-label="Annuller svar">✕</button></span></div>'
+    : '';
+  const prev = s.img
+    ? '<div class="cprevrow"><span class="cprev"><img src="'+esc(s.img.url)+'" alt="Valgt billede"><button class="cprev-x" data-id="'+pid+'" aria-label="Fjern billede">✕</button></span></div>'
+    : '';
+  const dis = (!s.text.trim() && !s.img) ? " disabled" : "";
+  return '<div class="cbox" data-id="'+pid+'">'+chip+prev+
+    '<div class="ccomposer">'+
+      avaHTML(me.handle, 28)+
+      '<input class="cfield" data-id="'+pid+'" placeholder="Tilføj en kommentar ..." maxlength="280" value="'+esc(s.text)+'">'+
+      '<button class="cimgb" data-id="'+pid+'" aria-label="Tilføj billede">'+
+        '<svg viewBox="0 0 24 24"><g class="stroke"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.7" cy="8.7" r="1.7"/><path d="M21 15.3 16 10.3 5 21"/></g></svg>'+
+      '</button>'+
+      '<button class="csend" data-id="'+pid+'"'+dis+'>Send</button>'+
+    '</div>'+
+  '</div>';
+}
+
 /* ================= Timeline ================= */
 function postHTML(p){
-  const ring = (me && hasStory(p.u)) ? (isSeen(p.u) ? "seen" : "") : "none";
   const big = (!p.img && p.text && p.text.length <= 64) ? " big" : "";
   const media = p.img
     ? '<div class="pmedia" data-id="'+p.id+'">'+
@@ -1242,15 +1206,14 @@ function postHTML(p){
         '<div class="bigheart"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>'+
       '</div>'
     : '';
-  const likeLine = '<div class="plikes"'+(p.likeCount > 0 ? '' : ' style="display:none"')+'>'+p.likeCount+' nik</div>';
+  const likeLine = '<div class="plikes"'+(p.likeCount > 0 ? '' : ' style="display:none"')+'>'+likesLabel(p.likeCount)+'</div>';
   const cap = (p.img && p.text) ? '<div class="pcap"><b>'+esc(p.u)+'</b> '+esc(p.text)+'</div>' : '';
-  const seeAll = p.cmts.length ? '<button class="pcmts cmt-btn" data-id="'+p.id+'">Se alle '+p.cmts.length+' svar</button>' : '';
 
   return (
     '<article class="post" data-id="'+p.id+'">'+
       '<div class="phead">'+
-        '<button class="pring '+ring+'" data-storyof="'+esc(p.u)+'" aria-label="Historie">'+
-          '<span class="pava" style="background:'+grad(p.u)+'">'+ini(p.u)+'</span>'+
+        '<button class="pavab" data-u="'+esc(p.u)+'" aria-label="Profil">'+
+          avaHTML(p.u, 32)+
         '</button>'+
         '<span class="nm">'+esc(user(p.u).name)+'</span>'+
         '<span class="badge">'+BADGE+'</span>'+
@@ -1262,10 +1225,10 @@ function postHTML(p){
       (!p.img && p.text ? '<div class="ptext'+big+'">'+esc(p.text)+'</div>' : '')+
       media+
       '<div class="pactions">'+
-        '<button class="like-btn'+(p.liked ? " on" : "")+'" data-id="'+p.id+'" aria-pressed="'+p.liked+'" aria-label="Nik">'+
-          '<svg viewBox="0 0 24 24"><path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>'+
+        '<button class="like-btn'+(p.liked ? " on" : "")+'" data-id="'+p.id+'" aria-pressed="'+p.liked+'" aria-label="Like">'+
+          HEART_SVG+
         '</button>'+
-        '<button class="cmt-btn" data-id="'+p.id+'" aria-label="Svar">'+
+        '<button class="cmt-btn" data-id="'+p.id+'" aria-label="Kommentér">'+
           '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>'+
         '</button>'+
         '<button class="share-btn" aria-label="Del">'+
@@ -1274,10 +1237,26 @@ function postHTML(p){
       '</div>'+
       likeLine+
       cap+
-      seeAll+
+      threadHTML(p)+
       '<div class="pts">'+esc(p.t)+'</div>'+
+      composerHTML(p.id)+
     '</article>'
   );
+}
+function rerenderPostCmts(pid){
+  const p = findPost(pid);
+  if(!p) return;
+  document.querySelectorAll('.post[data-id="'+pid+'"]').forEach(function(node){
+    const th = node.querySelector(".cthread");
+    if(th) th.outerHTML = threadHTML(p);
+    const box = node.querySelector(".cbox");
+    if(box) box.outerHTML = composerHTML(p.id);
+  });
+}
+function updateSendState(pid){
+  const s = cstate(pid);
+  const ok = !!(s.text.trim() || s.img);
+  document.querySelectorAll('.cbox[data-id="'+pid+'"] .csend').forEach(function(b){ b.disabled = !ok; });
 }
 
 function renderFeed(){
@@ -1290,7 +1269,13 @@ function renderFeed(){
   } else if(!(state.currentFeed === "all" && me && !state.friends.length)){
     html += '<div class="emptynote" style="padding:36px 20px;text-align:center">Ingen opslag i denne kreds endnu.<br>Vær den første ✍️</div>';
   }
+  const f = document.activeElement && document.activeElement.closest ? document.activeElement.closest("#feed .cfield") : null;
+  const fpid = f ? f.dataset.id : null, selS = f ? f.selectionStart : 0, selE = f ? f.selectionEnd : 0;
   el("feed").innerHTML = html;
+  if(fpid){
+    const nf = el("feed").querySelector('.cbox[data-id="'+fpid+'"] .cfield');
+    if(nf){ nf.focus(); try{ nf.setSelectionRange(selS, selE); }catch(_){} }
+  }
 }
 
 /* ================= Data-hentning ================= */
@@ -1385,7 +1370,7 @@ function renderKredshead(){
   if(!f){ kh.style.display = "none"; el("stories").style.display = "flex"; return; }
   el("stories").style.display = "none";
   const avs = f.members.map(function(m){
-    return '<span class="mav" style="background:'+grad(m)+'">'+ini(m)+'</span>';
+    return avaHTML(m, 30, "mav");
   }).join("");
   kh.innerHTML = '<div class="mstack">'+avs+'</div>'+
     '<div class="ktxt"><b>'+f.members.length+' medlemmer</b><br>Privat kreds — kun jer kan se og skrive her.</div>';
@@ -1393,6 +1378,7 @@ function renderKredshead(){
 }
 function setFeed(id){
   state.currentFeed = id;
+  expandedCmts.clear();
   renderFeedbar();
   renderKredshead();
   el("feed").innerHTML = '<div class="emptynote" style="text-align:center">Henter …</div>';
@@ -1418,7 +1404,7 @@ function openFeedSheet(){
 }
 function closeFeedSheet(){
   el("fsheet").classList.remove("on");
-  if(!el("cmtsheet").classList.contains("on") && !el("esheet").classList.contains("on"))
+  if(!el("esheet").classList.contains("on"))
     el("scrim").classList.remove("on");
 }
 function renderFsList(){
@@ -1428,7 +1414,7 @@ function renderFsList(){
   }
   el("fs-list").innerHTML = state.friends.map(function(h){
     return '<div class="listrow'+(fsSelected[h] ? " sel" : "")+'" data-h="'+esc(h)+'">'+
-      '<div class="ava44" style="background:'+grad(h)+'">'+ini(h)+'</div>'+
+      avaHTML(h, 44)+
       '<div class="grow"><div class="l1">'+esc(user(h).name)+'</div><div class="l2">@'+esc(h)+'</div></div>'+
       '<span class="mcheck"><svg viewBox="0 0 24 24"><path d="M20 6 9.5 16.5 4 11"/></svg></span>'+
     '</div>';
@@ -1479,46 +1465,57 @@ async function renderMyPosts(){
   el("myposts").innerHTML = mine.length
     ? mine.map(postHTML).join("")
     : '<div class="emptynote">Du har ikke delt noget endnu. Tryk på + og del et billede eller en tanke.</div>';
-  loadNikSaldo();
+  loadQuota();
   const r = await sb.from("posts").select("id", { count:"exact", head:true }).eq("author", me.id).is("feed_id", null);
   if(!r.error && r.count != null && me) el("stat-posts").textContent = r.count;
 }
-async function loadNikSaldo(){
-  if(!me) return;
+
+/* ================= Like-saldo (chip + profil, én datakilde) ================= */
+async function fetchLikeBalance(){
+  if(!me) return null;
+  const res = await Promise.all([
+    sb.from("likes").select("*", { count:"exact", head:true }).eq("user_id", me.id),
+    sb.from("likes").select("*, posts!inner(author)", { count:"exact", head:true }).eq("posts.author", me.id)
+  ]);
+  for(const r of res){ if(r.error) throw r.error; }
+  const given = res[0].count || 0;
+  const received = res[1].count || 0;
+  return { given: given, received: received, room: Math.max(0, given + 1 - received) };
+}
+let quotaSeq = 0;
+async function loadQuota(){
+  if(!me){ el("qchip").classList.remove("on"); return; }
+  const t = ++quotaSeq;
   try{
-    const mine = await sb.from("posts").select("id").eq("author", me.id);
-    if(mine.error) throw mine.error;
-    const ids = (mine.data || []).map(function(p){ return p.id; });
-    const reqs = [ sb.from("likes").select("*", { count:"exact", head:true }).eq("user_id", me.id) ];
-    if(ids.length) reqs.push(sb.from("likes").select("*", { count:"exact", head:true }).in("post_id", ids));
-    const res = await Promise.all(reqs);
-    for(const r of res){ if(r.error) throw r.error; }
-    if(!me) return;
-    const given = res[0].count || 0;
-    const received = ids.length ? (res[1].count || 0) : 0;
-    const room = Math.max(0, given + 1 - received);
+    const b = await fetchLikeBalance();
+    if(t !== quotaSeq || !me || !b) return;
+    el("qchip-n").textContent = b.room;
+    el("qchip").classList.add("on");
     el("nik-saldo").innerHTML =
-      '<div class="nik1">Nik: givet <b>'+given+'</b> · modtaget <b>'+received+'</b> · plads til <b>'+room+'</b></div>'+
-      '<div class="nik2">Du kan modtage ét nik mere, end du selv har givet.</div>';
+      '<div class="nik1">Likes: givet <b>'+b.given+'</b> · modtaget <b>'+b.received+'</b> · plads til <b>'+b.room+'</b></div>'+
+      '<div class="nik2">Du kan modtage ét like mere, end du selv har givet.</div>';
   }catch(err){
     console.error(err);
   }
 }
+el("qchip").addEventListener("click", function(){
+  const n = parseInt(el("qchip-n").textContent, 10) || 0;
+  toast("Du kan modtage "+likesLabel(n)+" mere. Giv likes til andre for at få plads til flere.");
+});
+
 function setOwnUI(){
-  el("own-ava").style.background = grad(me.handle);
-  el("own-ava").textContent = ini(me.handle);
+  el("own-ava").innerHTML = avaHTML(me.handle, 86);
   el("own-name").textContent = user(me.handle).name;
   el("own-handle").textContent = "@" + me.handle;
-  ["cmt-me-ava","compose-me-ava"].forEach(function(id){
-    const n = el(id);
-    n.style.background = grad(me.handle);
-    n.textContent = ini(me.handle);
-  });
+  el("compose-me-ava").innerHTML = avaHTML(me.handle, 44);
 }
 
 el("editprof").addEventListener("click", function(){
   if(!me) return;
   el("ep-name").value = me.name || "";
+  el("ep-ava").innerHTML = avaHTML(me.handle, 72);
+  el("ep-file").value = "";
+  resetDeleteUI();
   epCan();
   el("scrim").classList.add("on");
   el("esheet").classList.add("on");
@@ -1526,7 +1523,7 @@ el("editprof").addEventListener("click", function(){
 });
 function closeEditSheet(){
   el("esheet").classList.remove("on");
-  if(!el("cmtsheet").classList.contains("on") && !el("fsheet").classList.contains("on"))
+  if(!el("fsheet").classList.contains("on"))
     el("scrim").classList.remove("on");
 }
 function epCan(){ el("ep-save").disabled = !el("ep-name").value.trim(); }
@@ -1548,6 +1545,96 @@ el("ep-save").addEventListener("click", async function(){
   toast("Profil opdateret");
 });
 
+/* ---- Profilbillede ---- */
+el("ep-pic").addEventListener("click", function(){ el("ep-file").click(); });
+el("ep-file").addEventListener("change", function(){
+  const file = this.files && this.files[0];
+  if(!file || !me) return;
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = function(){
+    const side = Math.min(img.width, img.height);
+    const c = document.createElement("canvas");
+    c.width = c.height = 512;
+    c.getContext("2d").drawImage(img, (img.width - side)/2, (img.height - side)/2, side, side, 0, 0, 512, 512);
+    URL.revokeObjectURL(url);
+    c.toBlob(async function(blob){
+      if(!blob){ toast("Kunne ikke læse billedet"); return; }
+      if(!me) return;
+      const old = me.avatar_path;
+      let path = me.id + "/avatar-" + uuid() + ".jpg";
+      try{
+        const up = await sb.storage.from("post-images").upload(path, blob, { contentType:"image/jpeg" });
+        if(up.error) throw up.error;
+        if(up.data && up.data.path) path = up.data.path;
+        const upd = await sb.from("profiles").update({ avatar_path: path }).eq("id", me.id);
+        if(upd.error){
+          sb.storage.from("post-images").remove([path]).catch(function(){});
+          throw upd.error;
+        }
+      }catch(err){
+        console.error(err);
+        toast("Kunne ikke opdatere profilbilledet. Prøv igen.");
+        el("ep-file").value = "";
+        return;
+      }
+      if(old) sb.storage.from("post-images").remove([old]).catch(function(){});
+      me.avatar_path = path;
+      registerProfile(me);
+      setOwnUI();
+      el("ep-ava").innerHTML = avaHTML(me.handle, 72);
+      setTabIcons(curTab);
+      renderStories();
+      renderFeed();
+      renderMyPosts();
+      refreshPv();
+      if(el("view-search").classList.contains("active")) renderSearch();
+      el("ep-file").value = "";
+      toast("Profilbillede opdateret");
+    }, "image/jpeg", 0.85);
+  };
+  img.onerror = function(){
+    URL.revokeObjectURL(url);
+    toast("Kunne ikke læse billedet");
+  };
+  img.src = url;
+});
+
+/* ---- Slet konto ---- */
+function resetDeleteUI(){
+  el("del-open").style.display = "";
+  el("del-confirm").style.display = "none";
+  el("del-input").value = "";
+  el("del-btn").disabled = true;
+}
+el("del-open").addEventListener("click", function(){
+  el("del-open").style.display = "none";
+  el("del-confirm").style.display = "block";
+  setTimeout(function(){ el("del-input").focus(); }, 60);
+});
+el("del-cancel").addEventListener("click", resetDeleteUI);
+el("del-input").addEventListener("input", function(){
+  el("del-btn").disabled = this.value !== "SLET";
+});
+el("del-btn").addEventListener("click", async function(){
+  if(this.disabled || !me) return;
+  const btn = this;
+  btn.disabled = true;
+  try{
+    const { data, error } = await sb.functions.invoke("delete-account", { body:{} });
+    if(error || !data || !data.ok) throw (error || new Error("delete_failed"));
+    try{ await sb.auth.signOut(); }catch(_e){}
+    closeEditSheet();
+    resetApp();
+    showAuth();
+    toast("Din konto er slettet");
+  }catch(err){
+    console.error(err);
+    toast("Kunne ikke slette kontoen. Prøv igen.");
+    btn.disabled = false;
+  }
+});
+
 el("logoutbtn").addEventListener("click", async function(){
   const { error } = await sb.auth.signOut();
   if(error){ console.error(error); toast(GENERIC_ERR); }
@@ -1565,14 +1652,14 @@ function renderSearch(){
   const list = matchFriends(q);
   let html = list.map(function(h){
     return '<div class="listrow">'+
-             '<div class="ava44" style="background:'+grad(h)+'">'+ini(h)+'</div>'+
+             avaHTML(h, 44)+
              '<div class="grow"><div class="l1">'+esc(user(h).name)+' '+BADGE+'</div><div class="l2">@'+esc(h)+'</div></div>'+
            '</div>';
   }).join("");
   if(q && q === globalQ && globalResults.length){
     globalResults.forEach(function(p){
       html += '<div class="listrow">'+
-                '<div class="ava44" style="background:'+grad(p.handle)+'">'+ini(p.handle)+'</div>'+
+                avaHTML(p.handle, 44)+
                 '<div class="grow"><div class="l1">'+esc(p.name || p.handle)+'</div>'+
                 '<button class="addaction" data-add="'+esc(p.handle)+'">Tilføj @'+esc(p.handle)+' til din kreds</button></div>'+
               '</div>';
@@ -1641,7 +1728,7 @@ async function loadNotifs(){
   const P = '<svg viewBox="0 0 24 24"><g class="stroke"><circle cx="10" cy="8" r="3.4"/><path d="M3.8 19.5c.7-3.3 3.2-5 6.2-5s5.5 1.7 6.2 5"/><path d="M18.5 6.5v6M15.5 9.5h6"/></g></svg>';
   function row(icon, cls, u, text, snip, t){
     return '<div class="notif">'+
-      '<div class="ava32" style="background:'+grad(u)+'">'+ini(u)+'</div>'+
+      avaHTML(u, 32)+
       '<div class="grow">'+
         '<div class="ntext"><b>'+esc(user(u).name)+'</b> '+text+'. <span class="nt">'+esc(t)+'</span></div>'+
         (snip ? '<div class="nsnip">'+esc(snip)+'</div>' : '')+
@@ -1659,7 +1746,7 @@ async function loadNotifs(){
     const reqs = [ sb.from("friendships").select("created_at, from_profile:profiles!user_id(*)").eq("friend_id", me.id) ];
     if(ids.length){
       reqs.push(sb.from("likes").select("created_at, post_id, liker:profiles!user_id(*)").in("post_id", ids).neq("user_id", me.id));
-      reqs.push(sb.from("comments").select("created_at, post_id, text, author_profile:profiles!author(*)").in("post_id", ids).neq("author", me.id));
+      reqs.push(sb.from("comments").select("created_at, post_id, text, image_path, author_profile:profiles!author(*)").in("post_id", ids).neq("author", me.id));
     }
     const res = await Promise.all(reqs);
     for(const r of res){ if(r.error) throw r.error; }
@@ -1673,14 +1760,14 @@ async function loadNotifs(){
         if(r.liker){ registerProfile(r.liker); items.push({ type:"like", u:r.liker.handle, at:r.created_at, snip:textById[r.post_id] || "" }); }
       });
       (res[2].data || []).forEach(function(r){
-        if(r.author_profile){ registerProfile(r.author_profile); items.push({ type:"cmt", u:r.author_profile.handle, at:r.created_at, snip:r.text }); }
+        if(r.author_profile){ registerProfile(r.author_profile); items.push({ type:"cmt", u:r.author_profile.handle, at:r.created_at, snip:r.text || (r.image_path ? "📷 Billede" : "") }); }
       });
     }
     items.sort(function(a,b){ return new Date(b.at) - new Date(a.at); });
     const top = items.slice(0, 30);
     el("notifs").innerHTML = top.length
       ? top.map(function(n){
-          if(n.type === "like")   return row(H, "heart",  n.u, "nikkede til dit opslag", n.snip, fmtTime(n.at));
+          if(n.type === "like")   return row(H, "heart",  n.u, "likede dit opslag", n.snip, fmtTime(n.at));
           if(n.type === "cmt")    return row(B, "bubble", n.u, "svarede på dit opslag",  n.snip, fmtTime(n.at));
           return row(P, "friend", n.u, "er nu i din kreds", "", fmtTime(n.at));
         }).join("")
@@ -1692,7 +1779,9 @@ async function loadNotifs(){
 }
 
 /* ================= Tabs ================= */
+let curTab = "feed";
 function switchTab(name){
+  curTab = name;
   document.querySelectorAll(".view").forEach(function(v){ v.classList.remove("active"); });
   el("view-"+name).classList.add("active");
   document.querySelectorAll(".tabbar [data-view]").forEach(function(b){
@@ -1711,11 +1800,10 @@ el("nosparkle").addEventListener("click", function(){
   toast("Ingen algoritme her. Feedet er altid kronologisk.");
 });
 
-/* ================= Nik (likes) ================= */
+/* ================= Likes ================= */
 const pv = { u:null, posts:[] };
-const story = { list:[], idx:0, u:null, timer:null };
 
-function allPostArrays(){ return [state.posts, state.wholePosts, pv.posts, story.list]; }
+function allPostArrays(){ return [state.posts, state.wholePosts, pv.posts]; }
 function findPost(id){
   id = Number(id);
   const arrs = allPostArrays();
@@ -1744,15 +1832,11 @@ function applyLikeUI(id, on){
     if(p){
       const lc = node.querySelector(".plikes");
       if(lc){
-        lc.textContent = p.likeCount + " nik";
+        lc.textContent = likesLabel(p.likeCount);
         lc.style.display = p.likeCount > 0 ? "" : "none";
       }
     }
   });
-  if(el("storyview").classList.contains("on")){
-    const it = story.list[story.idx];
-    if(it && Number(it.id) === Number(id)) el("story-heart").classList.toggle("on", on);
-  }
 }
 async function setLike(id, force){
   if(!me) return;
@@ -1777,140 +1861,207 @@ async function setLike(id, force){
     applyLikeUI(id, cur);
     if(on && String(error.message || "").indexOf("like_quota") >= 0){
       const fname = (user(objs[0].u).name || objs[0].u).trim().split(/\s+/)[0];
-      toast(fname + " kan ikke modtage flere nik lige nu — de skal selv nikke mere 😉");
+      toast(fname + " kan ikke modtage flere likes lige nu — de skal selv give likes for at få plads 😉");
     } else {
       toast(GENERIC_ERR);
     }
   }
+  loadQuota();
 }
 
-/* ================= Kommentarer ================= */
-let openPostId = null;
-async function openComments(id){
-  openPostId = Number(id);
-  renderComments();
-  el("scrim").classList.add("on");
-  el("cmtsheet").classList.add("on");
-  await loadCommentLikes();
-}
-function closeComments(){
-  el("cmtsheet").classList.remove("on");
-  if(!el("fsheet").classList.contains("on") && !el("esheet").classList.contains("on"))
-    el("scrim").classList.remove("on");
-  openPostId = null;
-  el("cmt-field").value = "";
-  el("cmt-send").disabled = true;
-}
-async function loadCommentLikes(){
-  const p = findPost(openPostId);
-  if(!p || !p.cmts.length || !me) return;
-  const ids = p.cmts.map(function(c){ return c.id; });
-  const { data, error } = await sb.from("comment_likes").select("comment_id, user_id").in("comment_id", ids);
-  if(error){ console.error(error); return; }
-  p.cmts.forEach(function(c){
-    const ls = (data || []).filter(function(l){ return l.comment_id === c.id; });
-    c.likeCount = ls.length;
-    c.liked = ls.some(function(l){ return l.user_id === me.id; });
+/* ================= Kommentarer (inline) ================= */
+function findCommentAll(cid){
+  cid = Number(cid);
+  const out = [];
+  allPostArrays().forEach(function(arr){
+    arr.forEach(function(p){
+      p.cmts.forEach(function(c){
+        if(Number(c.id) === cid && out.indexOf(c) < 0) out.push(c);
+      });
+    });
   });
-  if(el("cmtsheet").classList.contains("on") && Number(openPostId) === Number(p.id)) renderComments();
+  return out;
 }
-function cmtRow(u, text, t, liked, idx){
-  return '<div class="cmt-row">'+
-    '<div class="ava34" style="background:'+grad(u)+'">'+ini(u)+'</div>'+
-    '<div class="body"><b>'+esc(user(u).name)+'</b><span class="t">@'+esc(u)+' · '+esc(t)+'</span>'+
-    '<div class="txt">'+esc(text)+'</div></div>'+
-    (idx >= 0 ? '<button class="likec'+(liked ? " on" : "")+'" data-ci="'+idx+'" aria-label="Nik">'+
-      '<svg viewBox="0 0 24 24"><path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>' : '')+
-    '</div>';
+function applyCmtLikeUI(cid){
+  const cs = findCommentAll(cid);
+  if(!cs.length) return;
+  const c = cs[0];
+  document.querySelectorAll('.crow[data-cid="'+cid+'"]').forEach(function(row){
+    const b = row.querySelector(".likec");
+    if(b) b.classList.toggle("on", c.liked);
+    const lc = row.querySelector(".clc");
+    if(lc){
+      lc.textContent = likesLabel(c.likeCount);
+      lc.style.display = c.likeCount > 0 ? "" : "none";
+    }
+  });
 }
-function renderComments(){
-  const p = findPost(openPostId);
-  if(!p) return;
-  let html = '<div class="cmt-cap">'+cmtRow(p.u, p.text || "(billede)", p.t, false, -1)+'</div>';
-  if(p.cmts.length){
-    html += p.cmts.map(function(c,i){ return cmtRow(c.u, c.text, c.t, c.liked, i); }).join("");
-  } else {
-    html += '<div class="emptynote">Ingen svar endnu. Start samtalen.</div>';
-  }
-  el("cmt-list").innerHTML = html;
-}
-el("cmt-list").addEventListener("click", async function(e){
-  const b = e.target.closest(".likec");
-  if(!b || !me) return;
-  const p = findPost(openPostId);
-  if(!p) return;
-  const c = p.cmts[Number(b.dataset.ci)];
-  if(!c) return;
-  const on = !c.liked;
-  c.liked = on;
-  c.likeCount = Math.max(0, (c.likeCount||0) + (on ? 1 : -1));
-  b.classList.toggle("on", on);
+async function toggleCmtLike(cid){
+  if(!me) return;
+  const cs = findCommentAll(cid);
+  if(!cs.length) return;
+  const on = !cs[0].liked;
+  cs.forEach(function(c){ c.liked = on; c.likeCount = Math.max(0, (c.likeCount||0) + (on ? 1 : -1)); });
+  applyCmtLikeUI(cid);
   let error = null;
   if(on){
-    const r = await sb.from("comment_likes").insert({ comment_id:c.id, user_id:me.id });
+    const r = await sb.from("comment_likes").insert({ comment_id:Number(cid), user_id:me.id });
     error = (r.error && r.error.code !== "23505") ? r.error : null;
   } else {
-    const r = await sb.from("comment_likes").delete().eq("comment_id", c.id).eq("user_id", me.id);
+    const r = await sb.from("comment_likes").delete().eq("comment_id", Number(cid)).eq("user_id", me.id);
     error = r.error;
   }
   if(error){
     console.error(error);
-    c.liked = !on;
-    c.likeCount = Math.max(0, c.likeCount + (on ? -1 : 1));
-    b.classList.toggle("on", !on);
+    cs.forEach(function(c){ c.liked = !on; c.likeCount = Math.max(0, c.likeCount + (on ? -1 : 1)); });
+    applyCmtLikeUI(cid);
     toast(GENERIC_ERR);
   }
-});
-el("cmt-field").addEventListener("input", function(){
-  el("cmt-send").disabled = this.value.trim().length === 0;
-});
-async function postComment(){
-  if(el("cmt-send").disabled) return;
-  const f = el("cmt-field");
-  const text = f.value.trim();
-  if(!text || openPostId == null || !me) return;
-  const pid = Number(openPostId);
-  el("cmt-send").disabled = true;
-  const { data, error } = await sb.from("comments")
-    .insert({ post_id:pid, author:me.id, text:text })
-    .select("*, author_profile:profiles!author(*)")
-    .single();
-  if(error){
-    console.error(error);
-    el("cmt-send").disabled = false;
-    toast("Kunne ikke sende svaret. Prøv igen.");
-    return;
-  }
-  const c = mapComment(data);
-  findPostAll(pid).forEach(function(post){
-    if(!post.cmts.some(function(x){ return x.id === c.id; })) post.cmts.push(c);
-  });
-  f.value = "";
-  el("cmt-send").disabled = true;
-  renderComments();
-  renderFeed();
-  refreshPv();
-  el("cmt-list").scrollTop = el("cmt-list").scrollHeight;
 }
-el("cmt-send").addEventListener("click", postComment);
-el("cmt-field").addEventListener("keydown", function(e){ if(e.key === "Enter" && !e.isComposing) postComment(); });
-el("scrim").addEventListener("click", function(){ closeComments(); closeFeedSheet(); closeEditSheet(); });
+
+let cfilePid = null;
+el("cfile").addEventListener("change", function(){
+  const file = this.files && this.files[0];
+  const pid = cfilePid;
+  if(!file || pid == null) return;
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = function(){
+    const max = 1080;
+    const s = Math.min(1, max/Math.max(img.width, img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(img.width*s));
+    c.height = Math.max(1, Math.round(img.height*s));
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(url);
+    c.toBlob(function(blob){
+      if(!blob){ toast("Kunne ikke læse billedet"); return; }
+      const st = cstate(pid);
+      if(st.img && st.img.url) URL.revokeObjectURL(st.img.url);
+      st.img = { blob:blob, url:URL.createObjectURL(blob) };
+      rerenderComposer(pid);
+    }, "image/jpeg", 0.85);
+  };
+  img.onerror = function(){
+    URL.revokeObjectURL(url);
+    toast("Kunne ikke læse billedet");
+  };
+  img.src = url;
+  this.value = "";
+});
+function rerenderComposer(pid){
+  document.querySelectorAll('.cbox[data-id="'+pid+'"]').forEach(function(box){
+    box.outerHTML = composerHTML(Number(pid));
+  });
+}
+function clearCImg(pid){
+  const s = cstate(pid);
+  if(s.img && s.img.url) URL.revokeObjectURL(s.img.url);
+  s.img = null;
+  rerenderComposer(pid);
+}
+function clearReply(pid){
+  cstate(pid).replyTo = null;
+  rerenderComposer(pid);
+}
+async function sendComment(pid){
+  pid = Number(pid);
+  if(!me) return;
+  const s = cstate(pid);
+  if(s.busy) return;
+  const text = (s.text || "").trim();
+  if(!text && !s.img) return;
+  s.busy = true;
+  document.querySelectorAll('.cbox[data-id="'+pid+'"] .csend').forEach(function(b){ b.disabled = true; });
+  let path = null;
+  try{
+    if(s.img){
+      path = me.id + "/" + uuid() + ".jpg";
+      const up = await sb.storage.from("post-images").upload(path, s.img.blob, { contentType:"image/jpeg" });
+      if(up.error) throw up.error;
+      if(up.data && up.data.path) path = up.data.path;
+    }
+    const ins = await sb.from("comments").insert({
+      post_id: pid,
+      author: me.id,
+      text: text || null,
+      image_path: path,
+      parent_id: s.replyTo ? s.replyTo.id : null
+    }).select("*, author_profile:profiles!author(*)").single();
+    if(ins.error) throw ins.error;
+    const c = mapComment(ins.data);
+    findPostAll(pid).forEach(function(post){
+      if(!post.cmts.some(function(x){ return x.id === c.id; })) post.cmts.push(c);
+    });
+    if(s.img && s.img.url) URL.revokeObjectURL(s.img.url);
+    composers.set(pid, { text:"", replyTo:null, img:null });
+    expandedCmts.add(pid);
+    rerenderPostCmts(pid);
+  }catch(err){
+    console.error(err);
+    if(path){ sb.storage.from("post-images").remove([path]).catch(function(){}); }
+    toast("Kunne ikke sende kommentaren. Prøv igen.");
+    updateSendState(pid);
+  }finally{
+    s.busy = false;
+  }
+}
+function cInput(e){
+  const f = e.target.closest(".cfield");
+  if(!f) return;
+  cstate(f.dataset.id).text = f.value;
+  updateSendState(f.dataset.id);
+}
+function cKey(e){
+  const f = e.target.closest(".cfield");
+  if(!f) return;
+  if(e.key === "Enter" && !e.isComposing) sendComment(f.dataset.id);
+}
+el("scrim").addEventListener("click", function(){ closeFeedSheet(); closeEditSheet(); });
 
 /* ---- Klik i timeline ---- */
 let lastTap = { id:null, t:0 };
 function timelineClick(e){
   const like = e.target.closest(".like-btn");
   if(like){ setLike(like.dataset.id); return; }
+  const lk = e.target.closest(".likec");
+  if(lk){ toggleCmtLike(lk.dataset.cid); return; }
+  const sv = e.target.closest(".csvar");
+  if(sv){
+    const node = sv.closest(".post");
+    if(!node) return;
+    const pid = node.dataset.id;
+    cstate(pid).replyTo = { id:Number(sv.dataset.cid), u:sv.dataset.u };
+    rerenderComposer(pid);
+    const f = node.querySelector(".cfield");
+    if(f) f.focus();
+    return;
+  }
+  const cx = e.target.closest(".cchip-x");
+  if(cx){ clearReply(cx.dataset.id); return; }
+  const px = e.target.closest(".cprev-x");
+  if(px){ clearCImg(px.dataset.id); return; }
+  const ib = e.target.closest(".cimgb");
+  if(ib){ cfilePid = Number(ib.dataset.id); el("cfile").click(); return; }
+  const sd = e.target.closest(".csend");
+  if(sd){ sendComment(sd.dataset.id); return; }
+  const more = e.target.closest(".cmore");
+  if(more){ expandedCmts.add(Number(more.dataset.id)); rerenderPostCmts(more.dataset.id); return; }
   const cmt = e.target.closest(".cmt-btn");
-  if(cmt){ openComments(cmt.dataset.id); return; }
+  if(cmt){
+    const node = cmt.closest(".post");
+    const f = node && node.querySelector(".cfield");
+    if(f) f.focus();
+    return;
+  }
   const sh = e.target.closest(".share-btn");
   if(sh){ toast("Bliver i kredsen — ingen deling udenfor"); return; }
   const d = e.target.closest(".dots");
   if(d){ toast("Intet skjult her — feedet er altid kronologisk"); return; }
-  const pr = e.target.closest(".pring");
-  if(pr && pr.dataset.storyof){
-    if(me && pr.dataset.storyof === me.handle){ closeProfile(); switchTab("profil"); }
-    else openProfile(pr.dataset.storyof);
+  const pr = e.target.closest(".pavab");
+  if(pr && pr.dataset.u){
+    if(me && pr.dataset.u === me.handle){ closeProfile(); switchTab("profil"); }
+    else openProfile(pr.dataset.u);
     return;
   }
   const media = e.target.closest(".pmedia");
@@ -1929,8 +2080,12 @@ function timelineClick(e){
     }
   }
 }
-el("feed").addEventListener("click", timelineClick);
-el("myposts").addEventListener("click", timelineClick);
+["feed","myposts","pv-posts"].forEach(function(id){
+  el(id).addEventListener("click", timelineClick);
+  el(id).addEventListener("input", cInput);
+  el(id).addEventListener("keydown", cKey);
+  el(id).addEventListener("focusout", function(e){ if(e.target.closest(".cfield") && me) scheduleRefetch(); });
+});
 
 /* ================= Ven-profil ================= */
 async function openProfile(h){
@@ -1943,11 +2098,7 @@ async function openProfile(h){
   el("pv-count").textContent = "";
   el("pv-handle").textContent = "@" + h;
   el("pv-stat-posts").textContent = "0";
-  el("pv-ava").style.background = grad(h);
-  el("pv-ava").textContent = ini(h);
-  const st = hasStory(h);
-  el("pv-story").style.display = st ? "flex" : "none";
-  el("pv-ava-ring").classList.toggle("seen", !st || isSeen(h));
+  el("pv-ava").innerHTML = avaHTML(h, 86);
   el("pv-since").textContent = "I din kreds siden "+(FRIEND_SINCE[h] || u.since || "i dag")+" · Gensidig ven";
   el("pv-posts").innerHTML = '<div class="emptynote">Henter …</div>';
   el("pv-body").scrollTop = 0;
@@ -1981,79 +2132,12 @@ function refreshPv(){
     el("pv-posts").innerHTML = pv.posts.length
       ? pv.posts.map(postHTML).join("")
       : '<div class="emptynote">Ingen opslag endnu.</div>';
-    el("pv-ava-ring").classList.toggle("seen", !hasStory(pv.u) || isSeen(pv.u));
+    el("pv-ava").innerHTML = avaHTML(pv.u, 86);
   }
 }
 el("pv-back").addEventListener("click", closeProfile);
-el("pv-story").addEventListener("click", function(){ if(pv.u) openStory(pv.u); });
-el("pv-ava-ring").addEventListener("click", function(){ if(pv.u) openStory(pv.u); });
-el("pv-posts").addEventListener("click", timelineClick);
 
-/* ================= Historier ================= */
-function openStory(h){
-  const items = storyItems(h);
-  if(!items.length){ toast("Ingen historier endnu"); return; }
-  story.list = items;
-  story.idx = 0;
-  story.u = h;
-  clearTimeout(story.timer);
-  state.seen[h] = items[items.length-1].id;
-  saveSeen();
-  el("story-ava").style.background = grad(h);
-  el("story-ava").textContent = ini(h);
-  el("story-name").textContent = user(h).name;
-  el("storyview").classList.add("on");
-  renderStorySlide();
-}
-function closeStory(){
-  clearTimeout(story.timer);
-  el("storyview").classList.remove("on");
-  renderStories();
-  renderFeed();
-  refreshPv();
-}
-function renderStorySlide(){
-  clearTimeout(story.timer);
-  const it = story.list[story.idx];
-  el("story-time").textContent = it.ts || "";
-  const m = el("story-media");
-  if(it.img){
-    m.innerHTML = '<img src="'+esc(it.img.src)+'" alt="'+esc(it.img.alt||"")+'">';
-  } else {
-    m.innerHTML = '<div class="story-textslide" style="background:'+tgrad(it.id)+'"><span>'+esc(it.text)+'</span></div>';
-  }
-  el("story-heart").classList.toggle("on", !!it.liked);
-
-  let bars = '';
-  for(let i = 0; i < story.list.length; i++) bars += '<div class="bar"><i></i></div>';
-  el("story-bars").innerHTML = bars;
-  const fills = el("story-bars").querySelectorAll("i");
-  fills.forEach(function(f,i){ f.style.width = i < story.idx ? "100%" : "0"; });
-  const active = fills[story.idx];
-  requestAnimationFrame(function(){
-    requestAnimationFrame(function(){
-      active.style.transition = "width 5s linear";
-      active.style.width = "100%";
-    });
-  });
-  story.timer = setTimeout(nextStory, 5000);
-}
-function nextStory(){
-  if(story.idx < story.list.length-1){ story.idx++; renderStorySlide(); }
-  else closeStory();
-}
-function prevStory(){
-  if(story.idx > 0){ story.idx--; }
-  renderStorySlide();
-}
-el("tap-r").addEventListener("click", nextStory);
-el("tap-l").addEventListener("click", prevStory);
-el("story-close").addEventListener("click", closeStory);
-el("story-heart").addEventListener("click", function(){
-  const it = story.list[story.idx];
-  if(!it) return;
-  setLike(it.id, !it.liked);
-});
+/* ================= Bobler: klik ================= */
 el("stories").addEventListener("click", function(e){
   const s = e.target.closest(".story");
   if(!s) return;
@@ -2202,6 +2286,13 @@ function scheduleRefetch(){
 }
 async function doRefetch(){
   if(!me) return;
+  const ae = document.activeElement;
+  if(ae && ae.classList && ae.classList.contains("cfield")){
+    // Udskyd mens brugeren skriver en kommentar (bevarer fokus, caret og mobil-tastatur)
+    clearTimeout(refetchTimer);
+    refetchTimer = setTimeout(doRefetch, 1500);
+    return;
+  }
   await Promise.all([loadFriends(), loadFeeds(), loadPosts()]);
   renderFeedbar();
   renderKredshead();
@@ -2210,10 +2301,7 @@ async function doRefetch(){
   renderStories();
   if(el("view-search").classList.contains("active")) renderSearch();
   if(el("profileview").classList.contains("on") && pv.u) await loadPvPosts();
-  if(el("cmtsheet").classList.contains("on") && openPostId != null){
-    renderComments();
-    loadCommentLikes();
-  }
+  loadQuota();
 }
 function subscribeRealtime(){
   if(channel) return;
@@ -2444,9 +2532,9 @@ async function boot(session){
   }
   me = prof;
   registerProfile(me);
-  loadSeen();
   setOwnUI();
   state.currentFeed = "all";
+  expandedCmts.clear();
   await Promise.all([loadFriends(), loadFeeds(), loadPosts()]);
   renderFeedbar();
   renderKredshead();
@@ -2455,6 +2543,7 @@ async function boot(session){
   renderFeed();
   switchTab("feed");
   subscribeRealtime();
+  loadQuota();
   hideAuth();
 }
 function resetApp(){
@@ -2462,7 +2551,6 @@ function resetApp(){
   me = null;
   switchTab("feed");
   Object.keys(FRIEND_SINCE).forEach(function(k){ delete FRIEND_SINCE[k]; });
-  state.seen = {};
   state.friends = [];
   state.posts = [];
   state.wholePosts = [];
@@ -2470,10 +2558,13 @@ function resetApp(){
   state.currentFeed = "all";
   pv.u = null;
   pv.posts = [];
-  story.list = [];
-  clearTimeout(story.timer);
-  el("storyview").classList.remove("on");
-  closeComments();
+  expandedCmts.clear();
+  clearComposers();
+  cfilePid = null;
+  el("cfile").value = "";
+  el("qchip").classList.remove("on");
+  el("qchip-n").textContent = "0";
+  resetDeleteUI();
   closeFeedSheet();
   closeEditSheet();
   closeCompose();
