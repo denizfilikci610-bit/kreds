@@ -37,7 +37,7 @@
     <section class="view active" id="view-feed">
       <div class="feedbar" id="feedbar"></div>
       <div class="stories" id="stories"></div>
-      <div class="kredshead" id="kredshead" style="display:none"></div>
+      <div class="kredshead" id="kredshead" style="display:none" role="button" tabindex="0" aria-label="Kredsens medlemmer"></div>
       <div id="feed"></div>
       <div class="caughtup">
         <div class="ring"><div class="inner">
@@ -258,6 +258,26 @@
     </div>
   </div>
 
+  <!-- Kredsens medlemmer (sheet) -->
+  <div class="fsheet" id="msheet" role="dialog" aria-label="Kredsens medlemmer">
+    <div class="cmt-grab"></div>
+    <div class="cmt-title" id="ms-title"></div>
+    <div class="ep-scroll" style="flex:1;overflow-y:auto;min-height:0">
+      <div class="fs-label">Medlemmer</div>
+      <div id="ms-members"></div>
+      <div class="fs-label">Tilføj ven</div>
+      <div id="ms-friends"></div>
+      <div class="ms-leavezone">
+        <button class="ms-leave" id="ms-leave">Forlad kreds</button>
+        <div id="ms-leave-confirm" style="display:none">
+          <div class="ms-confirmtxt">Vil du forlade kredsen? Er kredsen tom bagefter, slettes den.</div>
+          <button class="fs-create" id="ms-leave2">Ja, forlad kredsen</button>
+          <button class="del-cancel" id="ms-leave-cancel">Annuller</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Opslag-menu (egne opslag) -->
   <div class="modal" id="pmenu" role="dialog" aria-label="Opslag">
     <div class="modal-card">
@@ -270,6 +290,22 @@
         <div class="mtitle">Slet opslaget permanent?</div>
         <button class="mrow danger" id="pm-del2">Slet</button>
         <button class="mrow" id="pm-del-cancel">Annuller</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Anmeld opslag (andres opslag, popup) -->
+  <div class="modal" id="rmenu" role="dialog" aria-label="Anmeld opslag">
+    <div class="modal-card">
+      <div id="rmenu-main">
+        <button class="mrow danger" id="rm-report">Anmeld opslag</button>
+        <button class="mrow" id="rm-cancel">Annuller</button>
+      </div>
+      <div id="rmenu-confirm" style="display:none">
+        <div class="mtitle">Anmeld dette opslag?</div>
+        <p class="mtext">Ved 2 anmeldelser skjules det for alle.</p>
+        <button class="mrow danger" id="rm-report2">Anmeld</button>
+        <button class="mrow" id="rm-cancel2">Annuller</button>
       </div>
     </div>
   </div>

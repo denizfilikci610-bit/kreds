@@ -1,7 +1,7 @@
-import { sb, GENERIC_ERR } from "./config.js";
-import { state } from "./store.js";
+import { sb, GENERIC_ERR, BLOCKED_MSG } from "./config.js";
+import { me, state, ID2H } from "./store.js";
 import { el, esc, avaHTML, user, toast } from "./helpers.js";
-import { loadFeeds, setFeed } from "./feed.js";
+import { loadFeeds, loadPosts, setFeed, feedById, renderFeedbar, renderKredshead } from "./feed.js";
 import { renderComposeDest } from "./compose.js";
 
 /* ================= Ny kreds (sheet) ================= */
@@ -17,15 +17,15 @@ export function openFeedSheet(){
 }
 export function closeFeedSheet(){
   el("fsheet").classList.remove("on");
-  if(!el("esheet").classList.contains("on") && !el("edsheet").classList.contains("on"))
+  if(!el("esheet").classList.contains("on") && !el("edsheet").classList.contains("on") && !el("msheet").classList.contains("on"))
     el("scrim").classList.remove("on");
 }
 function renderFsList(){
-  if(!state.friends.length){
+  if(!state.humanFriends.length){
     el("fs-list").innerHTML = '<div class="emptynote">Du har ingen venner endnu. Find dem under Søg 🔍</div>';
     return;
   }
-  el("fs-list").innerHTML = state.friends.map(function(h){
+  el("fs-list").innerHTML = state.humanFriends.map(function(h){
     return '<div class="listrow'+(fsSelected[h] ? " sel" : "")+'" data-h="'+esc(h)+'">'+
       avaHTML(h, 44)+
       '<div class="grow"><div class="l1">'+esc(user(h).name)+'</div><div class="l2">@'+esc(h)+'</div></div>'+
@@ -36,6 +36,115 @@ function renderFsList(){
 function fsCan(){
   const any = Object.keys(fsSelected).some(function(k){ return fsSelected[k]; });
   el("fs-create").disabled = !(el("fs-name").value.trim() && any);
+}
+
+/* ================= Medlemmer (sheet, åbnes fra kredshead) ================= */
+let msFeedId = null;
+
+export function openMemberSheet(){
+  if(!me || state.currentFeed === "all" || !feedById(state.currentFeed)) return;
+  msFeedId = state.currentFeed;
+  el("ms-leave").style.display = "";
+  el("ms-leave-confirm").style.display = "none";
+  renderMemberSheet();
+  el("scrim").classList.add("on");
+  el("msheet").classList.add("on");
+}
+export function closeMemberSheet(){
+  el("msheet").classList.remove("on");
+  msFeedId = null;
+  if(!el("fsheet").classList.contains("on") && !el("esheet").classList.contains("on") && !el("edsheet").classList.contains("on"))
+    el("scrim").classList.remove("on");
+}
+function renderMemberSheet(){
+  const f = feedById(msFeedId);
+  if(!f){ closeMemberSheet(); return; }
+  el("ms-title").textContent = f.name;
+  el("ms-members").innerHTML = f.memberIds.map(function(id){
+    const h = ID2H[id] || "?";
+    const ownerTag = id === f.owner ? '<span class="ms-owner">Ejer</span>' : '';
+    const btn = id !== me.id
+      ? '<button class="ms-btn" data-rm="'+esc(id)+'">Fjern</button>'
+      : '';
+    return '<div class="listrow">'+
+      avaHTML(h, 44)+
+      '<div class="grow"><div class="l1">'+esc(user(h).name)+ownerTag+'</div><div class="l2">@'+esc(h)+'</div></div>'+
+      btn+
+    '</div>';
+  }).join("");
+  const cand = state.humanFriends.filter(function(h){
+    const u = user(h);
+    return u.id && f.memberIds.indexOf(u.id) < 0;
+  });
+  el("ms-friends").innerHTML = cand.length
+    ? cand.map(function(h){
+        return '<div class="listrow">'+
+          avaHTML(h, 44)+
+          '<div class="grow"><div class="l1">'+esc(user(h).name)+'</div><div class="l2">@'+esc(h)+'</div></div>'+
+          '<button class="ms-btn add" data-add="'+esc(user(h).id)+'">Tilføj</button>'+
+        '</div>';
+      }).join("")
+    : '<div class="emptynote">Alle dine venner er allerede med.</div>';
+}
+/* Gen-render det åbne medlemmer-sheet (no-op hvis det er lukket) — kaldes også fra realtime */
+export function refreshMemberSheet(){
+  if(msFeedId != null && el("msheet").classList.contains("on")) renderMemberSheet();
+}
+/* Efter enhver vellykket governance-handling: hent feeds/posts igen, så pill + medlemmer opdaterer */
+async function refreshAfterGov(){
+  await loadFeeds();
+  renderFeedbar();
+  renderKredshead();
+  renderComposeDest();
+  refreshMemberSheet();
+  loadPosts(); // en evt. ny afstemning (Ja/Nej-opslag) skal med i feedet
+}
+function govErrToast(m){
+  if(m.indexOf("proposal_exists") >= 0) toast("Der er allerede en afstemning i gang om det");
+  else if(m.indexOf("not_owner") >= 0) toast("Kun ejeren kan fjerne direkte i små kredse");
+  else if(m.indexOf("already_member") >= 0) toast("Personen er allerede med i kredsen");
+  else if(m.indexOf("not_friend") >= 0) toast("Du kan kun tilføje dine egne venner");
+  else toast(GENERIC_ERR);
+}
+async function msRemove(btn){
+  const fid = msFeedId;
+  const f = feedById(fid);
+  if(!f || !me || btn.disabled) return;
+  btn.disabled = true;
+  const { error } = await sb.rpc("remove_kreds_member", { f: fid, tgt: btn.dataset.rm });
+  if(error){
+    console.error(error);
+    btn.disabled = false;
+    govErrToast(String(error.message || ""));
+    return;
+  }
+  /* Serveren afgør direkte-vs-afstemning ud fra sit EGET medlemstal — aflæs resultatet
+     efter refetch i stedet for at gætte ud fra det (muligvis forældede) lokale tal */
+  await refreshAfterGov();
+  const f2 = feedById(fid);
+  if(!f2) return; // kredsen findes ikke længere for os — sheetet er allerede lukket
+  toast(f2.memberIds.indexOf(btn.dataset.rm) < 0
+    ? user(ID2H[btn.dataset.rm] || "?").name + " er fjernet fra kredsen"
+    : "Afstemning oprettet — de andre skal være enige");
+}
+async function msAdd(btn){
+  const fid = msFeedId;
+  const f = feedById(fid);
+  if(!f || !me || btn.disabled) return;
+  btn.disabled = true;
+  const { error } = await sb.rpc("add_kreds_member", { f: fid, u: btn.dataset.add });
+  if(error){
+    console.error(error);
+    btn.disabled = false;
+    govErrToast(String(error.message || ""));
+    return;
+  }
+  await refreshAfterGov();
+  const f2 = feedById(fid);
+  if(!f2) return;
+  toast(f2.memberIds.indexOf(btn.dataset.add) >= 0
+    ? user(ID2H[btn.dataset.add] || "?").name + " er nu med i kredsen"
+    : "Afstemning oprettet — de andre skal være enige");
 }
 
 export function initKredse(){
@@ -49,7 +158,7 @@ el("fs-list").addEventListener("click", function(e){
 el("fs-name").addEventListener("input", fsCan);
 el("fs-create").addEventListener("click", async function(){
   const name = el("fs-name").value.trim();
-  const ids = state.friends
+  const ids = state.humanFriends
     .filter(function(h){ return fsSelected[h]; })
     .map(function(h){ return user(h).id; })
     .filter(Boolean);
@@ -59,7 +168,8 @@ el("fs-create").addEventListener("click", async function(){
   this.disabled = false;
   if(error){
     const m = String(error.message || "");
-    if(m.indexOf("bad_name") >= 0) toast("Ugyldigt kredsnavn");
+    if(m.indexOf("blocked_content") >= 0) toast(BLOCKED_MSG);
+    else if(m.indexOf("bad_name") >= 0) toast("Ugyldigt kredsnavn");
     else if(m.indexOf("not_friend") >= 0 || m.indexOf("bad_members") >= 0) toast("Du kan kun vælge dine venner");
     else toast(GENERIC_ERR);
     return;
@@ -69,5 +179,37 @@ el("fs-create").addEventListener("click", async function(){
   renderComposeDest();
   setFeed(data);
   toast("Kredsen ”"+name+"” er oprettet");
+});
+/* ---- Medlemmer-sheet ---- */
+el("msheet").addEventListener("click", function(e){
+  const rm = e.target.closest(".ms-btn[data-rm]");
+  if(rm){ msRemove(rm); return; }
+  const ad = e.target.closest(".ms-btn[data-add]");
+  if(ad){ msAdd(ad); return; }
+});
+el("ms-leave").addEventListener("click", function(){
+  el("ms-leave").style.display = "none";
+  el("ms-leave-confirm").style.display = "";
+});
+el("ms-leave-cancel").addEventListener("click", function(){
+  el("ms-leave").style.display = "";
+  el("ms-leave-confirm").style.display = "none";
+});
+el("ms-leave2").addEventListener("click", async function(){
+  if(!me || msFeedId == null) return;
+  const btn = this;
+  btn.disabled = true;
+  const { error } = await sb.rpc("leave_kreds", { f: msFeedId });
+  btn.disabled = false;
+  if(error){
+    console.error(error);
+    toast(GENERIC_ERR);
+    return;
+  }
+  closeMemberSheet();
+  await loadFeeds();
+  renderComposeDest();
+  setFeed("all");
+  toast("Du har forladt kredsen");
 });
 }

@@ -1,7 +1,10 @@
 import { sb, GENERIC_ERR } from "./config.js";
-import { me } from "./store.js";
+import { me, expandedCmts } from "./store.js";
 import { el, esc, avaHTML, user, fmtTime, toast, registerProfile } from "./helpers.js";
 import { scheduleRefetch } from "./realtime.js";
+import { switchTab, setFeed } from "./feed.js";
+import { rerenderPostCmts } from "./comments.js";
+import { openProfile } from "./profile.js";
 
 /* ================= Notifikationer ================= */
 export async function loadNotifs(){
@@ -10,8 +13,8 @@ export async function loadNotifs(){
   const H = '<svg viewBox="0 0 24 24"><path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
   const B = '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>';
   const P = '<svg viewBox="0 0 24 24"><g class="stroke"><circle cx="10" cy="8" r="3.4"/><path d="M3.8 19.5c.7-3.3 3.2-5 6.2-5s5.5 1.7 6.2 5"/><path d="M18.5 6.5v6M15.5 9.5h6"/></g></svg>';
-  function row(icon, cls, u, text, snip, t){
-    return '<div class="notif">'+
+  function row(icon, cls, u, text, snip, t, attrs){
+    return '<div class="notif"'+(attrs || "")+'>'+
       avaHTML(u, 32)+
       '<div class="grow">'+
         '<div class="ntext"><b>'+esc(user(u).name)+'</b> '+text+'. <span class="nt">'+esc(t)+'</span></div>'+
@@ -63,20 +66,20 @@ export async function loadNotifs(){
     });
     if(ids.length){
       (res[2].data || []).forEach(function(r){
-        if(r.liker){ registerProfile(r.liker); items.push({ type:"like", u:r.liker.handle, at:r.created_at, snip:textById[r.post_id] || "" }); }
+        if(r.liker){ registerProfile(r.liker); items.push({ type:"like", u:r.liker.handle, at:r.created_at, pid:r.post_id, snip:textById[r.post_id] || "" }); }
       });
       (res[3].data || []).forEach(function(r){
-        if(r.author_profile){ registerProfile(r.author_profile); items.push({ type:"cmt", u:r.author_profile.handle, at:r.created_at, snip:r.text || (r.image_path ? "📷 Billede" : "") }); }
+        if(r.author_profile){ registerProfile(r.author_profile); items.push({ type:"cmt", u:r.author_profile.handle, at:r.created_at, pid:r.post_id, snip:r.text || (r.image_path ? "📷 Billede" : "") }); }
       });
     }
     items.sort(function(a,b){ return new Date(b.at) - new Date(a.at); });
     const top = items.slice(0, 30);
     el("notifs").innerHTML = top.length
       ? top.map(function(n){
-          if(n.type === "like")   return row(H, "heart",  n.u, "likede dit opslag", n.snip, fmtTime(n.at));
-          if(n.type === "cmt")    return row(B, "bubble", n.u, "svarede på dit opslag",  n.snip, fmtTime(n.at));
+          if(n.type === "like")   return row(H, "heart",  n.u, "likede dit opslag", n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="like"');
+          if(n.type === "cmt")    return row(B, "bubble", n.u, "svarede på dit opslag",  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"');
           if(n.type === "kreq")   return kreqRow(n);
-          return row(P, "friend", n.u, "er nu i din kreds", "", fmtTime(n.at));
+          return row(P, "friend", n.u, "er nu i din kreds", "", fmtTime(n.at), ' data-friend="'+esc(n.u)+'"');
         }).join("")
       : '<div class="emptynote">Ingen notifikationer endnu.</div>';
   }catch(err){
@@ -85,10 +88,37 @@ export async function loadNotifs(){
   }
 }
 
+/* ---- Tap på en notifikation: hop til opslaget (eller profilen) ---- */
+async function openNotifPost(pid, isCmt){
+  const { data, error } = await sb.from("posts").select("id, feed_id").eq("id", pid).maybeSingle();
+  if(error){ console.error(error); toast(GENERIC_ERR); return; }
+  if(!data){ toast("Opslaget findes ikke længere"); return; }
+  switchTab("feed");
+  await setFeed(data.feed_id || "all");
+  if(isCmt){
+    // Fold kommentartråden ud, så svarene er synlige når vi lander
+    expandedCmts.add(Number(pid));
+    rerenderPostCmts(pid);
+  }
+  const node = document.querySelector('#feed .post[data-id="'+data.id+'"]');
+  if(!node){ toast("Opslaget kunne ikke vises i feedet"); return; }
+  node.scrollIntoView({ block:"center" });
+  node.classList.add("flash");
+  setTimeout(function(){ node.classList.remove("flash"); }, 1600);
+}
+
 /* ---- Godkend/afvis kreds-anmodning (kun ejeren ser knapperne) ---- */
 async function notifClick(e){
   const b = e.target.closest(".kap, .krej");
-  if(!b || b.disabled || !me) return;
+  if(!b){
+    // Tap på selve rækken (ikke Godkend/Afvis): åbn opslag eller profil
+    const n = e.target.closest(".notif");
+    if(!n || !me) return;
+    if(n.dataset.pid){ openNotifPost(n.dataset.pid, n.dataset.type === "cmt"); return; }
+    if(n.dataset.friend){ openProfile(n.dataset.friend); return; }
+    return;
+  }
+  if(b.disabled || !me) return;
   const row = b.closest(".notif");
   if(!row || !row.dataset.f) return;
   const approve = b.classList.contains("kap");

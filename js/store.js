@@ -10,7 +10,8 @@ export const FRIEND_SINCE = {};  // handle -> year friendship started
 export function setMe(v){ me = v; }
 
 export const state = {
-  friends: [],            // handles
+  friends: [],            // handles (inkl. den officielle profil)
+  humanFriends: [],       // handles uden den officielle profil (tælles/vises som "venner")
   posts: [],              // posts in current view (view-model shape)
   wholePosts: [],         // whole-kreds posts (feed_id null)
   teasers: [],            // blurred teasers fra private kredse (kreds_teasers-RPC)

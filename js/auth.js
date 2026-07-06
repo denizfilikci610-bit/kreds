@@ -1,10 +1,10 @@
-import { sb, GENERIC_ERR, recoveryMode, setRecoveryMode } from "./config.js";
+import { sb, GENERIC_ERR, BLOCKED_MSG, recoveryMode, setRecoveryMode } from "./config.js";
 import { me, setMe, state, FRIEND_SINCE, pv, expandedCmts, clearComposers, setCfilePid } from "./store.js";
 import { el, registerProfile, toast } from "./helpers.js";
-import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu } from "./feed.js";
+import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu, closeReportMenu } from "./feed.js";
 import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPost, resetPoll } from "./compose.js";
 import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile } from "./profile.js";
-import { closeFeedSheet } from "./kredse.js";
+import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
 import { subscribeRealtime, unsubscribeRealtime } from "./realtime.js";
 import { resetSearch } from "./search.js";
 
@@ -95,6 +95,7 @@ export function resetApp(){
   switchTab("feed");
   Object.keys(FRIEND_SINCE).forEach(function(k){ delete FRIEND_SINCE[k]; });
   state.friends = [];
+  state.humanFriends = [];
   state.posts = [];
   state.wholePosts = [];
   state.teasers = [];
@@ -110,9 +111,11 @@ export function resetApp(){
   el("qchip-n").textContent = "0";
   resetDeleteUI();
   closeFeedSheet();
+  closeMemberSheet();
   closeEditSheet();
   closePostEdit();
   closePostMenu();
+  closeReportMenu();
   closeCompose();
   closeProfile();
   clearPendingImg();
@@ -269,12 +272,14 @@ el("auth-signup").addEventListener("submit", async function(e){
   try{
     const { error } = await sb.functions.invoke("signup", { body:{ email:email, password:pass, name:name, handle:handle } });
     if(error){
-      let code = "";
+      let code = "", raw = "";
       try{
-        const b = await error.context.json();
-        code = (b && b.error) || "";
+        raw = await error.context.text();
+        code = (JSON.parse(raw).error) || "";
       }catch(_e){}
-      el("su-err").textContent = SIGNUP_ERRORS[code] || GENERIC_ERR;
+      el("su-err").textContent = (code.indexOf("blocked_content") >= 0 || raw.indexOf("blocked_content") >= 0)
+        ? BLOCKED_MSG
+        : (SIGNUP_ERRORS[code] || GENERIC_ERR);
       return;
     }
     const si = await sb.auth.signInWithPassword({ email:email, password:pass });

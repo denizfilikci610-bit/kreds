@@ -1,4 +1,4 @@
-import { sb, GENERIC_ERR } from "./config.js";
+import { sb, GENERIC_ERR, BLOCKED_MSG } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab } from "./store.js";
 import { el, esc, avaHTML, user, toast, uuid, registerProfile } from "./helpers.js";
 import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos } from "./feed.js";
@@ -30,7 +30,7 @@ export async function renderMyPosts(){
   if(!me) return;
   const mine = state.wholePosts.filter(function(p){ return p.u === me.handle; });
   el("stat-posts").textContent = mine.length;
-  el("stat-friends").textContent = state.friends.length;
+  el("stat-friends").textContent = state.humanFriends.length;
   el("stat-kredse").textContent = state.feeds.length;
   const vsnap = snapVideos(el("myposts"));
   el("myposts").innerHTML = mine.length
@@ -54,7 +54,7 @@ export function setOwnUI(){
 
 export function closeEditSheet(){
   el("esheet").classList.remove("on");
-  if(!el("fsheet").classList.contains("on") && !el("edsheet").classList.contains("on"))
+  if(!el("fsheet").classList.contains("on") && !el("edsheet").classList.contains("on") && !el("msheet").classList.contains("on"))
     el("scrim").classList.remove("on");
 }
 function epCan(){ el("ep-save").disabled = !el("ep-name").value.trim(); }
@@ -155,7 +155,11 @@ el("ep-save").addEventListener("click", async function(){
   this.disabled = true;
   const { error } = await sb.from("profiles").update({ name:name, bio: bio || null }).eq("id", me.id);
   this.disabled = false;
-  if(error){ console.error(error); toast(GENERIC_ERR); return; }
+  if(error){
+    console.error(error);
+    toast(String(error.message || "").indexOf("blocked_content") >= 0 ? BLOCKED_MSG : GENERIC_ERR);
+    return;
+  }
   me.name = name;
   me.bio = bio || null;
   registerProfile(me);

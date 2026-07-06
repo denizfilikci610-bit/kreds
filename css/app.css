@@ -161,7 +161,9 @@
     display:flex;align-items:center;gap:11px;
     padding:12px 16px;
     border-bottom:1px solid var(--line);
+    cursor:pointer;
   }
+  .kredshead:active{opacity:.7}
   .mstack{display:flex}
   .mav{border:2px solid var(--bg)}
   .mav+.mav{margin-left:-9px}
@@ -177,6 +179,14 @@
     display:flex;gap:10px;
     padding:12px 16px;
     border-bottom:1px solid var(--line);
+  }
+  /* Fastgjort-label (officielt opslag øverst i 'Hele kredsen') */
+  .pinlabel{padding:10px 16px 0;font-size:12px;font-weight:700;color:var(--gray)}
+  /* Flash-highlight når man hopper til et opslag fra en notifikation */
+  .post.flash{animation:postflash 1.6s ease}
+  @keyframes postflash{
+    0%,100%{background:transparent}
+    25%,60%{background:var(--chip)}
   }
   .post>.pavab{flex:0 0 auto;display:flex;padding:0;align-self:flex-start}
   .pcol{flex:1;min-width:0}
@@ -389,6 +399,8 @@
     display:flex;align-items:center;gap:12px;
     padding:11px 16px;
   }
+  .notif[data-pid],.notif[data-friend]{cursor:pointer}
+  .notif[data-pid]:active,.notif[data-friend]:active{opacity:.7}
   .notif .grow{flex:1;min-width:0}
   .notif .ntext{font-size:14px;color:var(--ink);line-height:1.4}
   .notif .ntext b{font-weight:700}
@@ -526,6 +538,27 @@
     font-weight:700;font-size:15px;
   }
   .fs-create:disabled{opacity:.45;cursor:default}
+
+  /* ---- Kredsens medlemmer (sheet) ---- */
+  .ms-owner{
+    background:var(--chip);color:var(--gray);
+    border-radius:999px;
+    padding:1px 8px;
+    font-size:11px;font-weight:700;
+  }
+  .ms-btn{
+    flex:0 0 auto;
+    background:var(--chip);color:var(--gray);
+    border-radius:999px;
+    padding:6px 14px;
+    font-size:13px;font-weight:700;
+  }
+  .ms-btn.add{color:var(--red)}
+  .ms-btn:active{opacity:.7}
+  .ms-btn:disabled{opacity:.5;cursor:default}
+  .ms-leavezone{border-top:1px solid var(--line);margin-top:14px;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+  .ms-leave{color:var(--red);font-size:14px;font-weight:700;text-align:left;padding:0}
+  .ms-confirmtxt{font-size:13.5px;color:var(--gray);line-height:1.45;padding-bottom:12px}
 
   /* ---- Skriv (compose) ---- */
   .compose{
@@ -761,6 +794,7 @@
 
   @media(prefers-reduced-motion:reduce){
     .fsheet,.compose,.profileview,.scrim,.toast{transition:none}
-    .bigheart.go svg,.like-btn.on svg{animation:none}
+    .bigheart.go svg,.like-btn.on svg,.post.flash{animation:none}
     .bigheart.go svg{opacity:0}
+    .post.flash{background:var(--chip)}
   }

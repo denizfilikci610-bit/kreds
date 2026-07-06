@@ -3,6 +3,7 @@ import { me, pv } from "./store.js";
 import { el } from "./helpers.js";
 import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, loadQuota } from "./feed.js";
 import { renderComposeDest } from "./compose.js";
+import { refreshMemberSheet } from "./kredse.js";
 import { renderStories, loadPvPosts } from "./profile.js";
 import { renderSearch } from "./search.js";
 
@@ -24,6 +25,7 @@ async function doRefetch(){
   await Promise.all([loadFriends(), loadFeeds(), loadPosts()]);
   renderFeedbar();
   renderKredshead();
+  refreshMemberSheet();
   renderComposeDest();
   renderFeed();
   renderStories();
@@ -43,6 +45,8 @@ export function subscribeRealtime(){
     .on("postgres_changes", { event:"*", schema:"public", table:"comments" }, scheduleRefetch)
     .on("postgres_changes", { event:"*", schema:"public", table:"likes" }, scheduleRefetch)
     .on("postgres_changes", { event:"*", schema:"public", table:"poll_votes" }, scheduleRefetch)
+    .on("postgres_changes", { event:"*", schema:"public", table:"feed_members" }, scheduleRefetch)
+    .on("postgres_changes", { event:"*", schema:"public", table:"feeds" }, scheduleRefetch)
     .subscribe();
 }
 export function unsubscribeRealtime(){

@@ -10,4 +10,8 @@ const SB_URL = 'https://iduotqxkohuezxkveawc.supabase.co';
 const SB_KEY = 'sb_publishable_SHYSpCyVKFwf4jOwg8eSXA_9GzDcf5j';
 export const sb = createClient(SB_URL, SB_KEY);
 
+/* Officiel profil — auto-ven for alle brugere; dens opslag fastgøres øverst i 'Hele kredsen' */
+export const OFFICIAL_HANDLE = "vibefeed";
+
 export const GENERIC_ERR = "Noget gik galt. Prøv igen.";
+export const BLOCKED_MSG = "Teksten indeholder ord, der ikke er tilladt på VibeFeed.";

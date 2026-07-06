@@ -1,4 +1,4 @@
-import { sb, GENERIC_ERR } from "./config.js";
+import { sb, GENERIC_ERR, BLOCKED_MSG } from "./config.js";
 import { me, expandedCmts, composers, cstate, cfilePid } from "./store.js";
 import { el, esc, avaHTML, likesLabel, toast, uuid, HEART_SVG } from "./helpers.js";
 import { findPost, findPostAll, allPostArrays, mapComment } from "./feed.js";
@@ -213,7 +213,9 @@ export async function sendComment(pid){
   }catch(err){
     console.error(err);
     if(path){ sb.storage.from("post-images").remove([path]).catch(function(){}); }
-    toast("Kunne ikke sende kommentaren. Prøv igen.");
+    toast(String((err && err.message) || "").indexOf("blocked_content") >= 0
+      ? BLOCKED_MSG
+      : "Kunne ikke sende kommentaren. Prøv igen.");
     updateSendState(pid);
   }finally{
     s.busy = false;

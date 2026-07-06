@@ -1,4 +1,4 @@
-import { sb } from "./config.js";
+import { sb, BLOCKED_MSG } from "./config.js";
 import { me, state } from "./store.js";
 import { el, esc, toast, uuid } from "./helpers.js";
 import { feedById, setFeed, switchTab } from "./feed.js";
@@ -313,7 +313,9 @@ el("compose-post").addEventListener("click", async function(){
       toast(dfp ? "Delt i "+dfp.name : "Delt med hele kredsen");
     }catch(err){
       console.error(err);
-      toast("Kunne ikke oprette meningsmålingen. Prøv igen.");
+      toast(String((err && err.message) || "").indexOf("blocked_content") >= 0
+        ? BLOCKED_MSG
+        : "Kunne ikke oprette meningsmålingen. Prøv igen.");
     }finally{
       btn.disabled = false;
       canPost();
@@ -361,7 +363,9 @@ el("compose-post").addEventListener("click", async function(){
   }catch(err){
     console.error(err);
     if(path){ sb.storage.from("post-images").remove([path]).catch(function(){}); }
-    toast("Kunne ikke dele. Prøv igen.");
+    toast(String((err && err.message) || "").indexOf("blocked_content") >= 0
+      ? BLOCKED_MSG
+      : "Kunne ikke dele. Prøv igen.");
   }finally{
     btn.disabled = false;
     canPost();

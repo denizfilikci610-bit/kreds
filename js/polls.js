@@ -95,8 +95,10 @@ export async function votePoll(pid, oid){
     }
     // Fejlet upsert udløser ingen realtime-hændelse — hent server-tilstand igen
     scheduleRefetch();
-    toast(String(error.message || "").indexOf("bad_option") >= 0
-      ? "Den svarmulighed hører ikke til meningsmålingen."
-      : "Kunne ikke gemme din stemme. Prøv igen.");
+    const m = String(error.message || "");
+    if(m.indexOf("not_eligible") >= 0) toast("Du kan ikke stemme i en afstemning om dig selv.");
+    else if(m.indexOf("poll_closed") >= 0) toast("Afstemningen er afgjort.");
+    else if(m.indexOf("bad_option") >= 0) toast("Den svarmulighed hører ikke til meningsmålingen.");
+    else toast("Kunne ikke gemme din stemme. Prøv igen.");
   }
 }

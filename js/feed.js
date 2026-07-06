@@ -1,9 +1,9 @@
-import { sb, GENERIC_ERR } from "./config.js";
+import { sb, GENERIC_ERR, BLOCKED_MSG, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, expandedCmts, pv, cstate, setCurTab, setCfilePid, ID2H, FRIEND_SINCE } from "./store.js";
 import { el, esc, avaHTML, user, grad, likesLabel, toast, fmtTime, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
 import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, cInput, cKey, clearReply, clearCImg } from "./comments.js";
-import { openFeedSheet } from "./kredse.js";
-import { openProfile, closeProfile, renderMyPosts, renderStories } from "./profile.js";
+import { openFeedSheet, openMemberSheet } from "./kredse.js";
+import { openProfile, closeProfile, renderMyPosts, renderStories, refreshPv } from "./profile.js";
 import { renderSearch } from "./search.js";
 import { loadNotifs } from "./notifications.js";
 import { scheduleRefetch } from "./realtime.js";
@@ -246,15 +246,24 @@ export function restoreVideos(container, snap){
 
 export function renderFeed(){
   let html = "";
-  if(state.currentFeed === "all" && me && !state.friends.length){
+  if(state.currentFeed === "all" && me && !state.humanFriends.length){
     html += '<div class="emptynote" style="padding:24px 20px;text-align:center">Din kreds er tom endnu.<br>Find dine venner under Søg 🔍</div>';
   }
+  /* Fastgjorte opslag fra den officielle profil hejses op FØR teaser-flet (kun 'Hele kredsen') */
+  let rest = state.posts, pinned = [];
+  if(state.currentFeed === "all"){
+    pinned = state.posts.filter(function(p){ return p.u === OFFICIAL_HANDLE; });
+    rest = state.posts.filter(function(p){ return p.u !== OFFICIAL_HANDLE; });
+  }
   const items = (state.currentFeed === "all" && state.teasers.length)
-    ? state.posts.concat(state.teasers).sort(function(a,b){ return new Date(b.created) - new Date(a.created); })
-    : state.posts;
+    ? rest.concat(state.teasers).sort(function(a,b){ return new Date(b.created) - new Date(a.created); })
+    : rest;
+  pinned.forEach(function(p){
+    html += '<div class="pinlabel">📌 Fastgjort</div>' + postHTML(p);
+  });
   if(items.length){
     html += items.map(function(p){ return p.teaser ? teaserHTML(p) : postHTML(p); }).join("");
-  } else if(!(state.currentFeed === "all" && me && !state.friends.length)){
+  } else if(!pinned.length && !(state.currentFeed === "all" && me && !state.humanFriends.length)){
     html += '<div class="emptynote" style="padding:36px 20px;text-align:center">Ingen opslag i denne kreds endnu.<br>Vær den første ✍️</div>';
   }
   const f = document.activeElement && document.activeElement.closest ? document.activeElement.closest("#feed .cfield") : null;
@@ -326,14 +335,15 @@ export async function loadFriends(){
   });
   hs.sort();
   state.friends = hs;
-  el("stat-friends").textContent = hs.length;
+  state.humanFriends = hs.filter(function(h){ return h !== OFFICIAL_HANDLE; });
+  el("stat-friends").textContent = state.humanFriends.length;
 }
 export async function loadFeeds(){
   if(!me) return;
   const { data, error } = await sb.from("feeds").select("*, feed_members(user_id)");
   if(error){ console.error(error); toast(GENERIC_ERR); return; }
   const feeds = (data || []).map(function(f){
-    return { id:f.id, name:f.name, created:f.created_at, memberIds:(f.feed_members||[]).map(function(m){ return m.user_id; }) };
+    return { id:f.id, name:f.name, owner:f.owner, created:f.created_at, memberIds:(f.feed_members||[]).map(function(m){ return m.user_id; }) };
   });
   feeds.sort(function(a,b){ return new Date(a.created) - new Date(b.created); });
   const unknown = [];
@@ -388,8 +398,9 @@ export function setFeed(id){
   renderFeedbar();
   renderKredshead();
   el("feed").innerHTML = '<div class="emptynote" style="text-align:center">Henter …</div>';
-  loadPosts();
+  const done = loadPosts();
   el("app").scrollTop = 0;
+  return done; // kan awaites (fx notifikations-hop)
 }
 
 /* ================= Like-saldo (chip + profil, én datakilde) ================= */
@@ -519,6 +530,44 @@ export function closePostMenu(){
   menuPid = null;
 }
 
+/* ================= Andres opslag: anmeld (⋯-menu) ================= */
+let reportPid = null;
+
+export function openReportMenu(id){
+  reportPid = Number(id);
+  el("rmenu-main").style.display = "";
+  el("rmenu-confirm").style.display = "none";
+  el("rmenu").classList.add("on");
+}
+export function closeReportMenu(){
+  el("rmenu").classList.remove("on");
+  reportPid = null;
+}
+async function reportPost(){
+  const id = reportPid;
+  if(id == null || !me) return;
+  const btn = el("rm-report2");
+  btn.disabled = true;
+  const { error } = await sb.from("reports").insert({ post_id:id, user_id:me.id });
+  btn.disabled = false;
+  if(error && error.code !== "23505"){ // 23505 = allerede anmeldt — behandles som succes
+    console.error(error);
+    closeReportMenu();
+    toast(GENERIC_ERR);
+    return;
+  }
+  closeReportMenu();
+  allPostArrays().forEach(function(arr){
+    for(let i = arr.length - 1; i >= 0; i--){
+      if(Number(arr[i].id) === id) arr.splice(i, 1);
+    }
+  });
+  renderFeed();
+  if(el("view-profil").classList.contains("active")) renderMyPosts();
+  refreshPv();
+  toast("Tak. Opslaget er anmeldt og skjult for dig.");
+}
+
 export function openPostEdit(id){
   const p = findPost(id);
   if(!p) return;
@@ -532,7 +581,7 @@ export function openPostEdit(id){
 export function closePostEdit(){
   el("edsheet").classList.remove("on");
   editPid = null;
-  if(!el("fsheet").classList.contains("on") && !el("esheet").classList.contains("on"))
+  if(!el("fsheet").classList.contains("on") && !el("esheet").classList.contains("on") && !el("msheet").classList.contains("on"))
     el("scrim").classList.remove("on");
 }
 
@@ -549,7 +598,11 @@ async function savePostEdit(){
   btn.disabled = true;
   const { error } = await sb.from("posts").update({ text: text || null }).eq("id", id);
   btn.disabled = false;
-  if(error){ console.error(error); toast(GENERIC_ERR); return; }
+  if(error){
+    console.error(error);
+    toast(String(error.message || "").indexOf("blocked_content") >= 0 ? BLOCKED_MSG : GENERIC_ERR);
+    return;
+  }
   findPostAll(id).forEach(function(q){ q.text = text || undefined; });
   closePostEdit();
   renderFeed();
@@ -659,8 +712,9 @@ function timelineClick(e){
   const d = e.target.closest(".dots");
   if(d){
     const p = findPost(d.dataset.id);
-    if(me && p && p.u === me.handle) openPostMenu(p.id);
-    else toast("Intet skjult her — feedet er altid kronologisk");
+    if(!me || !p) return;
+    if(p.u === me.handle) openPostMenu(p.id);
+    else openReportMenu(p.id);
     return;
   }
   const pr = e.target.closest(".pavab");
@@ -727,6 +781,22 @@ el("pm-delete").addEventListener("click", function(){
 });
 el("pm-del-cancel").addEventListener("click", closePostMenu);
 el("pm-del2").addEventListener("click", deleteOwnPost);
+/* ---- Andres opslag: anmeld-popup ---- */
+el("rmenu").addEventListener("click", function(e){
+  if(e.target === el("rmenu")) closeReportMenu();
+});
+el("rm-cancel").addEventListener("click", closeReportMenu);
+el("rm-cancel2").addEventListener("click", closeReportMenu);
+el("rm-report").addEventListener("click", function(){
+  el("rmenu-main").style.display = "none";
+  el("rmenu-confirm").style.display = "";
+});
+el("rm-report2").addEventListener("click", reportPost);
+/* ---- Kreds-medlemmer: sheet åbnes fra kredshead ---- */
+el("kredshead").addEventListener("click", function(){ openMemberSheet(); });
+el("kredshead").addEventListener("keydown", function(e){
+  if(e.key === "Enter" || e.key === " "){ e.preventDefault(); openMemberSheet(); }
+});
 el("ed-save").addEventListener("click", savePostEdit);
 el("ed-field").addEventListener("input", function(){
   el("ed-hint").style.display = "none";
