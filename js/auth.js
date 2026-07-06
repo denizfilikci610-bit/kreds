@@ -97,6 +97,7 @@ export function resetApp(){
   state.friends = [];
   state.posts = [];
   state.wholePosts = [];
+  state.teasers = [];
   state.feeds = [];
   state.currentFeed = "all";
   pv.u = null;
@@ -129,6 +130,7 @@ export function resetApp(){
   el("nik-saldo").innerHTML = "";
   el("stat-posts").textContent = "0";
   el("stat-friends").textContent = "0";
+  el("stat-kredse").textContent = "0";
   resetSearch();
   el("su-name").value = "";
   el("su-handle").value = "";

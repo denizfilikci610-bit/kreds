@@ -15,13 +15,13 @@ Live: deployes automatisk via Vercel — hvert `git push` til `main` udløser et
 | `js/store.js` | Delt mutérbar tilstand: `me` (+`setMe`), `USERS`, `state`, composers, `pv`, `curTab` m.m. |
 | `js/helpers.js` | Småhjælpere: `esc`, `el`, tidsformat, avatarer/gradienter, `toast`, `imgUrl`, `uuid` |
 | `js/auth.js` | Login, opret, glemt/nulstil adgangskode, `boot()`/`resetApp()`, auth-events |
-| `js/feed.js` | Hent/render feed (X-layout, `postHTML`), likes + saldo (qchip), deling (`sharePost`), faner (`switchTab`), timeline-klik (inkl. video-lyd og dobbelttryk-like), rediger/slet egne opslag |
+| `js/feed.js` | Hent/render feed (X-layout, `postHTML`), slørede teasers fra private kredse (`kreds_teasers`-RPC, `teaserHTML`, anmod-om-at-være-med), likes + saldo (qchip), deling (`sharePost`), faner (`switchTab`), timeline-klik (inkl. video-lyd og dobbelttryk-like), rediger/slet egne opslag |
 | `js/comments.js` | Kommentartråde (sammenklappet som standard, `cmtSectionHTML`/`toggleCmtSection`), composer, kommentar-likes, billede i kommentar |
 | `js/kredse.js` | "Ny kreds"-sheet og `create_feed`-RPC |
 | `js/compose.js` | Skriv-skærmen: tekst, medie-menu (kamera/video/bibliotek), billede- og videovedhæftning (video maks. 6 s / 25 MB), meningsmåling-editor, tegn-ring, del-til-valg |
 | `js/polls.js` | Meningsmålinger: view-model (`mapPoll`), rendering (`pollHTML`) og stemmeafgivning (`votePoll`) |
 | `js/search.js` | Søg-fanen: venner + global søgning + `add_friend` |
-| `js/notifications.js` | Aktivitets-fanen (likes, svar, nye venner) |
+| `js/notifications.js` | Aktivitets-fanen (likes, svar, nye venner, kreds-anmodninger med Godkend/Afvis for kreds-ejeren) |
 | `js/profile.js` | Egen profil (statistik, bio, rediger-sheet, avatar, slet konto-popup, log ud), venneprofil (bio + vennetal), bobler |
 | `js/realtime.js` | Realtime-kanal og debounced refetch ved ændringer/fokus |
 | `js/main.js` | Importerer alt, kobler alle event-lyttere (`init*()`), kører opstartssekvensen |

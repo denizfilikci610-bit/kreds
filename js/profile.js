@@ -31,6 +31,7 @@ export async function renderMyPosts(){
   const mine = state.wholePosts.filter(function(p){ return p.u === me.handle; });
   el("stat-posts").textContent = mine.length;
   el("stat-friends").textContent = state.friends.length;
+  el("stat-kredse").textContent = state.feeds.length;
   const vsnap = snapVideos(el("myposts"));
   el("myposts").innerHTML = mine.length
     ? mine.map(postHTML).join("")
@@ -80,6 +81,7 @@ export async function openProfile(h){
   el("pv-bio").style.display = bio ? "" : "none";
   el("pv-stat-posts").textContent = "0";
   el("pv-stat-friends").textContent = "–";
+  el("pv-stat-kredse").textContent = "–";
   el("pv-ava").innerHTML = avaHTML(h, 86);
   el("pv-since").textContent = "I din kreds siden "+(FRIEND_SINCE[h] || u.since || "i dag")+" · Gensidig ven";
   el("pv-posts").innerHTML = '<div class="emptynote">Henter …</div>';
@@ -89,6 +91,11 @@ export async function openProfile(h){
     if(pv.u !== h) return;
     if(r.error){ console.error(r.error); return; }
     if(r.data != null) el("pv-stat-friends").textContent = r.data;
+  });
+  sb.rpc("kreds_count_of", { u: u.id }).then(function(r){
+    if(pv.u !== h) return;
+    if(r.error){ console.error(r.error); return; }
+    if(r.data != null) el("pv-stat-kredse").textContent = r.data;
   });
   await loadPvPosts();
 }

@@ -16,10 +16,11 @@ function fallbackGrad(h){
   for(let i = 0; i < h.length; i++) x = (x*31 + h.charCodeAt(i)) >>> 0;
   return FALLBACK[x % FALLBACK.length];
 }
+function okColor(c){ return /^#[0-9a-fA-F]{3,8}$/.test(c || ""); }
 export function registerProfile(p){
   if(!p || !p.handle) return;
   let g = [p.color1, p.color2];
-  if(!g[0] || !g[1]) g = fallbackGrad(p.handle);
+  if(!okColor(g[0]) || !okColor(g[1])) g = fallbackGrad(p.handle); // aldrig rå tekst i inline styles
   const prev = USERS[p.handle];
   USERS[p.handle] = {
     name: p.name || p.handle,
@@ -49,7 +50,7 @@ export function avaHTML(h, size, cls){
     return '<img class="'+c+'" src="'+esc(imgUrl(u.avatar_path))+'" alt="" style="'+style+'">';
   }
   const fs = Math.max(8, Math.round(size * 0.38));
-  return '<span class="'+c+'" style="'+style+'font-size:'+fs+'px;background:'+grad(h)+'">'+ini(h)+'</span>';
+  return '<span class="'+c+'" style="'+style+'font-size:'+fs+'px;background:'+esc(grad(h))+'">'+ini(h)+'</span>';
 }
 export function likesLabel(n){ return n + (n === 1 ? " like" : " likes"); }
 

@@ -1,6 +1,6 @@
 import { sb, GENERIC_ERR } from "./config.js";
 import { me, state, expandedCmts, pv, cstate, setCurTab, setCfilePid, ID2H, FRIEND_SINCE } from "./store.js";
-import { el, esc, avaHTML, user, likesLabel, toast, fmtTime, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
+import { el, esc, avaHTML, user, grad, likesLabel, toast, fmtTime, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
 import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, cInput, cKey, clearReply, clearCImg } from "./comments.js";
 import { openFeedSheet } from "./kredse.js";
 import { openProfile, closeProfile, renderMyPosts, renderStories } from "./profile.js";
@@ -46,6 +46,33 @@ export function mapPost(row){
     poll: mapPoll(row) || undefined,
     cmts: cmts
   };
+}
+/* Teasers fra private kredse (kreds_teasers-RPC — serveren sender ALDRIG indhold) */
+/* Kredse med en optimistisk 'Anmodning sendt' der endnu ikke er bekræftet af serveren */
+const pendingReq = new Set();
+async function mapTeasers(rows){
+  const unknown = [];
+  rows.forEach(function(r){
+    if(!ID2H[r.author] && unknown.indexOf(r.author) < 0) unknown.push(r.author);
+  });
+  if(unknown.length){
+    const r = await sb.from("profiles").select("*").in("id", unknown);
+    if(!r.error) (r.data || []).forEach(registerProfile);
+  }
+  return rows.map(function(r){
+    const requested = !!r.requested || pendingReq.has(r.feed_id);
+    if(r.requested) pendingReq.delete(r.feed_id); // serveren har bekræftet — override unødig
+    return {
+      teaser: true,
+      id: "t" + r.post_id,
+      u: ID2H[r.author] || "?",
+      created: r.created_at,
+      t: fmtTime(r.created_at),
+      feedId: r.feed_id,
+      feedName: r.feed_name || "",
+      requested: requested
+    };
+  });
 }
 
 /* ================= Ikoner (tabbar) ================= */
@@ -135,6 +162,62 @@ export function postHTML(p){
   );
 }
 
+/* ---- Teaser-kort: sløret pladsholder + anmod-knap (ingen actions/kommentarer) ---- */
+export function teaserHTML(p){
+  const name = user(p.u).name;
+  const btn = p.requested
+    ? '<button class="treq sent" data-f="'+esc(p.feedId)+'" disabled>Anmodning sendt ✓</button>'
+    : '<button class="treq" data-f="'+esc(p.feedId)+'">Anmod om at være med</button>';
+  return (
+    '<article class="post teaser" data-tid="'+esc(p.id)+'">'+
+      '<button class="pavab" data-u="'+esc(p.u)+'" aria-label="Profil">'+
+        avaHTML(p.u, 40)+
+      '</button>'+
+      '<div class="pcol">'+
+        '<div class="phead">'+
+          '<span class="nm">'+esc(name)+'</span>'+
+          '<span class="badge">'+BADGE+'</span>'+
+          '<span class="ph">@'+esc(p.u)+' · '+esc(p.t)+'</span>'+
+        '</div>'+
+        '<div class="pmedia tmedia">'+
+          '<div class="tblur" style="background:'+esc(grad(p.u))+'"></div>'+
+          '<div class="tlock">'+
+            '<span class="tic" aria-hidden="true">🔒</span>'+
+            '<span class="ttxt">'+esc(name)+' delte i den private kreds “'+esc(p.feedName)+'”</span>'+
+            btn+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+    '</article>'
+  );
+}
+function setTeaserReqUI(f, on){
+  state.teasers.forEach(function(x){ if(x.feedId === f) x.requested = on; });
+  document.querySelectorAll('.treq[data-f="'+f+'"]').forEach(function(b){
+    b.disabled = on;
+    b.classList.toggle("sent", on);
+    b.textContent = on ? "Anmodning sendt ✓" : "Anmod om at være med";
+  });
+}
+async function requestJoin(f){
+  if(!me || !f) return;
+  pendingReq.add(f);
+  setTeaserReqUI(f, true);
+  const { error } = await sb.rpc("request_join_kreds", { f: f });
+  if(!error) return;
+  console.error(error);
+  const m = String(error.message || "");
+  if(m.indexOf("already_member") >= 0){
+    pendingReq.delete(f); // teaseren forsvinder alligevel
+    toast("Du er allerede med i kredsen 🎉");
+    scheduleRefetch();
+    return;
+  }
+  pendingReq.delete(f);
+  setTeaserReqUI(f, false);
+  toast(m.indexOf("not_allowed") >= 0 ? "Du kan ikke anmode om at være med i den kreds" : GENERIC_ERR);
+}
+
 /* Bevar video-tilstand (lyd + position) hen over re-render af timeline-HTML */
 export function snapVideos(container){
   const snap = new Map();
@@ -166,8 +249,11 @@ export function renderFeed(){
   if(state.currentFeed === "all" && me && !state.friends.length){
     html += '<div class="emptynote" style="padding:24px 20px;text-align:center">Din kreds er tom endnu.<br>Find dine venner under Søg 🔍</div>';
   }
-  if(state.posts.length){
-    html += state.posts.map(postHTML).join("");
+  const items = (state.currentFeed === "all" && state.teasers.length)
+    ? state.posts.concat(state.teasers).sort(function(a,b){ return new Date(b.created) - new Date(a.created); })
+    : state.posts;
+  if(items.length){
+    html += items.map(function(p){ return p.teaser ? teaserHTML(p) : postHTML(p); }).join("");
   } else if(!(state.currentFeed === "all" && me && !state.friends.length)){
     html += '<div class="emptynote" style="padding:36px 20px;text-align:center">Ingen opslag i denne kreds endnu.<br>Vær den første ✍️</div>';
   }
@@ -195,11 +281,27 @@ export async function loadPosts(){
     const reqs = [ postQuery().is("feed_id", null) ];
     const cur = state.currentFeed;
     if(cur !== "all") reqs.push(postQuery().eq("feed_id", cur));
+    else reqs.push(sb.rpc("kreds_teasers")); // kun i 'Hele kredsen'
     const res = await Promise.all(reqs);
     if(state.currentFeed !== cur) return;
-    for(const r of res){ if(r.error) throw r.error; }
+    if(res[0].error) throw res[0].error;
+    if(cur !== "all" && res[1].error) throw res[1].error;
     state.wholePosts = (res[0].data || []).map(mapPost);
-    state.posts = cur === "all" ? state.wholePosts : (res[1].data || []).map(mapPost);
+    if(cur === "all"){
+      state.posts = state.wholePosts;
+      if(res[1].error){
+        // Teasers er ren pynt — de må ikke vælte hele feedet
+        console.error(res[1].error);
+        state.teasers = [];
+      } else {
+        const t = await mapTeasers(res[1].data || []);
+        if(state.currentFeed !== cur) return;
+        state.teasers = t;
+      }
+    } else {
+      state.teasers = [];
+      state.posts = (res[1].data || []).map(mapPost);
+    }
     renderFeed();
     renderStories();
     if(el("view-profil").classList.contains("active")) renderMyPosts();
@@ -513,6 +615,8 @@ export function sharePost(id){
 /* ---- Klik i timeline ---- */
 let lastTap = { id:null, t:0 };
 function timelineClick(e){
+  const tq = e.target.closest(".treq");
+  if(tq){ if(!tq.disabled) requestJoin(tq.dataset.f); return; }
   const like = e.target.closest(".like-btn");
   if(like){ setLike(like.dataset.id); return; }
   const vt = e.target.closest("[data-vote]");
@@ -566,7 +670,7 @@ function timelineClick(e){
     return;
   }
   const media = e.target.closest(".pmedia");
-  if(media){
+  if(media && media.dataset.id){
     const vid = media.querySelector("video");
     if(vid){
       // Tryk = slå lyd til/fra. Ved dobbelttryk slås den to gange (netto uændret) + like.

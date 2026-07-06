@@ -13,6 +13,7 @@ export const state = {
   friends: [],            // handles
   posts: [],              // posts in current view (view-model shape)
   wholePosts: [],         // whole-kreds posts (feed_id null)
+  teasers: [],            // blurred teasers fra private kredse (kreds_teasers-RPC)
   feeds: [],              // { id, name, memberIds:[uuid], members:[handle] }
   currentFeed: "all"
 };

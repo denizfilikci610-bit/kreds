@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-title" content="VibeFeed">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: https://iduotqxkohuezxkveawc.supabase.co; media-src https://iduotqxkohuezxkveawc.supabase.co blob:; connect-src https://iduotqxkohuezxkveawc.supabase.co wss://iduotqxkohuezxkveawc.supabase.co; base-uri 'self'; form-action 'self'; object-src 'none'">
 <title>VibeFeed</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -71,6 +73,7 @@
         <div class="pstats">
           <div class="stat"><b id="stat-posts">0</b><span>Opslag</span></div>
           <div class="stat"><b id="stat-friends">0</b><span>Venner</span></div>
+          <div class="stat"><b id="stat-kredse">0</b><span>Kredse</span></div>
         </div>
       </div>
       <div class="pinfo">
@@ -198,6 +201,7 @@
         <div class="pstats">
           <div class="stat"><b id="pv-stat-posts">0</b><span>Opslag</span></div>
           <div class="stat"><b id="pv-stat-friends">0</b><span>Venner</span></div>
+          <div class="stat"><b id="pv-stat-kredse">–</b><span>Kredse</span></div>
         </div>
       </div>
       <div class="pinfo">
@@ -218,7 +222,7 @@
   <div class="fsheet" id="esheet" role="dialog" aria-label="Rediger profil">
     <div class="cmt-grab"></div>
     <div class="cmt-title">Rediger profil</div>
-    <div style="flex:1;overflow-y:auto;min-height:0">
+    <div class="ep-scroll" style="flex:1;overflow-y:auto;min-height:0">
       <div class="ep-avarow">
         <span id="ep-ava" style="display:flex;flex:0 0 auto"></span>
         <button class="pic" id="ep-pic">Skift profilbillede</button>
