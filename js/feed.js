@@ -1,7 +1,7 @@
 import { sb, GENERIC_ERR } from "./config.js";
 import { me, state, expandedCmts, pv, cstate, setCurTab, setCfilePid, ID2H, FRIEND_SINCE } from "./store.js";
 import { el, esc, avaHTML, user, likesLabel, toast, fmtTime, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
-import { threadHTML, composerHTML, rerenderPostCmts, rerenderComposer, sendComment, toggleCmtLike, cInput, cKey, clearReply, clearCImg } from "./comments.js";
+import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, cInput, cKey, clearReply, clearCImg } from "./comments.js";
 import { openFeedSheet } from "./kredse.js";
 import { openProfile, closeProfile, renderMyPosts, renderStories } from "./profile.js";
 import { renderSearch } from "./search.js";
@@ -37,9 +37,9 @@ export function mapPost(row){
     u: h,
     created: row.created_at,
     t: fmtTime(row.created_at),
-    ts: fmtTime(row.created_at),
     text: row.text || undefined,
     img: row.image_path ? { src: imgUrl(row.image_path), alt: "Billede" } : undefined,
+    video: row.video_path ? { src: imgUrl(row.video_path) } : undefined,
     liked: !!(me && likes.some(function(l){ return l.user_id === me.id; })),
     likeCount: likes.length,
     feed: row.feed_id || undefined,
@@ -76,52 +76,89 @@ export function setTabIcons(active){
   }
 }
 
-/* ================= Timeline ================= */
+/* ================= Timeline (X-anatomi: avatar-kolonne + indholdskolonne) ================= */
+const BIGHEART = '<div class="bigheart"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>';
+const VSOUND =
+  '<span class="vsound muted" aria-hidden="true">'+
+    '<svg class="v-on" viewBox="0 0 24 24"><g class="stroke"><path d="M11 5 6.5 9H3v6h3.5L11 19V5Z"/><path d="M15.5 8.8a4.5 4.5 0 0 1 0 6.4M18 6.3a8 8 0 0 1 0 11.4"/></g></svg>'+
+    '<svg class="v-off" viewBox="0 0 24 24"><g class="stroke"><path d="M11 5 6.5 9H3v6h3.5L11 19V5Z"/><path d="m16 9.5 5 5m0-5-5 5"/></g></svg>'+
+  '</span>';
+function cntHTML(n){
+  return '<span class="cnt"'+(n > 0 ? '' : ' style="display:none"')+'>'+n+'</span>';
+}
 export function postHTML(p){
-  const big = (!p.img && p.text && p.text.length <= 64) ? " big" : "";
-  const media = p.img
-    ? '<div class="pmedia" data-id="'+p.id+'">'+
+  let media = '';
+  if(p.video){
+    media = '<div class="pmedia" data-id="'+p.id+'">'+
+        '<video src="'+esc(p.video.src)+'" playsinline muted loop autoplay preload="metadata"></video>'+
+        VSOUND+BIGHEART+
+      '</div>';
+  } else if(p.img){
+    media = '<div class="pmedia" data-id="'+p.id+'">'+
         '<img src="'+esc(p.img.src)+'" alt="'+esc(p.img.alt||"")+'" draggable="false">'+
-        '<div class="bigheart"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>'+
-      '</div>'
-    : '';
-  const likeLine = '<div class="plikes"'+(p.likeCount > 0 ? '' : ' style="display:none"')+'>'+likesLabel(p.likeCount)+'</div>';
-  const cap = (p.img && p.text) ? '<div class="pcap"><b>'+esc(p.u)+'</b> '+esc(p.text)+'</div>' : '';
-
+        BIGHEART+
+      '</div>';
+  }
   return (
     '<article class="post" data-id="'+p.id+'">'+
-      '<div class="phead">'+
-        '<button class="pavab" data-u="'+esc(p.u)+'" aria-label="Profil">'+
-          avaHTML(p.u, 32)+
-        '</button>'+
-        '<span class="nm">'+esc(user(p.u).name)+'</span>'+
-        '<span class="badge">'+BADGE+'</span>'+
-        '<span class="ptime">· '+esc(p.t)+'</span>'+
-        '<button class="dots" data-id="'+p.id+'" aria-label="Mere">'+
-          '<svg viewBox="0 0 24 24"><g class="fillic"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></g></svg>'+
-        '</button>'+
+      '<button class="pavab" data-u="'+esc(p.u)+'" aria-label="Profil">'+
+        avaHTML(p.u, 40)+
+      '</button>'+
+      '<div class="pcol">'+
+        '<div class="phead">'+
+          '<span class="nm">'+esc(user(p.u).name)+'</span>'+
+          '<span class="badge">'+BADGE+'</span>'+
+          '<span class="ph">@'+esc(p.u)+' · '+esc(p.t)+'</span>'+
+          '<button class="dots" data-id="'+p.id+'" aria-label="Mere">'+
+            '<svg viewBox="0 0 24 24"><g class="fillic"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></g></svg>'+
+          '</button>'+
+        '</div>'+
+        (p.text ? '<div class="ptext">'+esc(p.text)+'</div>' : '')+
+        media+
+        pollHTML(p)+
+        '<div class="pactions">'+
+          '<button class="cmt-btn" data-id="'+p.id+'" aria-label="Kommentarer">'+
+            '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>'+
+            cntHTML(p.cmts.length)+
+          '</button>'+
+          '<button class="like-btn'+(p.liked ? " on" : "")+'" data-id="'+p.id+'" aria-pressed="'+p.liked+'" aria-label="Like">'+
+            HEART_SVG+
+            cntHTML(p.likeCount)+
+          '</button>'+
+          '<button class="share-btn" data-id="'+p.id+'" aria-label="Del">'+
+            '<svg viewBox="0 0 24 24"><path class="stroke" d="M21.5 2.5 10.8 13.2M21.5 2.5l-6.8 19-3.9-8.3-8.3-3.9Z"/></svg>'+
+          '</button>'+
+        '</div>'+
+        cmtSectionHTML(p)+
       '</div>'+
-      (!p.img && p.text ? '<div class="ptext'+big+'">'+esc(p.text)+'</div>' : '')+
-      media+
-      pollHTML(p)+
-      '<div class="pactions">'+
-        '<button class="like-btn'+(p.liked ? " on" : "")+'" data-id="'+p.id+'" aria-pressed="'+p.liked+'" aria-label="Like">'+
-          HEART_SVG+
-        '</button>'+
-        '<button class="cmt-btn" data-id="'+p.id+'" aria-label="Kommentér">'+
-          '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>'+
-        '</button>'+
-        '<button class="share-btn" aria-label="Del">'+
-          '<svg viewBox="0 0 24 24"><path class="stroke" d="M21.5 2.5 10.8 13.2M21.5 2.5l-6.8 19-3.9-8.3-8.3-3.9Z"/></svg>'+
-        '</button>'+
-      '</div>'+
-      likeLine+
-      cap+
-      threadHTML(p)+
-      '<div class="pts">'+esc(p.t)+'</div>'+
-      composerHTML(p.id)+
     '</article>'
   );
+}
+
+/* Bevar video-tilstand (lyd + position) hen over re-render af timeline-HTML */
+export function snapVideos(container){
+  const snap = new Map();
+  container.querySelectorAll(".pmedia video").forEach(function(vid){
+    const m = vid.closest(".pmedia");
+    if(!m || !m.dataset.id) return;
+    snap.set(m.dataset.id, { muted: vid.muted, time: vid.currentTime });
+  });
+  return snap;
+}
+export function restoreVideos(container, snap){
+  if(!snap || !snap.size) return;
+  container.querySelectorAll(".pmedia video").forEach(function(vid){
+    const m = vid.closest(".pmedia");
+    const saved = m && m.dataset.id ? snap.get(m.dataset.id) : null;
+    if(!saved) return;
+    try{ vid.currentTime = saved.time; }catch(_){}
+    if(saved.muted === false){
+      vid.muted = false;
+      const s = m.querySelector(".vsound");
+      if(s) s.classList.toggle("muted", false);
+      vid.play().catch(function(){});
+    }
+  });
 }
 
 export function renderFeed(){
@@ -136,7 +173,9 @@ export function renderFeed(){
   }
   const f = document.activeElement && document.activeElement.closest ? document.activeElement.closest("#feed .cfield") : null;
   const fpid = f ? f.dataset.id : null, selS = f ? f.selectionStart : 0, selE = f ? f.selectionEnd : 0;
+  const vsnap = snapVideos(el("feed"));
   el("feed").innerHTML = html;
+  restoreVideos(el("feed"), vsnap);
   if(fpid){
     const nf = el("feed").querySelector('.cbox[data-id="'+fpid+'"] .cfield');
     if(nf){ nf.focus(); try{ nf.setSelectionRange(selS, selE); }catch(_){} }
@@ -321,12 +360,14 @@ export function applyLikeUI(id, on){
   const p = findPost(id);
   document.querySelectorAll('.post[data-id="'+id+'"]').forEach(function(node){
     const btn = node.querySelector(".like-btn");
-    if(btn){ btn.classList.toggle("on", on); btn.setAttribute("aria-pressed", on); }
+    if(!btn) return;
+    btn.classList.toggle("on", on);
+    btn.setAttribute("aria-pressed", on);
     if(p){
-      const lc = node.querySelector(".plikes");
-      if(lc){
-        lc.textContent = likesLabel(p.likeCount);
-        lc.style.display = p.likeCount > 0 ? "" : "none";
+      const c = btn.querySelector(".cnt");
+      if(c){
+        c.textContent = p.likeCount;
+        c.style.display = p.likeCount > 0 ? "" : "none";
       }
     }
   });
@@ -398,7 +439,7 @@ async function savePostEdit(){
   if(id == null || !me) return;
   const p = findPost(id);
   const text = el("ed-field").value.trim();
-  if(!text && !(p && p.img)){
+  if(!text && !(p && (p.img || p.video))){
     el("ed-hint").style.display = "";
     return;
   }
@@ -420,11 +461,15 @@ async function deleteOwnPost(){
   const btn = el("pm-del2");
   btn.disabled = true;
   try{
-    const r = await sb.from("posts").select("image_path").eq("id", id).maybeSingle();
-    const path = (!r.error && r.data) ? r.data.image_path : null;
+    const r = await sb.from("posts").select("image_path, video_path").eq("id", id).maybeSingle();
+    const paths = [];
+    if(!r.error && r.data){
+      if(r.data.image_path) paths.push(r.data.image_path);
+      if(r.data.video_path) paths.push(r.data.video_path);
+    }
     const del = await sb.from("posts").delete().eq("id", id);
     if(del.error) throw del.error;
-    if(path) sb.storage.from("post-images").remove([path]).catch(function(){});
+    if(paths.length) sb.storage.from("post-images").remove(paths).catch(function(){});
     closePostMenu();
     await loadPosts();
     if(el("view-profil").classList.contains("active")) renderMyPosts();
@@ -434,6 +479,34 @@ async function deleteOwnPost(){
     toast("Kunne ikke slette opslaget. Prøv igen.");
   }finally{
     btn.disabled = false;
+  }
+}
+
+/* ---- Deling (kun opslag til hele kredsen) ---- */
+export function sharePost(id){
+  const p = findPost(id);
+  if(!p) return;
+  if(p.feed){ toast("Privat kreds — ingen deling udenfor 🤫"); return; }
+  const name = user(p.u).name || p.u;
+  const text = name + " på VibeFeed" + (p.text ? ": " + p.text.slice(0, 120) : "");
+  const url = "https://vibefeed.dk";
+  if(navigator.share){
+    navigator.share({ title:"VibeFeed", text:text, url:url }).catch(function(err){
+      if(!err || err.name !== "AbortError"){
+        console.error(err);
+        toast(GENERIC_ERR);
+      }
+    });
+    return;
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text + " " + url).then(function(){
+      toast("Kopieret til udklipsholderen");
+    }, function(){
+      toast(GENERIC_ERR);
+    });
+  } else {
+    toast(GENERIC_ERR);
   }
 }
 
@@ -465,17 +538,20 @@ function timelineClick(e){
   if(ib){ setCfilePid(Number(ib.dataset.id)); el("cfile").click(); return; }
   const sd = e.target.closest(".csend");
   if(sd){ sendComment(sd.dataset.id); return; }
-  const more = e.target.closest(".cmore");
-  if(more){ expandedCmts.add(Number(more.dataset.id)); rerenderPostCmts(more.dataset.id); return; }
+  const tg = e.target.closest(".cmt-toggle");
+  if(tg){ toggleCmtSection(tg.dataset.id); return; }
   const cmt = e.target.closest(".cmt-btn");
   if(cmt){
-    const node = cmt.closest(".post");
-    const f = node && node.querySelector(".cfield");
-    if(f) f.focus();
+    const opened = toggleCmtSection(cmt.dataset.id);
+    if(opened){
+      const node = cmt.closest(".post");
+      const f = node && node.querySelector(".cfield");
+      if(f) f.focus();
+    }
     return;
   }
   const sh = e.target.closest(".share-btn");
-  if(sh){ toast("Bliver i kredsen — ingen deling udenfor"); return; }
+  if(sh){ sharePost(sh.dataset.id); return; }
   const d = e.target.closest(".dots");
   if(d){
     const p = findPost(d.dataset.id);
@@ -491,6 +567,14 @@ function timelineClick(e){
   }
   const media = e.target.closest(".pmedia");
   if(media){
+    const vid = media.querySelector("video");
+    if(vid){
+      // Tryk = slå lyd til/fra. Ved dobbelttryk slås den to gange (netto uændret) + like.
+      vid.muted = !vid.muted;
+      const s = media.querySelector(".vsound");
+      if(s) s.classList.toggle("muted", vid.muted);
+      if(vid.paused) vid.play().catch(function(){});
+    }
     const id = media.dataset.id;
     const now = Date.now();
     if(lastTap.id === id && now - lastTap.t < 320){

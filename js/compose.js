@@ -5,8 +5,11 @@ import { feedById, setFeed, switchTab } from "./feed.js";
 
 /* ================= Skriv ================= */
 let pendingImg = null; // { blob, url }
+let pendingVid = null; // { file, url }
 export const ta = el("compose-field");
 const MAXC = 280, CIRC = 56.55;
+const MAX_VID_SEC = 6.4, MAX_VID_BYTES = 25 * 1024 * 1024;
+const VID_EXT = { "video/mp4":"mp4", "video/quicktime":"mov", "video/webm":"webm" };
 
 export function updateRing(){
   const len = ta.value.length;
@@ -25,7 +28,7 @@ export function canPost(){
   const t = ta.value.trim();
   el("compose-post").disabled = pollOn
     ? !(t && pollReady())
-    : !(pendingImg || t.length > 0);
+    : !(pendingImg || pendingVid || t.length > 0);
 }
 let composeDest = "all";
 export function renderComposeDest(){
@@ -76,15 +79,125 @@ export function openCompose(){
   el("compose").classList.add("on");
   setTimeout(function(){ ta.focus(); }, 260);
 }
-export function closeCompose(){ el("compose").classList.remove("on"); }
+export function closeCompose(){
+  closeMediaMenu();
+  el("compose").classList.remove("on");
+}
 
-export function clearPendingImg(){
+/* ---- Vedhæftning (billede/video, gensidigt udelukkende) ---- */
+function syncAttach(){
+  el("attach").classList.toggle("on", !!(pendingImg || pendingVid));
+}
+function clearImg(){
   if(pendingImg && pendingImg.url) URL.revokeObjectURL(pendingImg.url);
   pendingImg = null;
-  el("attach").classList.remove("on");
   el("attach-img").removeAttribute("src");
-  el("file-input").value = "";
+  el("attach-img").style.display = "none";
 }
+function clearVid(){
+  if(pendingVid && pendingVid.url) URL.revokeObjectURL(pendingVid.url);
+  pendingVid = null;
+  const v = el("attach-vid");
+  v.pause();
+  v.removeAttribute("src");
+  v.style.display = "none";
+}
+export function clearPendingImg(){ // rydder AL ventende medie (bruges også af resetApp)
+  clearImg();
+  clearVid();
+  syncAttach();
+  el("file-input").value = "";
+  el("cam-photo").value = "";
+  el("cam-video").value = "";
+}
+
+function handleImageFile(file){
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = function(){
+    const max = 1440;
+    const s = Math.min(1, max/Math.max(img.width, img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(img.width*s));
+    c.height = Math.max(1, Math.round(img.height*s));
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(url);
+    c.toBlob(function(blob){
+      if(!blob){ toast("Kunne ikke læse billedet"); return; }
+      const hadVid = !!pendingVid;
+      clearImg();
+      clearVid();
+      const purl = URL.createObjectURL(blob);
+      pendingImg = { blob:blob, url:purl };
+      el("attach-img").src = purl;
+      el("attach-img").style.display = "block";
+      syncAttach();
+      if(hadVid) toast("Videoen blev fjernet — et opslag kan kun have ét medie");
+      canPost();
+    }, "image/jpeg", 0.87);
+  };
+  img.onerror = function(){
+    URL.revokeObjectURL(url);
+    toast("Kunne ikke læse billedet");
+  };
+  img.src = url;
+}
+
+function handleVideoFile(file){
+  if(file.size > MAX_VID_BYTES){ toast("Videoen er for stor"); return; }
+  const url = URL.createObjectURL(file);
+  const probe = document.createElement("video");
+  probe.preload = "metadata";
+  probe.muted = true;
+  function finish(dur){
+    probe.ontimeupdate = null;
+    probe.removeAttribute("src");
+    if(!isFinite(dur)){
+      URL.revokeObjectURL(url);
+      toast("Kunne ikke læse videoen");
+      return;
+    }
+    if(dur > MAX_VID_SEC){
+      URL.revokeObjectURL(url);
+      toast("Videoen må højst vare 6 sekunder");
+      return;
+    }
+    const hadImg = !!pendingImg;
+    clearImg();
+    clearVid();
+    pendingVid = { file:file, url:url };
+    const v = el("attach-vid");
+    v.src = url;
+    v.style.display = "block";
+    v.play().catch(function(){});
+    syncAttach();
+    if(hadImg) toast("Billedet blev fjernet — et opslag kan kun have ét medie");
+    canPost();
+  }
+  probe.onloadedmetadata = function(){
+    if(probe.duration === Infinity){
+      // MediaRecorder-WebM: varigheden mangler i headeren — tving den frem med et seek
+      const timer = setTimeout(function(){ finish(NaN); }, 3000);
+      probe.ontimeupdate = function(){
+        clearTimeout(timer);
+        finish(probe.duration);
+      };
+      probe.currentTime = 1e101;
+      return;
+    }
+    finish(probe.duration);
+  };
+  probe.onerror = function(){
+    probe.removeAttribute("src");
+    URL.revokeObjectURL(url);
+    toast("Kunne ikke læse videoen");
+  };
+  probe.src = url;
+}
+
+/* ---- Medie-menu (popup) ---- */
+function openMediaMenu(){ el("mediamenu").classList.add("on"); }
+function closeMediaMenu(){ el("mediamenu").classList.remove("on"); }
 
 export function initCompose(){
 el("compose-dest").addEventListener("click", function(e){
@@ -98,12 +211,20 @@ el("compose-cancel").addEventListener("click", closeCompose);
 
 ta.addEventListener("input", function(){ updateRing(); canPost(); });
 el("imgbtn").addEventListener("click", function(){
-  if(pollOn){ toast("Fjern meningsmålingen først — et opslag kan ikke have både billede og meningsmåling"); return; }
-  el("file-input").click();
+  if(pollOn){ toast("Fjern meningsmålingen først — et opslag kan ikke have både medie og meningsmåling"); return; }
+  openMediaMenu();
 });
+el("mediamenu").addEventListener("click", function(e){
+  if(e.target === el("mediamenu")) closeMediaMenu();
+});
+el("mm-cancel").addEventListener("click", closeMediaMenu);
+el("mm-photo").addEventListener("click", function(){ closeMediaMenu(); el("cam-photo").click(); });
+el("mm-video").addEventListener("click", function(){ closeMediaMenu(); el("cam-video").click(); });
+el("mm-lib").addEventListener("click", function(){ closeMediaMenu(); el("file-input").click(); });
 el("pollbtn").addEventListener("click", function(){
   if(pollOn){ resetPoll(); canPost(); return; }
   if(pendingImg){ toast("Fjern billedet først — et opslag kan ikke have både billede og meningsmåling"); return; }
+  if(pendingVid){ toast("Fjern videoen først — et opslag kan ikke have både video og meningsmåling"); return; }
   pollOn = true;
   renderPollBox();
   renderComposeDest();
@@ -140,35 +261,21 @@ el("pollbox").addEventListener("click", function(e){
     canPost();
   }
 });
-el("file-input").addEventListener("change", function(){
-  const file = this.files && this.files[0];
+function onFilePicked(input){
+  const file = input.files && input.files[0];
+  input.value = "";
   if(!file) return;
-  const img = new Image();
-  const url = URL.createObjectURL(file);
-  img.onload = function(){
-    const max = 1440;
-    const s = Math.min(1, max/Math.max(img.width, img.height));
-    const c = document.createElement("canvas");
-    c.width = Math.max(1, Math.round(img.width*s));
-    c.height = Math.max(1, Math.round(img.height*s));
-    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-    URL.revokeObjectURL(url);
-    c.toBlob(function(blob){
-      if(!blob){ toast("Kunne ikke læse billedet"); return; }
-      clearPendingImg();
-      const purl = URL.createObjectURL(blob);
-      pendingImg = { blob:blob, url:purl };
-      el("attach-img").src = purl;
-      el("attach").classList.add("on");
-      canPost();
-    }, "image/jpeg", 0.87);
-  };
-  img.onerror = function(){
-    URL.revokeObjectURL(url);
-    toast("Kunne ikke læse billedet");
-  };
-  img.src = url;
-});
+  const t = (file.type || "").toLowerCase();
+  let isVideo;
+  if(t.indexOf("video/") === 0) isVideo = true;
+  else if(t.indexOf("image/") === 0) isVideo = false;
+  else isVideo = /\.(mp4|mov|m4v|webm)$/i.test(file.name || "");
+  if(isVideo) handleVideoFile(file);
+  else handleImageFile(file);
+}
+el("file-input").addEventListener("change", function(){ onFilePicked(this); });
+el("cam-photo").addEventListener("change", function(){ onFilePicked(this); });
+el("cam-video").addEventListener("change", function(){ onFilePicked(this); });
 el("attach-remove").addEventListener("click", function(){
   clearPendingImg();
   canPost();
@@ -213,21 +320,33 @@ el("compose-post").addEventListener("click", async function(){
     }
     return;
   }
-  if(!pendingImg && !text) return;
+  if(!pendingImg && !pendingVid && !text) return;
   btn.disabled = true;
   let path = null;
   try{
+    let imgPath = null, vidPath = null;
     if(pendingImg){
       path = me.id + "/" + uuid() + ".jpg";
       const up = await sb.storage.from("post-images").upload(path, pendingImg.blob, { contentType:"image/jpeg" });
       if(up.error) throw up.error;
       if(up.data && up.data.path) path = up.data.path;
+      imgPath = path;
+    } else if(pendingVid){
+      const type = pendingVid.file.type || "";
+      const m = /\.(mp4|mov|m4v|webm)$/i.exec(pendingVid.file.name || "");
+      const ext = VID_EXT[type] || (m ? m[1].toLowerCase() : "bin");
+      path = me.id + "/" + uuid() + "." + ext;
+      const up = await sb.storage.from("post-images").upload(path, pendingVid.file, { contentType: type || "application/octet-stream" });
+      if(up.error) throw up.error;
+      if(up.data && up.data.path) path = up.data.path;
+      vidPath = path;
     }
     const ins = await sb.from("posts").insert({
       author: me.id,
       feed_id: dest === "all" ? null : dest,
       text: text || null,
-      image_path: path
+      image_path: imgPath,
+      video_path: vidPath
     });
     if(ins.error) throw ins.error;
 

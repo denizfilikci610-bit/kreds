@@ -1,7 +1,7 @@
 import { sb, GENERIC_ERR } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab } from "./store.js";
 import { el, esc, avaHTML, user, toast, uuid, registerProfile } from "./helpers.js";
-import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota } from "./feed.js";
+import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos } from "./feed.js";
 import { openCompose } from "./compose.js";
 import { renderSearch } from "./search.js";
 import { resetApp, showAuth } from "./auth.js";
@@ -31,9 +31,11 @@ export async function renderMyPosts(){
   const mine = state.wholePosts.filter(function(p){ return p.u === me.handle; });
   el("stat-posts").textContent = mine.length;
   el("stat-friends").textContent = state.friends.length;
+  const vsnap = snapVideos(el("myposts"));
   el("myposts").innerHTML = mine.length
     ? mine.map(postHTML).join("")
     : '<div class="emptynote">Du har ikke delt noget endnu. Tryk på + og del et billede eller en tanke.</div>';
+  restoreVideos(el("myposts"), vsnap);
   loadQuota();
   const r = await sb.from("posts").select("id", { count:"exact", head:true }).eq("author", me.id).is("feed_id", null);
   if(!r.error && r.count != null && me) el("stat-posts").textContent = r.count;
@@ -103,9 +105,11 @@ export async function loadPvPosts(){
   pv.posts = (data || []).map(mapPost);
   el("pv-count").textContent = pv.posts.length + " opslag";
   el("pv-stat-posts").textContent = pv.posts.length;
+  const vsnap = snapVideos(el("pv-posts"));
   el("pv-posts").innerHTML = pv.posts.length
     ? pv.posts.map(postHTML).join("")
     : '<div class="emptynote">Ingen opslag endnu.</div>';
+  restoreVideos(el("pv-posts"), vsnap);
 }
 export function closeProfile(){
   el("profileview").classList.remove("on");
@@ -114,9 +118,11 @@ export function refreshPv(){
   if(pv.u && el("profileview").classList.contains("on")){
     el("pv-count").textContent = pv.posts.length + " opslag";
     el("pv-stat-posts").textContent = pv.posts.length;
+    const vsnap = snapVideos(el("pv-posts"));
     el("pv-posts").innerHTML = pv.posts.length
       ? pv.posts.map(postHTML).join("")
       : '<div class="emptynote">Ingen opslag endnu.</div>';
+    restoreVideos(el("pv-posts"), vsnap);
     el("pv-ava").innerHTML = avaHTML(pv.u, 86);
   }
 }

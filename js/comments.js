@@ -3,9 +3,7 @@ import { me, expandedCmts, composers, cstate, cfilePid } from "./store.js";
 import { el, esc, avaHTML, likesLabel, toast, uuid, HEART_SVG } from "./helpers.js";
 import { findPost, findPostAll, allPostArrays, mapComment } from "./feed.js";
 
-/* ================= Kommentartråd (inline) ================= */
-const CMT_PREVIEW = 10;
-
+/* ================= Kommentartråd (inline, sammenklappet som standard) ================= */
 function buildThread(p){
   const byId = {};
   p.cmts.forEach(function(c){ byId[c.id] = c; });
@@ -53,14 +51,27 @@ function cmtRowHTML(item){
 }
 export function threadHTML(p){
   const flat = buildThread(p);
-  if(!flat.length) return '<div class="cthread" data-id="'+p.id+'"></div>';
-  const expanded = expandedCmts.has(Number(p.id));
-  const show = expanded ? flat : flat.slice(0, CMT_PREVIEW);
-  let html = show.map(cmtRowHTML).join("");
-  if(!expanded && flat.length > CMT_PREVIEW){
-    html += '<button class="cmore" data-id="'+p.id+'">Se '+(flat.length - CMT_PREVIEW)+' kommentarer mere</button>';
+  return '<div class="cthread" data-id="'+p.id+'">'+flat.map(cmtRowHTML).join("")+'</div>';
+}
+function cmtSectionInner(p){
+  const n = p.cmts.length;
+  if(!expandedCmts.has(Number(p.id))){
+    return n > 0 ? '<button class="cmt-toggle" data-id="'+p.id+'">Vis kommentarer ('+n+')</button>' : '';
   }
-  return '<div class="cthread" data-id="'+p.id+'">'+html+'</div>';
+  return (n > 0
+      ? '<button class="cmt-toggle" data-id="'+p.id+'">Skjul kommentarer</button>'+threadHTML(p)
+      : '')+
+    composerHTML(p.id);
+}
+export function cmtSectionHTML(p){
+  return '<div class="csec" data-id="'+p.id+'">'+cmtSectionInner(p)+'</div>';
+}
+export function toggleCmtSection(pid){
+  pid = Number(pid);
+  if(expandedCmts.has(pid)) expandedCmts.delete(pid);
+  else expandedCmts.add(pid);
+  rerenderPostCmts(pid);
+  return expandedCmts.has(pid);
 }
 export function composerHTML(pid){
   if(!me) return "";
@@ -87,11 +98,12 @@ export function composerHTML(pid){
 export function rerenderPostCmts(pid){
   const p = findPost(pid);
   if(!p) return;
-  document.querySelectorAll('.post[data-id="'+pid+'"]').forEach(function(node){
-    const th = node.querySelector(".cthread");
-    if(th) th.outerHTML = threadHTML(p);
-    const box = node.querySelector(".cbox");
-    if(box) box.outerHTML = composerHTML(p.id);
+  document.querySelectorAll('.csec[data-id="'+pid+'"]').forEach(function(node){
+    node.innerHTML = cmtSectionInner(p);
+  });
+  document.querySelectorAll('.post[data-id="'+pid+'"] .cmt-btn .cnt').forEach(function(c){
+    c.textContent = p.cmts.length;
+    c.style.display = p.cmts.length > 0 ? "" : "none";
   });
 }
 export function updateSendState(pid){
