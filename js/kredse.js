@@ -17,7 +17,7 @@ export function openFeedSheet(){
 }
 export function closeFeedSheet(){
   el("fsheet").classList.remove("on");
-  if(!el("esheet").classList.contains("on"))
+  if(!el("esheet").classList.contains("on") && !el("edsheet").classList.contains("on"))
     el("scrim").classList.remove("on");
 }
 function renderFsList(){

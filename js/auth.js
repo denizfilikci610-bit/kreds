@@ -1,8 +1,8 @@
 import { sb, GENERIC_ERR, recoveryMode, setRecoveryMode } from "./config.js";
 import { me, setMe, state, FRIEND_SINCE, pv, expandedCmts, clearComposers, setCfilePid } from "./store.js";
 import { el, registerProfile, toast } from "./helpers.js";
-import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota } from "./feed.js";
-import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPost } from "./compose.js";
+import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu } from "./feed.js";
+import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPost, resetPoll } from "./compose.js";
 import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile } from "./profile.js";
 import { closeFeedSheet } from "./kredse.js";
 import { subscribeRealtime, unsubscribeRealtime } from "./realtime.js";
@@ -110,10 +110,13 @@ export function resetApp(){
   resetDeleteUI();
   closeFeedSheet();
   closeEditSheet();
+  closePostEdit();
+  closePostMenu();
   closeCompose();
   closeProfile();
   clearPendingImg();
   ta.value = "";
+  resetPoll();
   updateRing();
   canPost();
   el("feed").innerHTML = "";

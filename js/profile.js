@@ -43,20 +43,22 @@ export function setOwnUI(){
   el("own-ava").innerHTML = avaHTML(me.handle, 86);
   el("own-name").textContent = user(me.handle).name;
   el("own-handle").textContent = "@" + me.handle;
+  const bio = (me.bio || "").trim();
+  el("own-bio").textContent = bio;
+  el("own-bio").style.display = bio ? "" : "none";
   el("compose-me-ava").innerHTML = avaHTML(me.handle, 44);
 }
 
 export function closeEditSheet(){
   el("esheet").classList.remove("on");
-  if(!el("fsheet").classList.contains("on"))
+  if(!el("fsheet").classList.contains("on") && !el("edsheet").classList.contains("on"))
     el("scrim").classList.remove("on");
 }
 function epCan(){ el("ep-save").disabled = !el("ep-name").value.trim(); }
 
-/* ---- Slet konto ---- */
+/* ---- Slet konto (popup) ---- */
 export function resetDeleteUI(){
-  el("del-open").style.display = "";
-  el("del-confirm").style.display = "none";
+  el("delmodal").classList.remove("on");
   el("del-input").value = "";
   el("del-btn").disabled = true;
 }
@@ -71,12 +73,21 @@ export async function openProfile(h){
   el("pv-name2").textContent = u.name;
   el("pv-count").textContent = "";
   el("pv-handle").textContent = "@" + h;
+  const bio = (u.bio || "").trim();
+  el("pv-bio").textContent = bio;
+  el("pv-bio").style.display = bio ? "" : "none";
   el("pv-stat-posts").textContent = "0";
+  el("pv-stat-friends").textContent = "–";
   el("pv-ava").innerHTML = avaHTML(h, 86);
   el("pv-since").textContent = "I din kreds siden "+(FRIEND_SINCE[h] || u.since || "i dag")+" · Gensidig ven";
   el("pv-posts").innerHTML = '<div class="emptynote">Henter …</div>';
   el("pv-body").scrollTop = 0;
   el("profileview").classList.add("on");
+  sb.rpc("friends_count_of", { u: u.id }).then(function(r){
+    if(pv.u !== h) return;
+    if(r.error){ console.error(r.error); return; }
+    if(r.data != null) el("pv-stat-friends").textContent = r.data;
+  });
   await loadPvPosts();
 }
 export async function loadPvPosts(){
@@ -114,6 +125,7 @@ export function initProfile(){
 el("editprof").addEventListener("click", function(){
   if(!me) return;
   el("ep-name").value = me.name || "";
+  el("ep-bio").value = me.bio || "";
   el("ep-ava").innerHTML = avaHTML(me.handle, 72);
   el("ep-file").value = "";
   resetDeleteUI();
@@ -125,12 +137,14 @@ el("editprof").addEventListener("click", function(){
 el("ep-name").addEventListener("input", epCan);
 el("ep-save").addEventListener("click", async function(){
   const name = el("ep-name").value.trim();
+  const bio = el("ep-bio").value.trim().slice(0, 160);
   if(!name || !me) return;
   this.disabled = true;
-  const { error } = await sb.from("profiles").update({ name:name }).eq("id", me.id);
+  const { error } = await sb.from("profiles").update({ name:name, bio: bio || null }).eq("id", me.id);
   this.disabled = false;
   if(error){ console.error(error); toast(GENERIC_ERR); return; }
   me.name = name;
+  me.bio = bio || null;
   registerProfile(me);
   setOwnUI();
   closeEditSheet();
@@ -194,11 +208,15 @@ el("ep-file").addEventListener("change", function(){
   img.src = url;
 });
 el("del-open").addEventListener("click", function(){
-  el("del-open").style.display = "none";
-  el("del-confirm").style.display = "block";
+  el("del-input").value = "";
+  el("del-btn").disabled = true;
+  el("delmodal").classList.add("on");
   setTimeout(function(){ el("del-input").focus(); }, 60);
 });
 el("del-cancel").addEventListener("click", resetDeleteUI);
+el("delmodal").addEventListener("click", function(e){
+  if(e.target === el("delmodal")) resetDeleteUI();
+});
 el("del-input").addEventListener("input", function(){
   el("del-btn").disabled = this.value !== "SLET";
 });

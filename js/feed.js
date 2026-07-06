@@ -7,8 +7,9 @@ import { openProfile, closeProfile, renderMyPosts, renderStories } from "./profi
 import { renderSearch } from "./search.js";
 import { loadNotifs } from "./notifications.js";
 import { scheduleRefetch } from "./realtime.js";
+import { mapPoll, pollHTML, votePoll } from "./polls.js";
 
-export const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id)";
+export const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id), poll_options(*, poll_votes(user_id))";
 
 export function mapComment(c){
   if(c.author_profile) registerProfile(c.author_profile);
@@ -42,6 +43,7 @@ export function mapPost(row){
     liked: !!(me && likes.some(function(l){ return l.user_id === me.id; })),
     likeCount: likes.length,
     feed: row.feed_id || undefined,
+    poll: mapPoll(row) || undefined,
     cmts: cmts
   };
 }
@@ -101,6 +103,7 @@ export function postHTML(p){
       '</div>'+
       (!p.img && p.text ? '<div class="ptext'+big+'">'+esc(p.text)+'</div>' : '')+
       media+
+      pollHTML(p)+
       '<div class="pactions">'+
         '<button class="like-btn'+(p.liked ? " on" : "")+'" data-id="'+p.id+'" aria-pressed="'+p.liked+'" aria-label="Like">'+
           HEART_SVG+
@@ -359,11 +362,88 @@ export async function setLike(id, force){
   loadQuota();
 }
 
+/* ================= Egne opslag: menu, rediger, slet ================= */
+let menuPid = null, editPid = null;
+
+export function openPostMenu(id){
+  menuPid = Number(id);
+  el("pmenu-main").style.display = "";
+  el("pmenu-confirm").style.display = "none";
+  el("pmenu").classList.add("on");
+}
+export function closePostMenu(){
+  el("pmenu").classList.remove("on");
+  menuPid = null;
+}
+
+export function openPostEdit(id){
+  const p = findPost(id);
+  if(!p) return;
+  editPid = Number(id);
+  el("ed-field").value = p.text || "";
+  el("ed-hint").style.display = "none";
+  el("scrim").classList.add("on");
+  el("edsheet").classList.add("on");
+  setTimeout(function(){ el("ed-field").focus(); }, 260);
+}
+export function closePostEdit(){
+  el("edsheet").classList.remove("on");
+  editPid = null;
+  if(!el("fsheet").classList.contains("on") && !el("esheet").classList.contains("on"))
+    el("scrim").classList.remove("on");
+}
+
+async function savePostEdit(){
+  const id = editPid;
+  if(id == null || !me) return;
+  const p = findPost(id);
+  const text = el("ed-field").value.trim();
+  if(!text && !(p && p.img)){
+    el("ed-hint").style.display = "";
+    return;
+  }
+  const btn = el("ed-save");
+  btn.disabled = true;
+  const { error } = await sb.from("posts").update({ text: text || null }).eq("id", id);
+  btn.disabled = false;
+  if(error){ console.error(error); toast(GENERIC_ERR); return; }
+  findPostAll(id).forEach(function(q){ q.text = text || undefined; });
+  closePostEdit();
+  renderFeed();
+  if(el("view-profil").classList.contains("active")) renderMyPosts();
+  toast("Opslaget er opdateret");
+}
+
+async function deleteOwnPost(){
+  const id = menuPid;
+  if(id == null || !me) return;
+  const btn = el("pm-del2");
+  btn.disabled = true;
+  try{
+    const r = await sb.from("posts").select("image_path").eq("id", id).maybeSingle();
+    const path = (!r.error && r.data) ? r.data.image_path : null;
+    const del = await sb.from("posts").delete().eq("id", id);
+    if(del.error) throw del.error;
+    if(path) sb.storage.from("post-images").remove([path]).catch(function(){});
+    closePostMenu();
+    await loadPosts();
+    if(el("view-profil").classList.contains("active")) renderMyPosts();
+    toast("Opslaget er slettet");
+  }catch(err){
+    console.error(err);
+    toast("Kunne ikke slette opslaget. Prøv igen.");
+  }finally{
+    btn.disabled = false;
+  }
+}
+
 /* ---- Klik i timeline ---- */
 let lastTap = { id:null, t:0 };
 function timelineClick(e){
   const like = e.target.closest(".like-btn");
   if(like){ setLike(like.dataset.id); return; }
+  const vt = e.target.closest("[data-vote]");
+  if(vt){ votePoll(vt.dataset.pid, vt.dataset.vote); return; }
   const lk = e.target.closest(".likec");
   if(lk){ toggleCmtLike(lk.dataset.cid); return; }
   const sv = e.target.closest(".csvar");
@@ -397,7 +477,12 @@ function timelineClick(e){
   const sh = e.target.closest(".share-btn");
   if(sh){ toast("Bliver i kredsen — ingen deling udenfor"); return; }
   const d = e.target.closest(".dots");
-  if(d){ toast("Intet skjult her — feedet er altid kronologisk"); return; }
+  if(d){
+    const p = findPost(d.dataset.id);
+    if(me && p && p.u === me.handle) openPostMenu(p.id);
+    else toast("Intet skjult her — feedet er altid kronologisk");
+    return;
+  }
   const pr = e.target.closest(".pavab");
   if(pr && pr.dataset.u){
     if(me && pr.dataset.u === me.handle){ closeProfile(); switchTab("profil"); }
@@ -437,5 +522,25 @@ el("qchip").addEventListener("click", function(){
   el(id).addEventListener("input", cInput);
   el(id).addEventListener("keydown", cKey);
   el(id).addEventListener("focusout", function(e){ if(e.target.closest(".cfield") && me) scheduleRefetch(); });
+});
+/* ---- Egne opslag: menu-popup + rediger-sheet ---- */
+el("pmenu").addEventListener("click", function(e){
+  if(e.target === el("pmenu")) closePostMenu();
+});
+el("pm-cancel").addEventListener("click", closePostMenu);
+el("pm-edit").addEventListener("click", function(){
+  const id = menuPid;
+  closePostMenu();
+  if(id != null) openPostEdit(id);
+});
+el("pm-delete").addEventListener("click", function(){
+  el("pmenu-main").style.display = "none";
+  el("pmenu-confirm").style.display = "";
+});
+el("pm-del-cancel").addEventListener("click", closePostMenu);
+el("pm-del2").addEventListener("click", deleteOwnPost);
+el("ed-save").addEventListener("click", savePostEdit);
+el("ed-field").addEventListener("input", function(){
+  el("ed-hint").style.display = "none";
 });
 }

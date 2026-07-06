@@ -224,6 +224,30 @@
   .like-btn.on svg{animation:pop .3s ease}
   @keyframes pop{0%{transform:scale(1)}45%{transform:scale(1.25)}100%{transform:scale(1)}}
 
+  /* ---------- Meningsmåling ---------- */
+  .pollwrap{padding:6px 12px 0}
+  .poll-opt{
+    display:block;width:100%;
+    border:1px solid var(--line2);border-radius:8px;
+    padding:9px 12px;margin-top:6px;
+    font-size:14px;font-weight:600;color:var(--ink);
+    text-align:left;background:none;
+  }
+  .poll-opt:active{opacity:.6}
+  .poll-res{
+    position:relative;display:flex;align-items:center;gap:8px;
+    width:100%;overflow:hidden;
+    border:1px solid var(--line);border-radius:8px;
+    padding:9px 12px;margin-top:6px;
+    text-align:left;background:none;
+  }
+  .poll-res .pfill{position:absolute;left:0;top:0;bottom:0;background:var(--chip)}
+  .poll-res .ptxt{position:relative;flex:1;min-width:0;font-size:14px;color:var(--ink);overflow-wrap:break-word;display:flex;align-items:center;gap:6px}
+  .poll-res.mine .ptxt{font-weight:700}
+  .poll-res .pcheck{width:14px;height:14px;flex:0 0 auto}
+  .poll-res .ppct{position:relative;flex:0 0 auto;font-size:13px;font-weight:700;color:var(--gray)}
+  .pollmeta{padding:7px 0 0;font-size:12.5px;color:var(--gray)}
+
   .plikes{padding:7px 12px 0;font-size:14px;font-weight:700;color:var(--ink)}
   .pcap{padding:4px 12px 0;font-size:14px;color:var(--ink);white-space:pre-wrap;overflow-wrap:break-word}
   .pcap b{font-weight:700}
@@ -232,7 +256,7 @@
   /* ---------- Kommentartråd (inline, Reddit-stil) ---------- */
   .cthread{padding:2px 12px 0}
   .crow{display:flex;gap:9px;padding:6px 0;align-items:flex-start}
-  .crow.cnest{border-left:1px solid var(--line);padding-left:10px}
+  .crow.cnest{padding-left:10px}
   .crow .cbody{flex:1;min-width:0}
   .crow .ctext{font-size:14px;color:var(--ink);overflow-wrap:break-word}
   .crow .ctext b{font-weight:700;font-size:13px;margin-right:5px}
@@ -343,7 +367,7 @@
   .pinfo .n{font-size:15px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:5px}
   .pinfo .n svg{width:15px;height:15px}
   .pinfo .h{font-size:13.5px;color:var(--gray)}
-  .pinfo .bio{font-size:14.5px;color:var(--ink);margin-top:6px}
+  .pinfo .bio{font-size:14.5px;color:var(--ink);margin-top:6px;white-space:pre-wrap}
   .pinfo .since{font-size:14px;color:var(--gray);margin-top:6px}
   .niksaldo{margin-top:8px}
   .niksaldo .nik1{font-size:14px;color:var(--ink)}
@@ -425,6 +449,8 @@
   }
   .fs-name input{flex:1;min-width:0;border:none;background:transparent;font-size:16px;font-weight:600}
   .fs-name input:focus{outline:none}
+  .fs-name textarea{flex:1;min-width:0;border:none;background:transparent;font-size:15px;resize:none;line-height:1.4}
+  .fs-name textarea:focus{outline:none}
   .fs-label{font-size:12.5px;font-weight:700;color:var(--gray);padding:14px 18px 2px;text-transform:uppercase;letter-spacing:.05em}
   .fs-list{flex:1;overflow-y:auto;min-height:120px}
   .mcheck{
@@ -529,12 +555,73 @@
   }
   .charring.warn .left{opacity:1}
 
+  /* ---- Poll-editor (compose) ---- */
+  .pollbox{margin-top:4px}
+  .pe-row{
+    display:flex;align-items:center;gap:8px;
+    background:var(--inputbg);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:10px 12px;
+    margin-top:8px;
+  }
+  .pe-row input{flex:1;min-width:0;border:none;background:transparent;font-size:15px}
+  .pe-row input:focus{outline:none}
+  .pe-rm{flex:0 0 auto;color:var(--gray);font-size:14px;line-height:1;padding:2px 4px}
+  .pe-add{display:block;color:var(--red);font-weight:700;font-size:14px;padding:10px 2px 0;text-align:left}
+  .pe-off{display:block;color:var(--gray);font-weight:600;font-size:13px;padding:8px 2px 0;text-align:left}
+
+  /* ---- Centreret popup (modal) ---- */
+  .modal{
+    position:absolute;inset:0;z-index:120;
+    background:var(--scrim);
+    display:none;align-items:center;justify-content:center;
+    padding:28px;
+  }
+  .modal.on{display:flex}
+  .modal-card{
+    width:100%;max-width:320px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    overflow:hidden;
+  }
+  .mrow{
+    display:block;width:100%;
+    padding:14px 16px;
+    font-size:15px;font-weight:600;color:var(--ink);
+    text-align:center;
+    border-top:1px solid var(--line);
+  }
+  .mrow:first-child{border-top:none}
+  .mrow:active{background:var(--chip)}
+  .mrow.danger{color:var(--red);font-weight:700}
+  .mtitle{padding:18px 16px 4px;text-align:center;font-weight:700;font-size:16px;color:var(--ink)}
+  .mtitle+.mrow{margin-top:8px;border-top:1px solid var(--line)}
+  .mtext{padding:6px 18px 14px;text-align:center;font-size:13.5px;color:var(--gray);line-height:1.45}
+  .mfoot{padding:0 16px 16px}
+
+  /* ---- Rediger opslag (sheet) ---- */
+  .ed-body{
+    margin:10px 16px 0;
+    background:var(--inputbg);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:10px 14px;
+  }
+  .ed-body textarea{
+    display:block;width:100%;
+    border:none;background:transparent;resize:none;
+    font-size:15px;line-height:1.4;
+  }
+  .ed-body textarea:focus{outline:none}
+  .ed-hint{padding:8px 18px 0;font-size:13px;font-weight:600;color:var(--red)}
+
   /* ---- Rediger profil: avatar + slet konto ---- */
   .ep-avarow{display:flex;align-items:center;gap:14px;padding:12px 16px 0}
   .ep-avarow .pic{font-size:14px;font-weight:700;color:var(--red);text-align:left;padding:4px 0}
   .delzone{border-top:1px solid var(--line);margin-top:14px;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
   .del-open{color:var(--red);font-size:14px;font-weight:700;text-align:left;padding:0}
-  .del-warn{font-size:13.5px;color:var(--ink);line-height:1.45}
   .del-cancel{display:block;width:100%;text-align:center;color:var(--gray);font-weight:700;font-size:14px;margin-top:10px;padding:8px 0}
 
   /* ---- Ven-profil ---- */

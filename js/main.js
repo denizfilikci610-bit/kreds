@@ -1,6 +1,6 @@
 import { sb, GENERIC_ERR, recoveryMode, recoveryLinkError } from "./config.js";
 import { el, toast } from "./helpers.js";
-import { initFeed, setTabIcons, switchTab } from "./feed.js";
+import { initFeed, setTabIcons, switchTab, closePostEdit } from "./feed.js";
 import { initComments } from "./comments.js";
 import { initKredse, closeFeedSheet } from "./kredse.js";
 import { initCompose } from "./compose.js";
@@ -19,7 +19,7 @@ initProfile();
 initRealtime();
 initAuth();
 
-el("scrim").addEventListener("click", function(){ closeFeedSheet(); closeEditSheet(); });
+el("scrim").addEventListener("click", function(){ closeFeedSheet(); closeEditSheet(); closePostEdit(); });
 
 document.querySelectorAll(".tabbar [data-view]").forEach(function(t){
   t.addEventListener("click", function(){ switchTab(t.dataset.view); });

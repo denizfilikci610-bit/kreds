@@ -34,9 +34,15 @@ async function doRefetch(){
 export function subscribeRealtime(){
   if(channel) return;
   channel = sb.channel("db-changes")
-    .on("postgres_changes", { event:"*", schema:"public", table:"posts" }, scheduleRefetch)
+    .on("postgres_changes", { event:"*", schema:"public", table:"posts" }, function(payload){
+      scheduleRefetch();
+      // Nye meningsmålinger: svarmulighederne indsættes efter opslaget og udløser
+      // ingen egen realtime-hændelse — hent igen lidt senere, så de kommer med
+      if(payload && payload.eventType === "INSERT") setTimeout(scheduleRefetch, 3000);
+    })
     .on("postgres_changes", { event:"*", schema:"public", table:"comments" }, scheduleRefetch)
     .on("postgres_changes", { event:"*", schema:"public", table:"likes" }, scheduleRefetch)
+    .on("postgres_changes", { event:"*", schema:"public", table:"poll_votes" }, scheduleRefetch)
     .subscribe();
 }
 export function unsubscribeRealtime(){

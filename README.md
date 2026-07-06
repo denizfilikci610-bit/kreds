@@ -1,6 +1,6 @@
 # VibeFeed (kreds)
 
-VibeFeed er en lille dansk social app til lukkede vennekredse: et kronologisk feed med opslag og billeder, indlejrede kommentartråde, en like-økonomi (du kan modtage ét like mere, end du selv har givet), private kredse, vennesøgning, notifikationer og profiler. Backend er Supabase (auth, Postgres, storage, realtime). Appen er en ren statisk side uden build-step.
+VibeFeed er en lille dansk social app til lukkede vennekredse: et kronologisk feed med opslag, billeder og meningsmålinger, indlejrede kommentartråde, en like-økonomi (du kan modtage ét like mere, end du selv har givet), private kredse, vennesøgning, notifikationer og profiler (med bio). Egne opslag kan redigeres og slettes. Backend er Supabase (auth, Postgres, storage, realtime). Appen er en ren statisk side uden build-step.
 
 Live: deployes automatisk via Vercel — hvert `git push` til `main` udløser et deploy.
 
@@ -15,13 +15,14 @@ Live: deployes automatisk via Vercel — hvert `git push` til `main` udløser et
 | `js/store.js` | Delt mutérbar tilstand: `me` (+`setMe`), `USERS`, `state`, composers, `pv`, `curTab` m.m. |
 | `js/helpers.js` | Småhjælpere: `esc`, `el`, tidsformat, avatarer/gradienter, `toast`, `imgUrl`, `uuid` |
 | `js/auth.js` | Login, opret, glemt/nulstil adgangskode, `boot()`/`resetApp()`, auth-events |
-| `js/feed.js` | Hent/render feed, likes + saldo (qchip), faner (`switchTab`), timeline-klik |
+| `js/feed.js` | Hent/render feed, likes + saldo (qchip), faner (`switchTab`), timeline-klik, rediger/slet egne opslag |
 | `js/comments.js` | Kommentartråde, composer, kommentar-likes, billede i kommentar |
 | `js/kredse.js` | "Ny kreds"-sheet og `create_feed`-RPC |
-| `js/compose.js` | Skriv-skærmen: tekst, billedvedhæftning, tegn-ring, del-til-valg |
+| `js/compose.js` | Skriv-skærmen: tekst, billedvedhæftning, meningsmåling-editor, tegn-ring, del-til-valg |
+| `js/polls.js` | Meningsmålinger: view-model (`mapPoll`), rendering (`pollHTML`) og stemmeafgivning (`votePoll`) |
 | `js/search.js` | Søg-fanen: venner + global søgning + `add_friend` |
 | `js/notifications.js` | Aktivitets-fanen (likes, svar, nye venner) |
-| `js/profile.js` | Egen profil (statistik, rediger-sheet, avatar, slet konto, log ud), venneprofil, bobler |
+| `js/profile.js` | Egen profil (statistik, bio, rediger-sheet, avatar, slet konto-popup, log ud), venneprofil (bio + vennetal), bobler |
 | `js/realtime.js` | Realtime-kanal og debounced refetch ved ændringer/fokus |
 | `js/main.js` | Importerer alt, kobler alle event-lyttere (`init*()`), kører opstartssekvensen |
 | `kreds-app.html` | Gammel demo — rør den ikke |
