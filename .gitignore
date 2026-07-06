@@ -1,3 +1,4 @@
 .vercel
 ios/build/
 ios/DerivedData/
+**/xcuserdata/
