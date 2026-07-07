@@ -17,6 +17,13 @@ export function realtimeNotify(table, payload){
   if(!me || !payload || payload.eventType !== "INSERT") return;
   const row = payload.new;
   if(!row) return;
+  if(table === "posts"){
+    // Nye opslag (RLS har allerede begrænset til synlige) tænder kun prikken —
+    // de optræder ikke i notifikationslisten, så ingen genindlæsning af den.
+    if(row.author === me.id) return;
+    if(curTab !== "akt") setNotifDot(true);
+    return;
+  }
   if(table === "kreds_invites"){
     if(row.user_id !== me.id) return; // kun invitationer TIL mig
   } else {

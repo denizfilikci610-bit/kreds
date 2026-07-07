@@ -1,6 +1,6 @@
 import { sb, recoveryMode, recoveryLinkError } from "./config.js";
 import { me, curTab } from "./store.js";
-import { el, toast } from "./helpers.js";
+import { el, toast, getConsent, setConsent } from "./helpers.js";
 import { t, initI18n, setLang, hasStoredLang } from "./i18n.js";
 import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, loadQuota } from "./feed.js";
 import { initComments } from "./comments.js";
@@ -54,19 +54,39 @@ el("nosparkle").addEventListener("click", function(){
   toast(t("nosparkle.toast"));
 });
 
-/* ================= Sprogvalg (kun første start — vf_lang mangler) ================= */
-function showLangPicker(){
+/* ================= Fælles gate-hjælper (langview/consentview) =================
+   Modal for alvor: appen bag porten gøres inert (fokus + a11y-træ), og fokus
+   flyttes til portens primære knap. inert fjernes igen før resolve(). */
+function showGate(viewId, focusSel, pickSel, onPickBtn){
   return new Promise(function(resolve){
-    const lv = el("langview");
-    lv.classList.add("on");
-    lv.addEventListener("click", function onPick(e){
-      const b = e.target.closest("[data-lang]");
+    const gv = el(viewId);
+    gv.classList.add("on");
+    el("app").inert = true;
+    const first = gv.querySelector(focusSel);
+    if(first) first.focus();
+    gv.addEventListener("click", function onPick(e){
+      const b = e.target.closest(pickSel);
       if(!b) return;
-      setLang(b.dataset.lang);
-      lv.classList.remove("on");
-      lv.removeEventListener("click", onPick);
+      onPickBtn(b);
+      gv.classList.remove("on");
+      gv.removeEventListener("click", onPick);
+      el("app").inert = false;
       resolve();
     });
+  });
+}
+
+/* ================= Sprogvalg (kun første start — vf_lang mangler) ================= */
+function showLangPicker(){
+  return showGate("langview", "[data-lang]", "[data-lang]", function(b){
+    setLang(b.dataset.lang);
+  });
+}
+
+/* ================= Reklame-samtykke (vises én gang — vf_consent mangler) ================= */
+function showConsentGate(){
+  return showGate("consentview", "#consent-personal", "#consent-personal, #consent-limited", function(b){
+    setConsent(b.id === "consent-personal" ? "personal" : "limited");
   });
 }
 
@@ -77,6 +97,7 @@ window.addEventListener("hashchange", function(){
 setTabIcons("feed");
 (async function init(){
   if(!hasStoredLang()) await showLangPicker(); // FØR auth/boot — intet skip
+  if(!getConsent()) await showConsentGate();   // efter sprogvalget — ingen lukning uden valg
   if(recoveryLinkError){
     history.replaceState(null, "", location.pathname);
     setAuthMode("login");

@@ -255,6 +255,14 @@
         <button class="langchip" id="lang-da" type="button">Dansk</button>
         <button class="langchip" id="lang-en" type="button">English</button>
       </div>
+      <div class="fs-label" data-i18n="ep.privacy">Privatliv</div>
+      <div class="ep-langrow">
+        <button class="langchip" id="ads-personal" type="button" data-i18n="ep.ads_personal">Personlige reklamer</button>
+        <button class="langchip" id="ads-limited" type="button" data-i18n="ep.ads_limited">Kun ikke-personlige</button>
+      </div>
+      <div class="ep-policyrow">
+        <a data-policy-link href="/privatliv.html" target="_blank" rel="noopener" data-i18n="consent.policy">Privatlivspolitik</a>
+      </div>
       <div class="fs-foot" style="padding-bottom:4px">
         <button class="fs-create" id="ep-save" disabled data-i18n="common.save">Gem</button>
       </div>
@@ -390,6 +398,7 @@
       <input type="password" id="su-pass" placeholder="Adgangskode (mindst 6 tegn)" data-i18n-ph="auth.pass_min" autocomplete="new-password" required>
       <div class="auth-err" id="su-err"></div>
       <button class="auth-btn" id="su-btn" type="submit" data-i18n="auth.signup">Opret profil</button>
+      <div class="auth-policy" id="su-policy"></div>
     </form>
 
     <div class="auth-alt" id="auth-alt"><span id="auth-alt-txt">Har du ikke en profil?</span> <button type="button" id="auth-toggle">Opret en</button></div>
@@ -397,12 +406,24 @@
   </div>
 
   <!-- Sprogvalg (kun første start — før auth/boot) -->
-  <div class="langview" id="langview" role="dialog" aria-label="Vælg sprog · Choose language">
+  <div class="langview" id="langview" role="dialog" aria-modal="true" aria-label="Vælg sprog · Choose language">
     <div class="lang-inner">
       <div class="wordmark">VibeFeed<span class="prik">.</span></div>
       <div class="lang-tag" data-i18n="lang.title">Vælg sprog · Choose language</div>
-      <button class="lang-btn" type="button" data-lang="da">Dansk 🇩🇰</button>
-      <button class="lang-btn" type="button" data-lang="en">English 🇬🇧</button>
+      <button class="lang-btn" type="button" data-lang="da">Dansk</button>
+      <button class="lang-btn" type="button" data-lang="en">English</button>
+    </div>
+  </div>
+
+  <!-- Reklame-samtykke (vises én gang — efter sprogvalget, før appen) -->
+  <div class="consentview" id="consentview" role="dialog" aria-modal="true" aria-label="Reklamer & privatliv" data-i18n-aria="consent.title">
+    <div class="consent-inner">
+      <div class="wordmark">VibeFeed<span class="prik">.</span></div>
+      <div class="consent-title" data-i18n="consent.title">Reklamer & privatliv</div>
+      <p class="consent-text" data-i18n="consent.text">VibeFeed viser reklamer. Vælg om de må være personlige — du kan ikke fravælge reklamer, kun personaliseringen. Du kan altid ændre dit valg under Rediger profil.</p>
+      <a class="consent-policy" data-policy-link href="/privatliv.html" target="_blank" rel="noopener" data-i18n="consent.policy">Privatlivspolitik</a>
+      <button class="consent-btn primary" id="consent-personal" type="button" data-i18n="consent.personal">OK — også personlige reklamer</button>
+      <button class="consent-btn" id="consent-limited" type="button" data-i18n="consent.limited">Kun ikke-personlige reklamer</button>
     </div>
   </div>
 

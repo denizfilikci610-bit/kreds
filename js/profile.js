@@ -1,6 +1,6 @@
 import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab } from "./store.js";
-import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime } from "./helpers.js";
+import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConsent, setConsent } from "./helpers.js";
 import { t, setLang } from "./i18n.js";
 import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts } from "./feed.js";
 import { openCompose } from "./compose.js";
@@ -59,6 +59,13 @@ export function closeEditSheet(){
     el("scrim").classList.remove("on");
 }
 function epCan(){ el("ep-save").disabled = !el("ep-name").value.trim(); }
+
+/* ---- Reklame-samtykke (Privatliv-chips i Rediger profil) ---- */
+function syncAdsChips(){
+  const c = getConsent();
+  el("ads-personal").classList.toggle("on", c === "personal");
+  el("ads-limited").classList.toggle("on", c === "limited");
+}
 
 /* ================= Aktivitet (samtykke-styret visning af likes/kommentarer) ================= */
 const ACT_H = '<svg viewBox="0 0 24 24"><path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
@@ -211,6 +218,7 @@ el("editprof").addEventListener("click", function(){
   el("ep-share").checked = me.show_activity !== false;
   el("ep-ava").innerHTML = avaHTML(me.handle, 72);
   el("ep-file").value = "";
+  syncAdsChips();
   resetDeleteUI();
   epCan();
   el("scrim").classList.add("on");
@@ -245,6 +253,9 @@ el("ep-save").addEventListener("click", async function(){
 /* ---- Sprog (per enhed — gemmes i localStorage, ikke i profilen) ---- */
 el("lang-da").addEventListener("click", function(){ setLang("da"); });
 el("lang-en").addEventListener("click", function(){ setLang("en"); });
+/* ---- Reklame-samtykke (per enhed — setConsent poster også til den native bro) ---- */
+el("ads-personal").addEventListener("click", function(){ setConsent("personal"); syncAdsChips(); });
+el("ads-limited").addEventListener("click", function(){ setConsent("limited"); syncAdsChips(); });
 /* ---- Profilbillede ---- */
 el("ep-pic").addEventListener("click", function(){ el("ep-file").click(); });
 el("ep-file").addEventListener("change", function(){

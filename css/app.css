@@ -161,6 +161,14 @@
   .fpill:active{opacity:.65}
   .fpill.on{background:var(--ink);color:var(--bg)}
   .fpill.new{color:var(--red)}
+  /* Ulæste opslag i en kreds: lille rød prik øverst til højre på pillen */
+  .fpill{position:relative}
+  .fpill .pdot{
+    position:absolute;top:2px;right:4px;
+    width:7px;height:7px;border-radius:50%;
+    background:var(--red);
+    pointer-events:none;
+  }
 
   /* ---- Kreds-søgning i feedbaren ---- */
   .fbseek{
@@ -897,6 +905,10 @@
   .auth-btn:disabled{opacity:.5;cursor:default}
   .auth-alt{text-align:center;color:var(--gray);font-size:13px;margin-top:18px}
   .auth-alt button{color:var(--red);font-weight:700}
+  /* Lille grå politik-linje under opret-knappen */
+  .auth-policy{text-align:center;color:var(--gray);font-size:12.5px;line-height:1.45;margin-top:2px}
+  .auth-policy:empty{display:none}
+  .auth-policy a{color:var(--gray);text-decoration:underline}
   .auth-forgot{align-self:flex-end;color:var(--gray);font-size:13px;font-weight:600;padding:2px 2px;margin-top:-2px}
   .auth-note{text-align:center;color:var(--gray);font-size:14.5px;line-height:1.45;margin-bottom:4px}
   .auth-back{color:var(--gray);font-size:13px;font-weight:600;margin-top:10px}
@@ -926,6 +938,43 @@
   }
   .lang-btn:active{opacity:.7}
 
+  /* ---- Reklame-samtykke (vises én gang — efter sprogvalget, under langview) ---- */
+  .consentview{
+    position:absolute;inset:0;z-index:240;
+    background:var(--bg);
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    padding:calc(34px + env(safe-area-inset-top)) 30px calc(30px + env(safe-area-inset-bottom));
+    overflow-y:auto;
+  }
+  .consentview.on{display:flex}
+  .consentview .consent-inner{margin:auto;width:100%;max-width:420px;display:flex;flex-direction:column}
+  .consentview .wordmark{font-size:44px;text-align:center}
+  .consent-title{text-align:center;font-weight:800;font-size:17px;color:var(--ink);margin-top:26px}
+  .consent-text{text-align:center;color:var(--gray);font-size:14.5px;line-height:1.5;margin-top:8px}
+  .consent-policy{
+    display:block;text-align:center;
+    color:var(--gray);font-size:13px;font-weight:600;
+    text-decoration:underline;
+    margin:10px 0 26px;
+  }
+  .consent-btn{
+    background:var(--chip);color:var(--ink);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:15px 12px;
+    font-weight:700;font-size:15.5px;
+    text-align:center;
+    margin-bottom:12px;
+  }
+  .consent-btn.primary{background:var(--red);color:#fff;border-color:var(--red)}
+  .consent-btn:active{opacity:.7}
+
+  /* ---- Privatliv (Rediger profil): politik-link under samtykke-chips ---- */
+  .ep-policyrow{padding:8px 18px 0}
+  .ep-policyrow a{color:var(--gray);font-size:13px;font-weight:600;text-decoration:underline}
+
   /* ---- Sprog-chips (Rediger profil) ---- */
   .ep-langrow{display:flex;gap:8px;padding:8px 18px 4px}
   .langchip{
@@ -940,9 +989,9 @@
   .langchip.on{background:var(--ink);color:var(--bg)}
 
   /* ---- Ingen synlige scrollbars i appen (kun indikatoren skjules — scroll uændret) ---- */
-  .app,.pv-body,.fs-list,.compose-body,.ep-scroll,.authview,textarea{scrollbar-width:none;-ms-overflow-style:none}
+  .app,.pv-body,.fs-list,.compose-body,.ep-scroll,.authview,.consentview,textarea{scrollbar-width:none;-ms-overflow-style:none}
   .app::-webkit-scrollbar,.pv-body::-webkit-scrollbar,.fs-list::-webkit-scrollbar,
-  .compose-body::-webkit-scrollbar,.ep-scroll::-webkit-scrollbar,.authview::-webkit-scrollbar,textarea::-webkit-scrollbar{display:none;width:0;height:0}
+  .compose-body::-webkit-scrollbar,.ep-scroll::-webkit-scrollbar,.authview::-webkit-scrollbar,.consentview::-webkit-scrollbar,textarea::-webkit-scrollbar{display:none;width:0;height:0}
 
   @media(prefers-reduced-motion:reduce){
     .fsheet,.compose,.profileview,.scrim,.toast,.topbar,.feedbar,.searchhead,.epswitch,.epswitch::after{transition:none}

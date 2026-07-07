@@ -42,6 +42,13 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
                 requestPermission()
                 scheduleRefresh()
             }
+        case "consent":
+            // "personal" (personalized ads allowed) or "limited" (non-personalized
+            // only). Read by the ad SDK integration at initialization.
+            if let value = dict["value"] as? String {
+                UserDefaults.standard.set(value == "personal" ? "personal" : "limited",
+                                          forKey: "vf_consent")
+            }
         case "logout":
             UserDefaults.standard.removeObject(forKey: secretKey)
             UserDefaults.standard.removeObject(forKey: lastCheckKey)

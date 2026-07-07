@@ -352,6 +352,77 @@ export async function loadFeeds(){
     f.members = f.memberIds.map(function(id){ return ID2H[id]; }).filter(Boolean);
   });
   state.feeds = feeds;
+  await refreshUnseen(); // ulæste-prikker på kreds-pillerne følger med hver feeds-hentning
+}
+
+/* ================= Ulæste kreds-opslag (rød prik på kreds-pillerne) =================
+   Per enhed: vf_feed_seen er et JSON-map feed_id -> ISO-tidspunkt for hvornår
+   kredsen sidst blev ÅBNET. In-memory: unseenFeeds (ryddes ved logout — mappet består). */
+const SEEN_KEY = "vf_feed_seen";
+const unseenFeeds = new Set();
+function readSeenMap(){
+  try{
+    const m = JSON.parse(localStorage.getItem(SEEN_KEY) || "{}");
+    return (m && typeof m === "object") ? m : {};
+  }catch(_e){ return {}; }
+}
+function writeSeenMap(m){
+  try{ localStorage.setItem(SEEN_KEY, JSON.stringify(m)); }catch(_e){}
+}
+export function clearUnseenFeeds(){ unseenFeeds.clear(); }
+export function markFeedSeen(id, floor){
+  if(!id || id === "all") return;
+  const m = readSeenMap();
+  // Gulv mod ur-skævhed: gem mindst det nyeste sete opslags server-tid.
+  // Date-aritmetik (ikke streng-max) — ISO-varianter ('+00:00'/'Z') sammenlignes ellers forkert.
+  const ts = Math.max(Date.now(), floor ? new Date(floor).getTime() : 0);
+  m[id] = new Date(ts).toISOString();
+  writeSeenMap(m);
+  unseenFeeds.delete(id);
+}
+/* Én forespørgsel: nyeste kreds-opslag (RLS viser kun mine kredse) — nyeste først,
+   så første række pr. feed_id ER kredsens nyeste opslag */
+export async function refreshUnseen(){
+  if(!me) return;
+  if(!state.feeds.length){ unseenFeeds.clear(); return; }
+  const { data, error } = await sb.from("posts")
+    .select("feed_id, created_at")
+    .not("feed_id", "is", null)
+    .order("created_at", { ascending:false })
+    .limit(100);
+  if(error){ console.error(error); return; }
+  const newest = {};
+  (data || []).forEach(function(r){
+    if(newest[r.feed_id] === undefined) newest[r.feed_id] = r.created_at;
+  });
+  const m = readSeenMap();
+  state.feeds.forEach(function(f){
+    if(f.id === state.currentFeed){
+      // Den åbne kreds er set — løft også det gemte set-tidspunkt til nyeste opslag,
+      // så et ur der går bagud (eller et misset realtime-event) ikke genopliver prikken
+      // når brugeren forlader kredsen.
+      unseenFeeds.delete(f.id);
+      const top = newest[f.id];
+      if(top !== undefined && new Date(top) > new Date(m[f.id] || 0)) markFeedSeen(f.id, top);
+      return;
+    }
+    const top = newest[f.id];
+    if(top === undefined) return; // intet opslag i top-100 — lad realtime-tilstanden stå
+    const seen = m[f.id];
+    // Manglende tidsstempel tæller som ulæst, når kredsen har opslag
+    if(!seen || new Date(top) > new Date(seen)) unseenFeeds.add(f.id);
+    else unseenFeeds.delete(f.id);
+  });
+}
+/* Realtime posts-INSERT: kreds-opslag fra andre markerer kredsen ulæst med det samme.
+   Den aktuelt åbne kreds vises live i stedet — dér opdateres set-tidspunktet. */
+export function markFeedUnseenRT(payload){
+  if(!me || !payload || payload.eventType !== "INSERT") return;
+  const row = payload.new;
+  if(!row || !row.feed_id || row.author === me.id) return;
+  if(row.feed_id === state.currentFeed){ markFeedSeen(row.feed_id, row.created_at); return; }
+  unseenFeeds.add(row.feed_id);
+  renderFeedbar();
 }
 
 /* ================= Kredse (egne feeds) ================= */
@@ -368,12 +439,17 @@ export function resetFeedbarSearch(){
 }
 const SEEK_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></g></svg>';
 const FBX_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><path d="M6 6l12 12M18 6 6 18"/></g></svg>';
+/* Kreds-pille — med ulæst-prik når kredsen har nye opslag siden sidste åbning */
+function pillHTML(f){
+  return '<button class="fpill'+(state.currentFeed === f.id ? " on" : "")+'" data-feed="'+esc(f.id)+'">'+esc(f.name)+
+    (unseenFeeds.has(f.id) ? '<span class="pdot"></span>' : '')+'</button>';
+}
 function fbPillsHTML(){
   let html = '<button class="fpill'+(state.currentFeed === "all" ? " on" : "")+'" data-feed="all">'+t("feedbar.all")+'</button>';
   const q = kseek.q.trim().toLowerCase();
   const matches = state.feeds.filter(function(f){ return f.name.toLowerCase().indexOf(q) >= 0; });
   matches.forEach(function(f){
-    html += '<button class="fpill'+(state.currentFeed === f.id ? " on" : "")+'" data-feed="'+esc(f.id)+'">'+esc(f.name)+'</button>';
+    html += pillHTML(f);
   });
   if(q && !matches.length) html += '<span class="fbnone">'+t("feedbar.no_match")+'</span>';
   return html;
@@ -402,7 +478,7 @@ export function renderFeedbar(){
   let html = '<button class="fbseek" aria-label="'+t("feedbar.seek_aria")+'">'+SEEK_SVG+'</button>';
   html += '<button class="fpill'+(state.currentFeed === "all" ? " on" : "")+'" data-feed="all">'+t("feedbar.all")+'</button>';
   state.feeds.forEach(function(f){
-    html += '<button class="fpill'+(state.currentFeed === f.id ? " on" : "")+'" data-feed="'+esc(f.id)+'">'+esc(f.name)+'</button>';
+    html += pillHTML(f);
   });
   html += '<button class="fpill new" data-feed="__new">'+t("feedbar.new")+'</button>';
   bar.innerHTML = html;
@@ -426,6 +502,7 @@ export function renderKredshead(){
 }
 export function setFeed(id){
   state.currentFeed = id;
+  if(id !== "all") markFeedSeen(id); // åbning af en kreds gemmer nu() i vf_feed_seen og fjerner prikken
   expandedCmts.clear();
   resetFeedbarSearch(); // kreds-søgningen lukkes/nulstilles ved feed-skift
   renderFeedbar();

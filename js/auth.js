@@ -1,8 +1,8 @@
 import { sb, recoveryMode, setRecoveryMode } from "./config.js";
-import { t, getLang } from "./i18n.js";
+import { t, getLang, policyURL } from "./i18n.js";
 import { me, setMe, state, FRIEND_SINCE, pv, expandedCmts, clearComposers, setCfilePid } from "./store.js";
-import { el, registerProfile, toast } from "./helpers.js";
-import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu, closeReportMenu, resetFeedbarSearch, resetTapState, resetBarHide } from "./feed.js";
+import { el, registerProfile, toast, getConsent } from "./helpers.js";
+import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu, closeReportMenu, resetFeedbarSearch, resetTapState, resetBarHide, clearUnseenFeeds } from "./feed.js";
 import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPost, resetPoll } from "./compose.js";
 import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet } from "./profile.js";
 import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
@@ -31,6 +31,10 @@ export function setAuthMode(mode){
   el("auth-alt").style.display = (mode === "login" || mode === "signup") ? "" : "none";
   el("auth-alt-txt").textContent = mode === "login" ? t("auth.alt_login") : t("auth.alt_signup");
   el("auth-toggle").textContent = mode === "login" ? t("auth.toggle_login") : t("auth.toggle_signup");
+  /* Politik-linjen under opret-knappen (kun statiske i18n-tekster — ingen brugerdata) */
+  el("su-policy").innerHTML = t("signup.accept", {
+    link: '<a href="'+policyURL()+'" target="_blank" rel="noopener">'+t("signup.policy")+'</a>'
+  });
   el("li-err").textContent = "";
   el("su-err").textContent = "";
   el("fp-err").textContent = "";
@@ -80,7 +84,7 @@ export async function pushNativeCreds(){
       secret = data;
       localStorage.setItem("vf_device_secret", secret);
     }
-    if(me && me.id === uid) window.webkit.messageHandlers.vibefeed.postMessage({ type:"creds", secret:secret, userId: me.id, lang: getLang() });
+    if(me && me.id === uid) window.webkit.messageHandlers.vibefeed.postMessage({ type:"creds", secret:secret, userId: me.id, lang: getLang(), consent: getConsent() });
   }catch(_e){ /* aldrig lade broen vælte web-appen */ }
 }
 /* Best effort: tilbagekald token + giv appen besked. Kaldes FØR signOut (session i live)
@@ -136,6 +140,7 @@ export function resetApp(){
   switchTab("feed");
   resetBarHide();
   el("tabdot").classList.remove("on");
+  clearUnseenFeeds(); // kun in-memory — vf_feed_seen i localStorage er per enhed og bliver stående
   Object.keys(FRIEND_SINCE).forEach(function(k){ delete FRIEND_SINCE[k]; });
   state.friends = [];
   state.humanFriends = [];

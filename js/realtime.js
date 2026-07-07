@@ -1,7 +1,7 @@
 import { sb } from "./config.js";
 import { me, pv } from "./store.js";
 import { el } from "./helpers.js";
-import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, loadQuota } from "./feed.js";
+import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, loadQuota, markFeedUnseenRT } from "./feed.js";
 import { renderComposeDest } from "./compose.js";
 import { refreshMemberSheet } from "./kredse.js";
 import { renderStories, loadPvPosts } from "./profile.js";
@@ -39,6 +39,8 @@ export function subscribeRealtime(){
   channel = sb.channel("db-changes")
     .on("postgres_changes", { event:"*", schema:"public", table:"posts" }, function(payload){
       scheduleRefetch();
+      realtimeNotify("posts", payload);  // nye opslag (ikke egne) tænder hjerte-prikken
+      markFeedUnseenRT(payload);         // kreds-opslag tænder også prikken på kreds-pillen
       // Nye meningsmålinger: svarmulighederne indsættes efter opslaget og udløser
       // ingen egen realtime-hændelse — hent igen lidt senere, så de kommer med
       if(payload && payload.eventType === "INSERT") setTimeout(scheduleRefetch, 3000);

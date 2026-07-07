@@ -317,7 +317,23 @@ const DA = {
   "lb.close": "Luk",
 
   /* Sprogvalg */
-  "lang.title": "Vælg sprog · Choose language"
+  "lang.title": "Vælg sprog · Choose language",
+
+  /* Samtykke (reklamer) */
+  "consent.title": "Reklamer & privatliv",
+  "consent.text": "VibeFeed viser reklamer. Vælg om de må være personlige — du kan ikke fravælge reklamer, kun personaliseringen. Du kan altid ændre dit valg under Rediger profil.",
+  "consent.policy": "Privatlivspolitik",
+  "consent.personal": "OK — også personlige reklamer",
+  "consent.limited": "Kun ikke-personlige reklamer",
+
+  /* Privatliv (Rediger profil) */
+  "ep.privacy": "Privatliv",
+  "ep.ads_personal": "Personlige reklamer",
+  "ep.ads_limited": "Kun ikke-personlige",
+
+  /* Signup */
+  "signup.accept": "Ved at oprette en profil accepterer du vores {link}",
+  "signup.policy": "privatlivspolitik"
 };
 
 const EN = {
@@ -627,7 +643,23 @@ const EN = {
   "lb.close": "Close",
 
   /* Language picker */
-  "lang.title": "Vælg sprog · Choose language"
+  "lang.title": "Vælg sprog · Choose language",
+
+  /* Consent (ads) */
+  "consent.title": "Ads & privacy",
+  "consent.text": "VibeFeed shows ads. Choose whether they may be personalized — you can't opt out of ads, only of personalization. You can always change your choice under Edit profile.",
+  "consent.policy": "Privacy policy",
+  "consent.personal": "OK — personalized ads too",
+  "consent.limited": "Only non-personalized ads",
+
+  /* Privacy (Edit profile) */
+  "ep.privacy": "Privacy",
+  "ep.ads_personal": "Personalized ads",
+  "ep.ads_limited": "Only non-personalized",
+
+  /* Signup */
+  "signup.accept": "By creating a profile you accept our {link}",
+  "signup.policy": "privacy policy"
 };
 
 const DICT = { da: DA, en: EN };
@@ -670,6 +702,9 @@ export function initI18n(cb){
   applyStaticI18n();
 }
 
+/* Sprogafhængig URL til privatlivspolitikken (statisk side pr. sprog) */
+export function policyURL(){ return lang === "da" ? "/privatliv.html" : "/privacy.html"; }
+
 /* Statisk markup: data-i18n (textContent), data-i18n-ph (placeholder),
    data-i18n-aria (aria-label), data-i18n-title (title), data-i18n-alt (alt) */
 export function applyStaticI18n(){
@@ -681,6 +716,8 @@ export function applyStaticI18n(){
   const cd = document.getElementById("lang-da"), ce = document.getElementById("lang-en");
   if(cd) cd.classList.toggle("on", lang === "da");
   if(ce) ce.classList.toggle("on", lang === "en");
+  /* Links til privatlivspolitikken følger sproget */
+  document.querySelectorAll("a[data-policy-link]").forEach(function(a){ a.setAttribute("href", policyURL()); });
 }
 
 /* Pluralisering (sprogafhængig) */
