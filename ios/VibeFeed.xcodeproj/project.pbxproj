@@ -6,13 +6,22 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F7C6CE4D130A956090F99FCB /* Pods_VibeFeed.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8848D0A6DED257595B48776E /* Pods_VibeFeed.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		1F487266ADF9B04BC8D23824 /* Pods-VibeFeed.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-VibeFeed.release.xcconfig"; path = "Target Support Files/Pods-VibeFeed/Pods-VibeFeed.release.xcconfig"; sourceTree = "<group>"; };
+		3BB9867DCC411E608FF0AABE /* Pods-VibeFeed.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-VibeFeed.debug.xcconfig"; path = "Target Support Files/Pods-VibeFeed/Pods-VibeFeed.debug.xcconfig"; sourceTree = "<group>"; };
+		8848D0A6DED257595B48776E /* Pods_VibeFeed.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_VibeFeed.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000000001 /* VibeFeed.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VibeFeed.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AA0000000000000000000002 /* VibeFeed */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = VibeFeed;
 			sourceTree = "<group>";
 		};
@@ -23,17 +32,38 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F7C6CE4D130A956090F99FCB /* Pods_VibeFeed.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3D16A394D0D513FD9F81CFE8 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				3BB9867DCC411E608FF0AABE /* Pods-VibeFeed.debug.xcconfig */,
+				1F487266ADF9B04BC8D23824 /* Pods-VibeFeed.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		7CE2D26B2C088D2A82A22300 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				8848D0A6DED257595B48776E /* Pods_VibeFeed.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		AA0000000000000000000004 = {
 			isa = PBXGroup;
 			children = (
 				AA0000000000000000000002 /* VibeFeed */,
 				AA0000000000000000000005 /* Products */,
+				3D16A394D0D513FD9F81CFE8 /* Pods */,
+				7CE2D26B2C088D2A82A22300 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -52,9 +82,12 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = AA0000000000000000000007 /* Build configuration list for PBXNativeTarget "VibeFeed" */;
 			buildPhases = (
+				8B3946E95EEBAC20275B2F4E /* [CP] Check Pods Manifest.lock */,
 				AA0000000000000000000008 /* Sources */,
 				AA0000000000000000000003 /* Frameworks */,
 				AA0000000000000000000009 /* Resources */,
+				E92D7D6FFED27651F422FAD2 /* [CP] Embed Pods Frameworks */,
+				20B8E0E08E96381B7067983E /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -64,8 +97,6 @@
 				AA0000000000000000000002 /* VibeFeed */,
 			);
 			name = VibeFeed;
-			packageProductDependencies = (
-			);
 			productName = VibeFeed;
 			productReference = AA0000000000000000000001 /* VibeFeed.app */;
 			productType = "com.apple.product-type.application";
@@ -114,6 +145,65 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		20B8E0E08E96381B7067983E /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-VibeFeed/Pods-VibeFeed-resources-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-VibeFeed/Pods-VibeFeed-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-VibeFeed/Pods-VibeFeed-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		8B3946E95EEBAC20275B2F4E /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-VibeFeed-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		E92D7D6FFED27651F422FAD2 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-VibeFeed/Pods-VibeFeed-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-VibeFeed/Pods-VibeFeed-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-VibeFeed/Pods-VibeFeed-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		AA0000000000000000000008 /* Sources */ = {
@@ -247,6 +337,7 @@
 		};
 		AA000000000000000000000E /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3BB9867DCC411E608FF0AABE /* Pods-VibeFeed.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -254,6 +345,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -271,6 +363,7 @@
 		};
 		AA000000000000000000000F /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1F487266ADF9B04BC8D23824 /* Pods-VibeFeed.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -278,6 +371,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

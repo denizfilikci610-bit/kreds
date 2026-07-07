@@ -2,3 +2,7 @@
 ios/build/
 ios/DerivedData/
 **/xcuserdata/
+
+# CocoaPods: commit Podfile, Podfile.lock and the .xcworkspace, but not the
+# downloaded pod sources (restored with `pod install`).
+ios/Pods/

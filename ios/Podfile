@@ -1,0 +1,38 @@
+# VibeFeed iOS — Appodeal SDK 4.2.0 with Google AdMob mediation.
+#
+# Minimal fleet on purpose: the owner's Appodeal app (782028) is configured for
+# AdMob-managed mediation, so only the AdMob adapter is needed. Appodeal's
+# dashboard selects the actual ad units at runtime, and new units are picked up
+# automatically — no ad-unit ids are hardcoded here.
+#
+# Build after `pod install` with:
+#   cd ios && xcodebuild -workspace VibeFeed.xcworkspace -scheme VibeFeed \
+#     -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
+
+platform :ios, '17.0'
+
+# Appodeal SDK + adapters live in Appodeal's own spec repo; the AdMob adapter
+# pulls Bidon (Appodeal's bidding layer) from the Bidon spec repo; everything
+# else (Google-Mobile-Ads-SDK, Protobuf) comes from the CocoaPods CDN.
+source 'https://github.com/appodeal/CocoaPods.git'
+source 'https://github.com/bidon-io/CocoaPods-Specs.git'
+source 'https://cdn.cocoapods.org/'
+
+install! 'cocoapods', :deterministic_uuids => false
+
+use_frameworks!
+
+target 'VibeFeed' do
+  pod 'Appodeal', '4.2.0'
+  pod 'AppodealGoogleAdMobAdapter', '12.13.0.0'
+end
+
+# Keep the pods on iOS 17 and strip bitcode/signing noise for simulator builds.
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
+      config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+    end
+  end
+end
