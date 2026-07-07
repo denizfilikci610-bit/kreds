@@ -489,6 +489,7 @@ export async function refreshUnseen(){
   });
   const m = readSeenMap();
   state.feeds.forEach(function(f){
+    f.lastPost = newest[f.id]; // seneste opslags-tid → feedbar-rækkefølge (chat-liste)
     if(f.id === state.currentFeed){
       // Den åbne kreds er set — løft også det gemte set-tidspunkt til nyeste opslag,
       // så et ur der går bagud (eller et misset realtime-event) ikke genopliver prikken
@@ -511,16 +512,31 @@ export async function refreshUnseen(){
 export function markFeedUnseenRT(payload){
   if(!me || !payload || payload.eventType !== "INSERT") return;
   const row = payload.new;
-  if(!row || !row.feed_id || row.author === me.id) return;
-  if(row.feed_id === state.currentFeed){ markFeedSeen(row.feed_id, row.created_at); return; }
-  unseenFeeds.add(row.feed_id);
-  renderFeedbar();
+  if(!row || !row.feed_id) return;
+  const f = feedById(row.feed_id);
+  if(f) f.lastPost = row.created_at; // seneste aktivitet → kredsen rykker frem i feedbaren
+  if(row.feed_id === state.currentFeed){
+    markFeedSeen(row.feed_id, row.created_at); // live i feedet; reordnes ved næste render
+    return;
+  }
+  if(row.author !== me.id) unseenFeeds.add(row.feed_id); // andres opslag → rød prik
+  renderFeedbar(); // rykker kredsen frem (egne opslag i en anden kreds + andres)
 }
 
 /* ================= Kredse (egne feeds) ================= */
 export function feedById(id){
   for(let i = 0; i < state.feeds.length; i++) if(state.feeds[i].id === id) return state.feeds[i];
   return null;
+}
+/* Feedbar-rækkefølge: kredse med seneste opslag først (chat-liste), tomme kredse
+   nederst i oprettelsesorden. f.lastPost sættes af refreshUnseen + realtime. */
+function sortedFeeds(){
+  return state.feeds.slice().sort(function(a, b){
+    const ta = a.lastPost ? new Date(a.lastPost).getTime() : 0;
+    const tb = b.lastPost ? new Date(b.lastPost).getTime() : 0;
+    if(ta !== tb) return tb - ta;                     // nyeste aktivitet først
+    return new Date(a.created) - new Date(b.created); // ellers oprettelse (ældste først)
+  });
 }
 /* ---- Kreds-søgning i feedbaren (lup ved venstre kant) ---- */
 const kseek = { on:false, q:"" };
@@ -539,7 +555,7 @@ function pillHTML(f){
 function fbPillsHTML(){
   let html = '<button class="fpill'+(state.currentFeed === "all" ? " on" : "")+'" data-feed="all">'+t("feedbar.all")+'</button>';
   const q = kseek.q.trim().toLowerCase();
-  const matches = state.feeds.filter(function(f){ return f.name.toLowerCase().indexOf(q) >= 0; });
+  const matches = sortedFeeds().filter(function(f){ return f.name.toLowerCase().indexOf(q) >= 0; });
   matches.forEach(function(f){
     html += pillHTML(f);
   });
@@ -569,7 +585,7 @@ export function renderFeedbar(){
   }
   let html = '<button class="fbseek" aria-label="'+t("feedbar.seek_aria")+'">'+SEEK_SVG+'</button>';
   html += '<button class="fpill'+(state.currentFeed === "all" ? " on" : "")+'" data-feed="all">'+t("feedbar.all")+'</button>';
-  state.feeds.forEach(function(f){
+  sortedFeeds().forEach(function(f){
     html += pillHTML(f);
   });
   html += '<button class="fpill new" data-feed="__new">'+t("feedbar.new")+'</button>';
