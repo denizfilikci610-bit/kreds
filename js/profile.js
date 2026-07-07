@@ -82,7 +82,9 @@ async function openActivitySheet(h){
   el("as-list").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
   el("scrim").classList.add("on");
   el("asheet").classList.add("on");
-  const { data, error } = await sb.rpc("activity_of", { u: user(h).id });
+  // Kun DAGENS aktivitet: send enhedens lokale midnat som nedre grænse.
+  const since = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+  const { data, error } = await sb.rpc("activity_of", { u: user(h).id, since: since });
   if(!el("asheet").classList.contains("on")) return; // lukket imens
   if(error){
     console.error(error);

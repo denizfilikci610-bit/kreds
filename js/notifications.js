@@ -72,7 +72,10 @@ export async function refreshNotifDot(){
 async function hasUnseenNotifs(){
   if(!me) return false;
   // Samme "set"-grænse som listen (seenSinceMs) → prik og liste kan aldrig være uenige.
-  const sinceIso = new Date(seenSinceMs()).toISOString();
+  const seenMs = seenSinceMs();
+  const sinceIso = new Date(seenMs).toISOString();                                    // handlinger: uset uanset alder
+  // Reaktioner tæller kun for I DAG (samme grænse som listen), så prik og liste er enige.
+  const reactIso = new Date(Math.max(seenMs, new Date().setHours(0, 0, 0, 0))).toISOString();
   const [mp, mc] = await Promise.all([
     sb.from("posts").select("id").eq("author", me.id),
     sb.from("comments").select("id").eq("author", me.id)
@@ -85,16 +88,16 @@ async function hasUnseenNotifs(){
   const probes = [
     sb.from("friend_requests").select("*", head).eq("to_id", me.id).gt("created_at", sinceIso),
     sb.from("kreds_invites").select("*", head).eq("user_id", me.id).gt("created_at", sinceIso),
-    // Kreds-opslag fra andre (RLS viser kun mine kredse) → prikken følger listen
-    sb.from("posts").select("*", head).not("feed_id", "is", null).neq("author", me.id).gt("created_at", sinceIso)
+    // Kreds-opslag fra andre (RLS viser kun mine kredse) → prikken følger listen (kun i dag)
+    sb.from("posts").select("*", head).not("feed_id", "is", null).neq("author", me.id).gt("created_at", reactIso)
   ];
   if(ids.length){
-    probes.push(sb.from("likes").select("*", head).in("post_id", ids).neq("user_id", me.id).gt("created_at", sinceIso));
-    probes.push(sb.from("comments").select("*", head).in("post_id", ids).neq("author", me.id).gt("created_at", sinceIso));
+    probes.push(sb.from("likes").select("*", head).in("post_id", ids).neq("user_id", me.id).gt("created_at", reactIso));
+    probes.push(sb.from("comments").select("*", head).in("post_id", ids).neq("author", me.id).gt("created_at", reactIso));
   }
   if(cids.length){
-    probes.push(sb.from("comments").select("*", head).in("parent_id", cids).neq("author", me.id).gt("created_at", sinceIso));
-    probes.push(sb.from("comment_likes").select("*", head).in("comment_id", cids).neq("user_id", me.id).gt("created_at", sinceIso));
+    probes.push(sb.from("comments").select("*", head).in("parent_id", cids).neq("author", me.id).gt("created_at", reactIso));
+    probes.push(sb.from("comment_likes").select("*", head).in("comment_id", cids).neq("user_id", me.id).gt("created_at", reactIso));
   }
   const res = await Promise.all(probes);
   return res.some(function(r){ return !r.error && (r.count || 0) > 0; });
@@ -122,6 +125,10 @@ export async function loadNotifs(){
   const seq = ++notifSeq; // sekvens-token: kun det nyeste kald må skrive resultatet
   el("notifs").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
   const seenMs = seenSinceMs();
+  // Kun DAGENS notifikationer: reaktioner (likes/kommentarer/kreds-opslag) fra før i dag
+  // midnat (enhedens lokale tid) vises ikke. Uafsluttede handlinger (invitationer/anmodninger)
+  // beholdes uanset alder, så man altid kan besvare dem.
+  const dayStartIso = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
   function isUnread(at){ return new Date(at).getTime() > seenMs; }
   const H = '<svg viewBox="0 0 24 24"><path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
   const B = '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>';
@@ -197,23 +204,23 @@ export async function loadNotifs(){
     (mine.data || []).forEach(function(p){ textById[p.id] = p.text || (p.image_path ? t("notif.photo") : ""); });
 
     const reqs = [
-      sb.from("friendships").select("created_at, from_profile:profiles!user_id(*)").eq("friend_id", me.id),
+      sb.from("friendships").select("created_at, from_profile:profiles!user_id(*)").eq("friend_id", me.id).gte("created_at", dayStartIso),
       sb.from("kreds_requests").select("created_at, feed_id, user_id, requester:profiles!user_id(*), feed:feeds!feed_id(name)").neq("user_id", me.id),
       sb.from("kreds_invites").select("created_at, feed_id, feed:feeds!feed_id(name), inviter:profiles!invited_by(*)").eq("user_id", me.id),
       sb.from("friend_requests").select("created_at, from_profile:profiles!from_id(*)").eq("to_id", me.id),
       // Kreds-opslag i mine kredse (ikke egne). RLS begrænser til synlige kredse.
       sb.from("posts").select("id, created_at, text, image_path, feed_id, author_profile:profiles!author(*), feed:feeds!feed_id(name)")
-        .not("feed_id", "is", null).neq("author", me.id).order("created_at", { ascending:false }).limit(30)
+        .not("feed_id", "is", null).neq("author", me.id).gte("created_at", dayStartIso).order("created_at", { ascending:false }).limit(30)
     ];
     let iLikes = -1, iCmts = -1, iReplies = -1, iClikes = -1;
     if(ids.length){
-      iLikes = reqs.push(sb.from("likes").select("created_at, post_id, liker:profiles!user_id(*)").in("post_id", ids).neq("user_id", me.id)) - 1;
-      iCmts  = reqs.push(sb.from("comments").select("id, created_at, post_id, text, image_path, author_profile:profiles!author(*)").in("post_id", ids).neq("author", me.id)) - 1;
+      iLikes = reqs.push(sb.from("likes").select("created_at, post_id, liker:profiles!user_id(*)").in("post_id", ids).neq("user_id", me.id).gte("created_at", dayStartIso)) - 1;
+      iCmts  = reqs.push(sb.from("comments").select("id, created_at, post_id, text, image_path, author_profile:profiles!author(*)").in("post_id", ids).neq("author", me.id).gte("created_at", dayStartIso)) - 1;
     }
     if(myCmtIds.length){
-      iReplies = reqs.push(sb.from("comments").select("id, created_at, post_id, text, image_path, author_profile:profiles!author(*)").in("parent_id", myCmtIds).neq("author", me.id)) - 1;
+      iReplies = reqs.push(sb.from("comments").select("id, created_at, post_id, text, image_path, author_profile:profiles!author(*)").in("parent_id", myCmtIds).neq("author", me.id).gte("created_at", dayStartIso)) - 1;
       // Likes PÅ mine kommentarer (comment_likes → comment.post_id for at kunne åbne opslaget)
-      iClikes = reqs.push(sb.from("comment_likes").select("created_at, comment:comments!comment_id(post_id), liker:profiles!user_id(*)").in("comment_id", myCmtIds).neq("user_id", me.id)) - 1;
+      iClikes = reqs.push(sb.from("comment_likes").select("created_at, comment:comments!comment_id(post_id), liker:profiles!user_id(*)").in("comment_id", myCmtIds).neq("user_id", me.id).gte("created_at", dayStartIso)) - 1;
     }
     const res = await Promise.all(reqs);
     for(const r of res){ if(r.error) throw r.error; }
