@@ -3,6 +3,7 @@ import UIKit
 import WebKit
 import AppTrackingTransparency
 import Appodeal
+import GoogleMobileAds
 
 /// Geometry of one sponsored slot as reported by the web feed. Coordinates are
 /// CSS px (== WKWebView points) relative to the viewport's top-left, which is
@@ -66,17 +67,20 @@ final class AdsManager: NSObject, ObservableObject {
     // they track the feed smoothly; each layout message re-bases this.
     private var baseScrollY: CGFloat = 0
 
-    // Live native-ad queue (production). nil in DEBUG, where we render guaranteed
-    // fake cards instead so the feed visibly shows the design without live demand.
+    // Live native-ad queue (production).
     private var queue: APDNativeAdQueue?
 
-    // In DEBUG we render guaranteed fake native cards so the post design is visible
-    // on-device even before live native demand exists. Compiled OUT of Release.
+    // In DEBUG we fetch a REAL Google native TEST ad (guaranteed fill) so a genuine
+    // ad renders on-device before live native demand is set up — same idea as the
+    // Google test banner used for MREC. Compiled OUT of Release (real ads only there).
     #if DEBUG
-    private let useFakeCards = true
+    private let useTestAd = true
     #else
-    private let useFakeCards = false
+    private let useTestAd = false
     #endif
+    private var testLoader: AdLoader?
+    private var testAds: [NativeAd] = []
+    private var testLoading = false
 
     private override init() { super.init() }
 
@@ -149,7 +153,17 @@ final class AdsManager: NSObject, ObservableObject {
         guard isInitialized, overlay != nil, cards.isEmpty else { return }
         for _ in 0..<poolSize { cards.append(AdCardItem()) }
 
-        if !useFakeCards {
+        if useTestAd {
+            // DEBUG: fetch REAL Google native test ads (guaranteed fill).
+            MobileAds.shared.start(completionHandler: nil)
+            let loader = AdLoader(adUnitID: "ca-app-pub-3940256099942544/3986624511", // Google's public native test unit
+                                  rootViewController: Self.topViewController(),
+                                  adTypes: [.native], options: nil)
+            loader.delegate = self
+            testLoader = loader
+            refillTestAds()
+        } else {
+            // Production: live native ads from the Appodeal mediation queue.
             let settings = APDNativeAdSettings.default()
             settings.adViewClass = NativeAdCardView.self
             settings.type = .noVideo // simpler, tighter-height card at launch (no video)
@@ -158,6 +172,12 @@ final class AdsManager: NSObject, ObservableObject {
             q.loadAd()
             queue = q
         }
+    }
+
+    private func refillTestAds() {
+        guard useTestAd, let loader = testLoader, !testLoading, testAds.count < poolSize else { return }
+        testLoading = true
+        loader.load(Request())
     }
 
     // MARK: - Layout updates from the web feed
@@ -235,11 +255,21 @@ final class AdsManager: NSObject, ObservableObject {
         }
     }
 
-    /// Pull a card for this slot: a fake one in DEBUG, else the next queued native ad.
+    /// Pull a card for this slot: a real Google native TEST ad in DEBUG, else the next
+    /// live native ad from the Appodeal queue.
     private func makeCard(for item: AdCardItem, index: Int) -> NativeAdCardView? {
-        #if DEBUG
-        if useFakeCards { return Self.makeFakeCard(index) }
-        #endif
+        if useTestAd {
+            guard let ad = testAds.first else { refillTestAds(); return nil }
+            testAds.removeFirst()
+            let card = NativeAdCardView()
+            card.populate(title: ad.headline ?? "Annonce",
+                          body: ad.body,
+                          cta: ad.callToAction ?? "Åbn",
+                          image: ad.images?.first?.image,
+                          icon: ad.icon?.image)
+            refillTestAds()
+            return card
+        }
         guard let q = queue, q.currentAdCount > 0,
               let ad = q.getNativeAds(ofCount: 1).first,
               let root = Self.topViewController(),
@@ -311,44 +341,23 @@ final class AdsManager: NSObject, ObservableObject {
         return top
     }
 
-    // MARK: - DEBUG fake cards (no SDK, guaranteed visible)
+}
 
-    #if DEBUG
-    private static func makeFakeCard(_ index: Int) -> NativeAdCardView {
-        let card = NativeAdCardView()
-        switch index % 3 {
-        case 0:
-            card.fillFake(title: "RADIUSaaS",
-                          body: "Skift RADIUS-boksen ud med sikker cloud-login — hurtigt, enkelt og skalerbart.",
-                          cta: "Prøv gratis",
-                          image: demoImage(UIColor(red: 0.55, green: 0.78, blue: 0.35, alpha: 1), "R"),
-                          icon: demoImage(.systemGreen, "R"))
-        case 1:
-            card.fillFake(title: "Nordisk Opsparing",
-                          body: "Få 3,5% i rente på din opsparing. Ingen binding, ingen gebyrer.",
-                          cta: "Læs mere", image: nil, icon: demoImage(.systemBlue, "N"))
-        default:
-            card.fillFake(title: "FitPuls", body: nil, cta: "Installer",
-                          image: nil, icon: demoImage(.systemOrange, "F"))
-        }
-        return card
-    }
+// MARK: - Google native test-ad loader (DEBUG only — a real test ad, not fake data)
 
-    private static func demoImage(_ color: UIColor, _ text: String) -> UIImage {
-        let size = CGSize(width: 160, height: 160)
-        return UIGraphicsImageRenderer(size: size).image { ctx in
-            color.setFill(); ctx.fill(CGRect(origin: .zero, size: size))
-            let attrs: [NSAttributedString.Key: Any] = [
-                .foregroundColor: UIColor.white,
-                .font: UIFont.systemFont(ofSize: 84, weight: .heavy),
-            ]
-            let s = text as NSString
-            let ts = s.size(withAttributes: attrs)
-            s.draw(at: CGPoint(x: (size.width - ts.width) / 2, y: (size.height - ts.height) / 2),
-                   withAttributes: attrs)
-        }
+extension AdsManager: NativeAdLoaderDelegate {
+    func adLoader(_ adLoader: AdLoader, didReceive nativeAd: NativeAd) {
+        testLoading = false
+        testAds.append(nativeAd)
+        applyLayout()
+        refillTestAds()
     }
-    #endif
+    func adLoader(_ adLoader: AdLoader, didFailToReceiveAdWithError error: Error) {
+        testLoading = false
+        #if DEBUG
+        print("VF-ADS google test native failed: \(error.localizedDescription)")
+        #endif
+    }
 }
 
 // MARK: - Native ad queue delegate

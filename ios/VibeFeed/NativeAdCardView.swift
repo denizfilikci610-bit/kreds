@@ -163,10 +163,12 @@ final class NativeAdCardView: UIView, @preconcurrency APDNativeAdView {
         iconImageView.isHidden = !hasIcon
     }
 
-    // MARK: - DEBUG fake fill (no SDK) — proves the look/height/glide on device
+    // MARK: - Populate from raw asset values
 
-    #if DEBUG
-    func fillFake(title: String, body: String?, cta: String, image: UIImage?, icon: UIImage?) {
+    /// Fill the card from raw ad-asset values. Used by the DEBUG path, which reads a
+    /// REAL Google native TEST ad's assets and shows them directly (no invented data).
+    /// Production ads are populated by the Appodeal SDK via the protocol getters.
+    func populate(title: String, body: String?, cta: String, image: UIImage?, icon: UIImage?) {
         titleLbl.text = title
         descriptionLbl.text = body
         ctaLbl.text = cta
@@ -182,7 +184,6 @@ final class NativeAdCardView: UIView, @preconcurrency APDNativeAdView {
         }
         applyTemplate(hasBody: (body?.isEmpty == false), hasMedia: image != nil, hasIcon: icon != nil)
     }
-    #endif
 
     // MARK: - APDNativeAdView protocol (asset views the SDK binds + tracks)
 
