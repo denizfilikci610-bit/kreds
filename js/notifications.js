@@ -18,10 +18,15 @@ export function realtimeNotify(table, payload){
   const row = payload.new;
   if(!row) return;
   if(table === "posts"){
-    // Nye opslag (RLS har allerede begrænset til synlige) tænder kun prikken —
-    // de optræder ikke i notifikationslisten, så ingen genindlæsning af den.
-    if(row.author === me.id) return;
-    if(curTab !== "akt") setNotifDot(true);
+    // Kun KREDS-opslag (feed_id) fra andre er notifikationer — venners almindelige
+    // opslag tæller ikke. Åben fane → frisk listen med det samme; ellers tænd prikken.
+    if(row.author === me.id || !row.feed_id) return;
+    if(curTab === "akt"){
+      clearTimeout(notifTimer);
+      notifTimer = setTimeout(loadNotifs, 400);
+    } else {
+      setNotifDot(true);
+    }
     return;
   }
   // Reaktioner (like/kommentar/kommentar-like): actor-tjekket fjerner egne handlinger,
@@ -79,7 +84,9 @@ async function hasUnseenNotifs(){
   // Overlap mellem probes er ligegyldigt — vi spørger kun "findes der NOGET uset?".
   const probes = [
     sb.from("friend_requests").select("*", head).eq("to_id", me.id).gt("created_at", sinceIso),
-    sb.from("kreds_invites").select("*", head).eq("user_id", me.id).gt("created_at", sinceIso)
+    sb.from("kreds_invites").select("*", head).eq("user_id", me.id).gt("created_at", sinceIso),
+    // Kreds-opslag fra andre (RLS viser kun mine kredse) → prikken følger listen
+    sb.from("posts").select("*", head).not("feed_id", "is", null).neq("author", me.id).gt("created_at", sinceIso)
   ];
   if(ids.length){
     probes.push(sb.from("likes").select("*", head).in("post_id", ids).neq("user_id", me.id).gt("created_at", sinceIso));
@@ -119,6 +126,7 @@ export async function loadNotifs(){
   const H = '<svg viewBox="0 0 24 24"><path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
   const B = '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>';
   const P = '<svg viewBox="0 0 24 24"><g class="stroke"><circle cx="10" cy="8" r="3.4"/><path d="M3.8 19.5c.7-3.3 3.2-5 6.2-5s5.5 1.7 6.2 5"/><path d="M18.5 6.5v6M15.5 9.5h6"/></g></svg>';
+  const K = '<svg viewBox="0 0 24 24"><g class="stroke"><circle cx="9" cy="9" r="3.1"/><path d="M3.6 19c.6-3 2.6-4.6 5.4-4.6s4.8 1.6 5.4 4.6"/><circle cx="17.2" cy="8" r="2.3"/><path d="M15.7 13.2c2.5.1 4.2 1.5 4.7 3.9"/></g></svg>';
   function row(icon, cls, u, text, snip, tm, attrs, unread){
     return '<div class="notif'+(unread ? " unread" : "")+'"'+(attrs || "")+'>'+
       (unread ? '<span class="udot"></span>' : '')+
@@ -192,7 +200,10 @@ export async function loadNotifs(){
       sb.from("friendships").select("created_at, from_profile:profiles!user_id(*)").eq("friend_id", me.id),
       sb.from("kreds_requests").select("created_at, feed_id, user_id, requester:profiles!user_id(*), feed:feeds!feed_id(name)").neq("user_id", me.id),
       sb.from("kreds_invites").select("created_at, feed_id, feed:feeds!feed_id(name), inviter:profiles!invited_by(*)").eq("user_id", me.id),
-      sb.from("friend_requests").select("created_at, from_profile:profiles!from_id(*)").eq("to_id", me.id)
+      sb.from("friend_requests").select("created_at, from_profile:profiles!from_id(*)").eq("to_id", me.id),
+      // Kreds-opslag i mine kredse (ikke egne). RLS begrænser til synlige kredse.
+      sb.from("posts").select("id, created_at, text, image_path, feed_id, author_profile:profiles!author(*), feed:feeds!feed_id(name)")
+        .not("feed_id", "is", null).neq("author", me.id).order("created_at", { ascending:false }).limit(30)
     ];
     let iLikes = -1, iCmts = -1, iReplies = -1, iClikes = -1;
     if(ids.length){
@@ -225,6 +236,14 @@ export async function loadNotifs(){
     });
     (res[3].data || []).forEach(function(r){
       if(r.from_profile){ registerProfile(r.from_profile); items.push({ type:"freq", u:r.from_profile.handle, at:r.created_at }); }
+    });
+    // Kreds-opslag: "postede i {kreds}" + selve teksten, klikbar → åbner opslaget
+    (res[4].data || []).forEach(function(r){
+      if(r.author_profile){
+        registerProfile(r.author_profile);
+        items.push({ type:"kpost", u:r.author_profile.handle, at:r.created_at, pid:r.id,
+                     k:(r.feed && r.feed.name) || "", snip:r.text || (r.image_path ? t("notif.photo") : "") });
+      }
     });
     // Svar PÅ mine kommentarer først — så deres id'er kan udelukkes fra "kommentar på dit opslag"
     const replyIds = new Set();
@@ -273,6 +292,7 @@ export async function loadNotifs(){
           if(n.type === "clike")  return row(H, "heart",  n.u, t("notif.liked_comment"), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "reply")  return row(B, "bubble", n.u, t("notif.replied"),   n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "cmt")    return row(B, "bubble", n.u, t("notif.commented"),  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
+          if(n.type === "kpost")  return row(K, "kpost",  n.u, t("notif.posted_kreds", { k: esc(n.k) }), n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
           if(n.type === "kreq")   return kreqRow(n);
           if(n.type === "inv")    return invRow(n);
           if(n.type === "freq")   return freqRow(n);

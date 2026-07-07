@@ -525,6 +525,7 @@
   .notif .nicon.heart svg path{fill:var(--red);stroke:var(--red)}
   .notif .nicon.bubble{color:var(--gray)}
   .notif .nicon.friend{color:var(--red)}
+  .notif .nicon.kpost{color:var(--red)}
   /* Ulæste notifikationer (siden sidste åbning af fanen): rød prik + tonet række */
   .notif.unread{background:var(--chip)}
   .notif.unread .ntext{font-weight:600}

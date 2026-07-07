@@ -150,6 +150,7 @@ const DA = {
   /* Notifikationer */
   "notif.liked": "likede dit opslag",
   "notif.commented": "svarede på dit opslag",
+  "notif.posted_kreds": "postede i {k}",
   "notif.replied": "svarede på din kommentar",
   "notif.liked_comment": "likede din kommentar",
   "notif.friend": "er nu i din kreds",
@@ -503,6 +504,7 @@ const EN = {
   /* Notifications */
   "notif.liked": "liked your post",
   "notif.commented": "replied to your post",
+  "notif.posted_kreds": "posted in {k}",
   "notif.replied": "replied to your comment",
   "notif.liked_comment": "liked your comment",
   "notif.friend": "is now in your circle",
