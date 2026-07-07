@@ -610,6 +610,7 @@ export function renderKredshead(){
 }
 export function setFeed(id){
   state.currentFeed = id;
+  try{ sessionStorage.setItem("vf_cur_feed", id); }catch(_e){} // husk valgt kreds over et reload
   if(id !== "all") markFeedSeen(id); // åbning af en kreds gemmer nu() i vf_feed_seen og fjerner prikken
   expandedCmts.clear();
   resetFeedbarSearch(); // kreds-søgningen lukkes/nulstilles ved feed-skift

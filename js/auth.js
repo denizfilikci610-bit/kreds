@@ -2,7 +2,7 @@ import { sb, recoveryMode, setRecoveryMode } from "./config.js";
 import { t, getLang, policyURL } from "./i18n.js";
 import { me, setMe, state, FRIEND_SINCE, pv, expandedCmts, clearComposers, setCfilePid } from "./store.js";
 import { el, registerProfile, toast, getConsent } from "./helpers.js";
-import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu, closeReportMenu, resetFeedbarSearch, resetTapState, resetBarHide, clearUnseenFeeds } from "./feed.js";
+import { loadFriends, loadFeeds, loadPosts, feedById, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu, closeReportMenu, resetFeedbarSearch, resetTapState, resetBarHide, clearUnseenFeeds } from "./feed.js";
 import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPost, resetPoll } from "./compose.js";
 import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet, closeUnfriendMenu } from "./profile.js";
 import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
@@ -44,13 +44,21 @@ export function setAuthMode(mode){
 }
 /* Gen-anvend teksterne for den aktuelle auth-tilstand (kaldes ved sprogskifte) */
 export function refreshAuthMode(){ setAuthMode(authMode); }
+// Fader boot-splashen væk, når appen står færdig (boot) eller auth-skærmen vises —
+// så et reload aldrig blotter den tomme app-skal mens data hentes.
+export function hideSplash(){
+  const s = el("splash");
+  if(s) s.classList.add("gone");
+}
 export function showAuth(msg){
+  hideSplash();
   setAuthMode("login");
   el("authview").classList.add("on");
   el("li-err").textContent = msg || "";
   el("su-err").textContent = "";
 }
 export function showRecovery(){
+  hideSplash();
   setAuthMode("recover");
   el("authview").classList.add("on");
 }
@@ -122,7 +130,13 @@ export async function boot(session){
   setOwnUI();
   state.currentFeed = "all";
   expandedCmts.clear();
-  await Promise.all([loadFriends(), loadFeeds(), loadPosts()]);
+  // Hent venner + kredse først, så vi kender kredsene og kan gendanne den kreds
+  // brugeren var i før et reload (kun hvis den stadig findes) — DERNÆST posts, så
+  // loadPosts henter den rigtige kreds' opslag fra første frame (ingen flimren).
+  await Promise.all([loadFriends(), loadFeeds()]);
+  let savedFeed; try{ savedFeed = sessionStorage.getItem("vf_cur_feed"); }catch(_e){}
+  if(savedFeed && savedFeed !== "all" && feedById(savedFeed)) state.currentFeed = savedFeed;
+  await loadPosts();
   renderFeedbar();
   renderKredshead();
   renderComposeDest();
@@ -136,6 +150,7 @@ export async function boot(session){
   loadQuota();
   refreshNotifDot(); // tænd hjerte-prikken hvis nogen reagerede mens jeg var væk/logget ud
   hideAuth();
+  hideSplash(); // appen står nu færdig på rette fane + kreds → fad splashen væk
   pushNativeCreds(); // fire-and-forget — kun i WKWebView'en
 }
 export function resetApp(){
@@ -154,6 +169,7 @@ export function resetApp(){
   state.teasers = [];
   state.feeds = [];
   state.currentFeed = "all";
+  try{ sessionStorage.setItem("vf_cur_feed", "all"); }catch(_e){} // ryd valgt kreds ved logout
   pv.u = null;
   pv.posts = [];
   expandedCmts.clear();

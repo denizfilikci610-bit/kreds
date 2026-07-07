@@ -969,6 +969,16 @@
   }
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 
+  /* ---- Boot-splash (dækker den tomme app-skal ved (gen)indlæsning) ---- */
+  .splash{
+    position:absolute;inset:0;z-index:150;
+    background:var(--bg);
+    display:flex;align-items:center;justify-content:center;
+    transition:opacity .35s ease;
+  }
+  .splash .wordmark{font-size:44px}
+  .splash.gone{opacity:0;pointer-events:none}
+
   /* ---- Auth ---- */
   .authview{
     position:absolute;inset:0;z-index:200;
