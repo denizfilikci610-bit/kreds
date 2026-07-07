@@ -24,6 +24,11 @@ export function realtimeNotify(table, payload){
     if(curTab !== "akt") setNotifDot(true);
     return;
   }
+  // Reaktioner (like/kommentar/kommentar-like): actor-tjekket fjerner egne handlinger,
+  // MEN payloaden afslører ikke om målet (opslag/kommentar) er MIT — RLS leverer også
+  // reaktioner på andres synlige indhold. Derfor må prikken afgøres af et ejerskabs-tjek
+  // (hasUnseenNotifs), ikke tændes blindt (ellers lyste en like på en vens opslag prikken).
+  const isReaction = (table === "likes" || table === "comments" || table === "comment_likes");
   if(table === "kreds_invites"){
     if(row.user_id !== me.id) return; // kun invitationer TIL mig
   } else if(table === "friend_requests"){
@@ -42,7 +47,50 @@ export function realtimeNotify(table, payload){
     notifTimer = setTimeout(loadNotifs, 400);
     return;
   }
-  setNotifDot(true);
+  if(isReaction) scheduleNotifDotRefresh(); // ejerskabs-tjekket prik
+  else setNotifDot(true);                    // pålideligt: payload/RLS bekræfter relevans
+}
+
+/* ---- Live prik: tændes for USETE reaktioner/anmodninger på MIT indhold. Bruges både af
+   realtime (reaktioner, hvor payloaden ikke afslører ejerskab) OG ved app-fokus/boot, så
+   reaktioner der landede mens app'en var i baggrunden (realtime-socket droppet) også fanges.
+   Let count-probe (head:true → ingen rækker hentes); tænder kun — rydder aldrig (akt rydder). */
+let dotTimer = null;
+export function scheduleNotifDotRefresh(){
+  clearTimeout(dotTimer);
+  dotTimer = setTimeout(refreshNotifDot, 500);
+}
+export async function refreshNotifDot(){
+  if(!me || curTab === "akt") return;
+  if(await hasUnseenNotifs()) setNotifDot(true);
+}
+async function hasUnseenNotifs(){
+  if(!me) return false;
+  // Samme "set"-grænse som listen (seenSinceMs) → prik og liste kan aldrig være uenige.
+  const sinceIso = new Date(seenSinceMs()).toISOString();
+  const [mp, mc] = await Promise.all([
+    sb.from("posts").select("id").eq("author", me.id),
+    sb.from("comments").select("id").eq("author", me.id)
+  ]);
+  if(mp.error || mc.error) return false;
+  const ids = (mp.data || []).map(function(p){ return p.id; });
+  const cids = (mc.data || []).map(function(c){ return c.id; });
+  const head = { count: "exact", head: true };
+  // Overlap mellem probes er ligegyldigt — vi spørger kun "findes der NOGET uset?".
+  const probes = [
+    sb.from("friend_requests").select("*", head).eq("to_id", me.id).gt("created_at", sinceIso),
+    sb.from("kreds_invites").select("*", head).eq("user_id", me.id).gt("created_at", sinceIso)
+  ];
+  if(ids.length){
+    probes.push(sb.from("likes").select("*", head).in("post_id", ids).neq("user_id", me.id).gt("created_at", sinceIso));
+    probes.push(sb.from("comments").select("*", head).in("post_id", ids).neq("author", me.id).gt("created_at", sinceIso));
+  }
+  if(cids.length){
+    probes.push(sb.from("comments").select("*", head).in("parent_id", cids).neq("author", me.id).gt("created_at", sinceIso));
+    probes.push(sb.from("comment_likes").select("*", head).in("comment_id", cids).neq("user_id", me.id).gt("created_at", sinceIso));
+  }
+  const res = await Promise.all(probes);
+  return res.some(function(r){ return !r.error && (r.count || 0) > 0; });
 }
 
 /* ================= Notifikationer ================= */
@@ -55,14 +103,18 @@ function readNotifSeen(){
 function writeNotifSeen(iso){
   try{ localStorage.setItem(NOTIF_SEEN_KEY, iso); }catch(_e){}
 }
+/* ÉN fælles definition af "set" — så prikken (hasUnseenNotifs) og listen (isUnread) ALDRIG
+   er uenige. Intet gemt tidsstempel (akt-fanen aldrig åbnet på enheden) = alt er uset (0). */
+function seenSinceMs(){
+  const iso = readNotifSeen();
+  return iso ? new Date(iso).getTime() : 0;
+}
 let notifTimer = null, notifSeq = 0;
 export async function loadNotifs(){
   if(!me) return;
   const seq = ++notifSeq; // sekvens-token: kun det nyeste kald må skrive resultatet
   el("notifs").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
-  const seenIso = readNotifSeen();
-  // Intet gemt tidsstempel (fanen aldrig åbnet på enheden) = alt er ulæst
-  const seenMs = seenIso ? new Date(seenIso).getTime() : 0;
+  const seenMs = seenSinceMs();
   function isUnread(at){ return new Date(at).getTime() > seenMs; }
   const H = '<svg viewBox="0 0 24 24"><path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
   const B = '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>';
@@ -142,13 +194,15 @@ export async function loadNotifs(){
       sb.from("kreds_invites").select("created_at, feed_id, feed:feeds!feed_id(name), inviter:profiles!invited_by(*)").eq("user_id", me.id),
       sb.from("friend_requests").select("created_at, from_profile:profiles!from_id(*)").eq("to_id", me.id)
     ];
-    let iLikes = -1, iCmts = -1, iReplies = -1;
+    let iLikes = -1, iCmts = -1, iReplies = -1, iClikes = -1;
     if(ids.length){
       iLikes = reqs.push(sb.from("likes").select("created_at, post_id, liker:profiles!user_id(*)").in("post_id", ids).neq("user_id", me.id)) - 1;
       iCmts  = reqs.push(sb.from("comments").select("id, created_at, post_id, text, image_path, author_profile:profiles!author(*)").in("post_id", ids).neq("author", me.id)) - 1;
     }
     if(myCmtIds.length){
       iReplies = reqs.push(sb.from("comments").select("id, created_at, post_id, text, image_path, author_profile:profiles!author(*)").in("parent_id", myCmtIds).neq("author", me.id)) - 1;
+      // Likes PÅ mine kommentarer (comment_likes → comment.post_id for at kunne åbne opslaget)
+      iClikes = reqs.push(sb.from("comment_likes").select("created_at, comment:comments!comment_id(post_id), liker:profiles!user_id(*)").in("comment_id", myCmtIds).neq("user_id", me.id)) - 1;
     }
     const res = await Promise.all(reqs);
     for(const r of res){ if(r.error) throw r.error; }
@@ -197,6 +251,14 @@ export async function loadNotifs(){
         }
       });
     }
+    if(iClikes >= 0){
+      (res[iClikes].data || []).forEach(function(r){
+        if(r.liker && r.comment){
+          registerProfile(r.liker);
+          items.push({ type:"clike", u:r.liker.handle, at:r.created_at, pid:r.comment.post_id });
+        }
+      });
+    }
     items.sort(function(a,b){ return new Date(b.at) - new Date(a.at); });
     /* Invitationer/anmodninger er handlingskrævende — de må aldrig ryge ud af 30-loftet */
     const isAct = function(n){ return n.type === "inv" || n.type === "kreq" || n.type === "freq"; };
@@ -208,6 +270,7 @@ export async function loadNotifs(){
     el("notifs").innerHTML = top.length
       ? top.map(function(n){
           if(n.type === "like")   return row(H, "heart",  n.u, t("notif.liked"), n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="like"', isUnread(n.at));
+          if(n.type === "clike")  return row(H, "heart",  n.u, t("notif.liked_comment"), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "reply")  return row(B, "bubble", n.u, t("notif.replied"),   n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "cmt")    return row(B, "bubble", n.u, t("notif.commented"),  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "kreq")   return kreqRow(n);

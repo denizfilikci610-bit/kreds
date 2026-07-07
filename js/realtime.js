@@ -6,7 +6,7 @@ import { renderComposeDest } from "./compose.js";
 import { refreshMemberSheet } from "./kredse.js";
 import { renderStories, loadPvPosts } from "./profile.js";
 import { renderSearch } from "./search.js";
-import { realtimeNotify } from "./notifications.js";
+import { realtimeNotify, scheduleNotifDotRefresh } from "./notifications.js";
 
 /* ================= Realtime + fokus ================= */
 let channel = null, refetchTimer = null;
@@ -53,6 +53,11 @@ export function subscribeRealtime(){
       scheduleRefetch();
       realtimeNotify("likes", payload);
     })
+    .on("postgres_changes", { event:"INSERT", schema:"public", table:"comment_likes" }, function(payload){
+      // Ingen scheduleRefetch: kommentar-like-tal ses kun i udfoldet tråd (gen-renderes ved åbning);
+      // en fuld feed-refetch pr. kommentar-like ville være unødigt tungt.
+      realtimeNotify("comment_likes", payload);
+    })
     .on("postgres_changes", { event:"*", schema:"public", table:"poll_votes" }, scheduleRefetch)
     .on("postgres_changes", { event:"*", schema:"public", table:"feed_members" }, scheduleRefetch)
     .on("postgres_changes", { event:"*", schema:"public", table:"feeds" }, scheduleRefetch)
@@ -77,5 +82,5 @@ export function unsubscribeRealtime(){
 }
 
 export function initRealtime(){
-window.addEventListener("focus", function(){ if(me) scheduleRefetch(); });
+window.addEventListener("focus", function(){ if(me){ scheduleRefetch(); scheduleNotifDotRefresh(); } });
 }

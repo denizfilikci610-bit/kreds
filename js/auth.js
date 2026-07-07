@@ -8,6 +8,7 @@ import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, c
 import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
 import { closeLightbox } from "./lightbox.js";
 import { subscribeRealtime, unsubscribeRealtime } from "./realtime.js";
+import { refreshNotifDot } from "./notifications.js";
 import { resetSearch } from "./search.js";
 
 /* ================= Auth ================= */
@@ -130,6 +131,7 @@ export async function boot(session){
   switchTab("feed");
   subscribeRealtime();
   loadQuota();
+  refreshNotifDot(); // tænd hjerte-prikken hvis nogen reagerede mens jeg var væk/logget ud
   hideAuth();
   pushNativeCreds(); // fire-and-forget — kun i WKWebView'en
 }
