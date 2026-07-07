@@ -32,7 +32,9 @@ function buildThread(p){
 }
 function cmtRowHTML(item){
   const c = item.c;
-  const lvl = Math.min(item.lvl, 3);
+  // Kun ÉT indrykningsniveau: top-kommentar (0) og alle svar (1). Dybere svar
+  // rykker ikke længere ind — @navn foran viser hvem svaret er rettet til.
+  const lvl = item.lvl > 0 ? 1 : 0;
   const ind = lvl * 26;
   // Vis ALTID hvem svaret er rettet til (ikke kun ved dyb nesting)
   const prefix = item.parentU ? '<span class="cat">@'+esc(item.parentU)+'</span> ' : '';

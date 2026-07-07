@@ -322,6 +322,20 @@ function advancePostSeen(){
   if(!seen || newest > new Date(seen).getTime()) writePostSeen(new Date(newest).toISOString());
 }
 
+/* Signatur over det synlige feed — bruges til at springe unødige gen-renders over
+   ved baggrunds-refetch (realtime/polling), så feedet ikke hopper hvert par sekunder. */
+let lastFeedSig = "";
+function feedSig(){
+  const posts = state.posts.map(function(p){
+    return [p.id, p.created, p.text || "", p.likeCount, p.liked ? 1 : 0, p.isNew ? 1 : 0,
+            (p.img && p.img.src) || "", (p.video && p.video.src) || "",
+            p.poll ? JSON.stringify(p.poll) : 0,
+            p.cmts.map(function(c){ return [c.id, c.text || "", c.likeCount, c.liked ? 1 : 0, c.img || ""]; })];
+  });
+  const teasers = state.teasers.map(function(t){ return [t.id, t.requested ? 1 : 0]; });
+  return JSON.stringify([state.currentFeed, posts, teasers]);
+}
+
 /* ================= Data-hentning ================= */
 export function postQuery(){
   return sb.from("posts").select(POST_SELECT)
@@ -329,7 +343,10 @@ export function postQuery(){
     .order("created_at", { ascending:true, referencedTable:"comments" })
     .limit(100);
 }
-export async function loadPosts(){
+export async function loadPosts(advanceSeen){
+  // advanceSeen: bruger-initieret hentning (boot, faneskift, egne handlinger) = true;
+  // baggrunds-refetch (realtime/polling) = false. Default true for eksisterende kald.
+  if(advanceSeen === undefined) advanceSeen = true;
   if(!me) return;
   try{
     const reqs = [ postQuery().is("feed_id", null) ];
@@ -357,10 +374,17 @@ export async function loadPosts(){
       state.posts = (res[1].data || []).map(mapPost);
     }
     flagNewPosts();
-    renderFeed();
-    renderStories();
-    if(el("view-profil").classList.contains("active")) renderMyPosts();
-    advancePostSeen(); // EFTER render: dette renders NY-mærker står — næste hentning ser dem som set
+    // Bruger-initieret: gen-render altid. Baggrund: kun når noget faktisk ændrede sig.
+    const sig = feedSig();
+    if(advanceSeen || sig !== lastFeedSig){
+      lastFeedSig = sig;
+      renderFeed();
+      renderStories();
+      if(el("view-profil").classList.contains("active")) renderMyPosts();
+    }
+    // NY-mærker rykkes kun "set" ved bruger-handlinger — IKKE ved baggrunds-refetch,
+    // så nye opslag der ankommer live beholder deres NY, til feedet reelt ses igen.
+    if(advanceSeen) advancePostSeen();
   }catch(err){
     console.error(err);
     toast(t("feed.load_failed"));

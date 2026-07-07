@@ -1,15 +1,28 @@
 import { sb } from "./config.js";
 import { me, pv } from "./store.js";
 import { el } from "./helpers.js";
-import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, loadQuota, markFeedUnseenRT } from "./feed.js";
+import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, loadQuota, markFeedUnseenRT } from "./feed.js";
 import { renderComposeDest } from "./compose.js";
 import { refreshMemberSheet } from "./kredse.js";
-import { renderStories, loadPvPosts } from "./profile.js";
+import { loadPvPosts } from "./profile.js";
 import { renderSearch } from "./search.js";
 import { realtimeNotify, scheduleNotifDotRefresh } from "./notifications.js";
 
 /* ================= Realtime + fokus ================= */
-let channel = null, refetchTimer = null;
+let channel = null, refetchTimer = null, pollTimer = null;
+
+/* Sikkerhedsnet: realtime giver øjeblikkelige INSERTs, men et let poll hvert
+   12. sekund (kun mens fanen er synlig) fanger også sletninger/redigeringer/
+   unlikes og alt realtime måtte misse — så man aldrig behøver at genindlæse.
+   loadPosts(false) gen-renderer kun ved reelle ændringer, så det er ikke synligt
+   når intet er sket. */
+function startPolling(){
+  if(pollTimer) return;
+  pollTimer = setInterval(function(){
+    if(me && !document.hidden) scheduleRefetch();
+  }, 12000);
+}
+function stopPolling(){ if(pollTimer){ clearInterval(pollTimer); pollTimer = null; } }
 export function scheduleRefetch(){
   clearTimeout(refetchTimer);
   refetchTimer = setTimeout(doRefetch, 400);
@@ -17,19 +30,21 @@ export function scheduleRefetch(){
 async function doRefetch(){
   if(!me) return;
   const ae = document.activeElement;
-  if(ae && ae.classList && ae.classList.contains("cfield")){
-    // Udskyd mens brugeren skriver en kommentar (bevarer fokus, caret og mobil-tastatur)
+  const composing = el("compose") && el("compose").classList.contains("on");
+  if((ae && ae.classList && ae.classList.contains("cfield")) || composing){
+    // Udskyd mens brugeren skriver en kommentar eller opretter et opslag — bevarer
+    // fokus, caret, tastatur og valgt destination (gælder både realtime og poll).
     clearTimeout(refetchTimer);
     refetchTimer = setTimeout(doRefetch, 1500);
     return;
   }
-  await Promise.all([loadFriends(), loadFeeds(), loadPosts()]);
+  // false = baggrunds-refetch: rykker ikke NY-mærker til "set", og gen-renderer kun
+  // feedet hvis noget faktisk ændrede sig (renderFeed/renderStories sker inde i loadPosts).
+  await Promise.all([loadFriends(), loadFeeds(), loadPosts(false)]);
   renderFeedbar();
   renderKredshead();
   refreshMemberSheet();
   renderComposeDest();
-  renderFeed();
-  renderStories();
   if(el("view-search").classList.contains("active")) renderSearch();
   if(el("profileview").classList.contains("on") && pv.u) await loadPvPosts();
   loadQuota();
@@ -75,12 +90,18 @@ export function subscribeRealtime(){
       realtimeNotify("friendships", payload);
     })
     .subscribe();
+  startPolling();
 }
 export function unsubscribeRealtime(){
   if(channel){ sb.removeChannel(channel); channel = null; }
   clearTimeout(refetchTimer);
+  stopPolling();
 }
 
 export function initRealtime(){
-window.addEventListener("focus", function(){ if(me){ scheduleRefetch(); scheduleNotifDotRefresh(); } });
+  // Fokus OG synlighed (mobil-faneskift udløser ikke altid focus) → frisk feedet.
+  window.addEventListener("focus", function(){ if(me){ scheduleRefetch(); scheduleNotifDotRefresh(); } });
+  document.addEventListener("visibilitychange", function(){
+    if(!document.hidden && me){ scheduleRefetch(); scheduleNotifDotRefresh(); }
+  });
 }
