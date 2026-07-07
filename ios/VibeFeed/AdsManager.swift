@@ -165,14 +165,9 @@ final class AdsManager: NSObject, ObservableObject {
         guard isInitialized, let overlay = overlay, !pool.isEmpty else { return }
         let root = Self.topViewController()
 
-        // Hide everything while the feed is actively scrolling — a native overlay
-        // cannot ride an inner CSS scroll container, so following it mid-scroll
-        // would lag. The web skeleton shows through until scrolling settles.
-        if lastScrolling {
-            for item in pool { item.mrec.alpha = 0 }
-            return
-        }
-
+        // The web reports slot positions continuously (including during scroll), so
+        // the MRECs are repositioned to follow the feed and stay visible rather than
+        // hiding on every scroll.
         let midY = overlay.bounds.midY
         let chosen = lastSlots
             .sorted { abs(($0.y + $0.h / 2) - midY) < abs(($1.y + $1.h / 2) - midY) }
@@ -213,7 +208,7 @@ final class AdsManager: NSObject, ObservableObject {
         if ok {
             it.loadStarted = true
             if let sid = it.slotId {
-                it.mrec.alpha = lastScrolling ? 0 : 1
+                it.mrec.alpha = 1
                 fillWeb(sid, true) // reveal — also un-collapses the card if it was collapsed
             }
             return
