@@ -3,6 +3,7 @@ import UIKit
 import WebKit
 import AppTrackingTransparency
 import Appodeal
+import GoogleMobileAds
 
 /// Geometry of one sponsored slot as reported by the web feed. Coordinates are
 /// CSS px (== WKWebView points) relative to the viewport's top-left, which is
@@ -28,6 +29,9 @@ final class AdPoolItem {
     // otherwise a routine refresh would blank an ad that is already on screen.
     var hasCreative = false
     var loadStarted = false
+    // DEBUG only: a guaranteed-fill Google test MREC used to visibly prove the ad
+    // pipeline while the live waterfall has no inventory yet. nil in Release.
+    var testBanner: BannerView?
 
     init(mrec: APDMRECView, proxy: MRECDelegateProxy) {
         self.mrec = mrec
@@ -68,6 +72,15 @@ final class AdsManager: NSObject, ObservableObject {
     private let poolSize = 3
     private var lastSlots: [AdSlot] = []
     private var lastScrolling = false
+
+    // In DEBUG we lay Google's guaranteed test MREC over the slots so the feed
+    // visibly renders an ad even before the live waterfall has any inventory.
+    // Compiled OUT of Release (App Store) builds — real users only ever see live ads.
+    #if DEBUG
+    private let useTestAds = true
+    #else
+    private let useTestAds = false
+    #endif
 
     private override init() { super.init() }
 
@@ -143,16 +156,32 @@ final class AdsManager: NSObject, ObservableObject {
     private func buildPoolIfPossible() {
         guard isInitialized, let overlay = overlay, pool.isEmpty else { return }
         let root = Self.topViewController()
+        if useTestAds { MobileAds.shared.start(completionHandler: nil) }
         for index in 0..<poolSize {
             // ObjC `-init` is imported as optional (no nullability annotation);
             // it never actually returns nil.
             guard let mrec = APDMRECView() else { continue }
             let proxy = MRECDelegateProxy(index: index)
             mrec.rootViewController = root
-            mrec.delegate = proxy
             mrec.alpha = 0
             overlay.addSubview(mrec)
-            pool.append(AdPoolItem(mrec: mrec, proxy: proxy))
+            let item = AdPoolItem(mrec: mrec, proxy: proxy)
+
+            if useTestAds {
+                // Lay a guaranteed Google test MREC over the slot; leave the live
+                // Appodeal MREC inert (no delegate, never loaded) so its no-fill can't
+                // collapse the card out from under the test ad.
+                let banner = BannerView(adSize: AdSizeMediumRectangle)
+                banner.adUnitID = "ca-app-pub-3940256099942544/2934735716" // Google's public test unit
+                banner.rootViewController = root
+                banner.alpha = 0
+                overlay.addSubview(banner)
+                banner.load(Request())
+                item.testBanner = banner
+            } else {
+                mrec.delegate = proxy
+            }
+            pool.append(item)
         }
     }
 
@@ -180,6 +209,7 @@ final class AdsManager: NSObject, ObservableObject {
         for item in pool where item.slotId != nil && !visibleIds.contains(item.slotId!) {
             item.slotId = nil
             item.mrec.alpha = 0
+            item.testBanner?.alpha = 0
         }
 
         // Give any free MREC the nearest still-unserved slot (nearest the viewport
@@ -200,10 +230,22 @@ final class AdsManager: NSObject, ObservableObject {
         for it in pool {
             guard let sid = it.slotId,
                   let slot = lastSlots.first(where: { $0.id == sid }) else { continue }
-            it.mrec.rootViewController = root
             let fx = slot.x + (slot.w - size.width) / 2
             let fy = slot.y + (slot.h - size.height) / 2
-            it.mrec.frame = CGRect(x: fx, y: fy, width: size.width, height: size.height)
+            let frame = CGRect(x: fx, y: fy, width: size.width, height: size.height)
+
+            // DEBUG: a guaranteed test ad always fills, so just place and show it.
+            if let banner = it.testBanner {
+                banner.frame = frame
+                banner.rootViewController = root
+                banner.alpha = 1
+                it.mrec.alpha = 0
+                fillWeb(sid, true)
+                continue
+            }
+
+            it.mrec.rootViewController = root
+            it.mrec.frame = frame
             if !it.loadStarted {
                 it.loadStarted = true
                 it.mrec.loadAd()
