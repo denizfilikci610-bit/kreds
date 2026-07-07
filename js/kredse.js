@@ -52,15 +52,31 @@ function renderFsAll(){
 
 /* ================= Medlemmer (sheet, åbnes fra kredshead) ================= */
 let msFeedId = null;
+let msInvited = new Set(); // user_id'er med en afventende invitation til den viste kreds
+let msInvSeq = 0;          // generations-token: kun den NYESTE hentning må skrive msInvited
 
-export function openMemberSheet(){
+/* Hent afventende invitationer for kredsen. RLS tillader medlemmer at læse
+   kreds_invites for deres egne kredse, så inviteren kan se hvem der er inviteret. */
+async function loadMsInvites(fid){
+  const seq = ++msInvSeq;
+  const { data, error } = await sb.from("kreds_invites").select("user_id").eq("feed_id", fid);
+  if(error){ console.error(error); return; }
+  if(msFeedId !== fid || seq !== msInvSeq) return; // lukket/skiftet — eller en nyere hentning vandt
+  msInvited = new Set((data || []).map(function(r){ return r.user_id; }));
+}
+
+export async function openMemberSheet(){
   if(!me || state.currentFeed === "all" || !feedById(state.currentFeed)) return;
   msFeedId = state.currentFeed;
+  const fid = msFeedId;
+  msInvited = new Set();
   el("ms-leave").style.display = "";
   el("ms-leave-confirm").style.display = "none";
   renderMemberSheet();
   el("scrim").classList.add("on");
   el("msheet").classList.add("on");
+  await loadMsInvites(fid);                     // afventende invitationer → "Invitation sendt"
+  if(msFeedId === fid) renderMemberSheet();
 }
 export function closeMemberSheet(){
   el("msheet").classList.remove("on");
@@ -90,17 +106,26 @@ function renderMemberSheet(){
   });
   el("ms-friends").innerHTML = cand.length
     ? cand.map(function(h){
+        const uid = user(h).id;
+        // Allerede inviteret → tydeligt "Invitation sendt ✓" (ingen knap → kan ikke inviteres igen)
+        const action = msInvited.has(uid)
+          ? '<span class="ms-btn sent" aria-disabled="true">'+t("ms.invited")+'</span>'
+          : '<button class="ms-btn add" data-add="'+esc(uid)+'">'+t("ms.invite")+'</button>';
         return '<div class="listrow">'+
           avaHTML(h, 44)+
           '<div class="grow"><div class="l1">'+esc(user(h).name)+'</div><div class="l2">@'+esc(h)+'</div></div>'+
-          '<button class="ms-btn add" data-add="'+esc(user(h).id)+'">'+t("ms.invite")+'</button>'+
+          action+
         '</div>';
       }).join("")
     : '<div class="emptynote">'+t("ms.all_in")+'</div>';
 }
 /* Gen-render det åbne medlemmer-sheet (no-op hvis det er lukket) — kaldes også fra realtime */
 export function refreshMemberSheet(){
-  if(msFeedId != null && el("msheet").classList.contains("on")) renderMemberSheet();
+  if(msFeedId != null && el("msheet").classList.contains("on")){
+    const fid = msFeedId;
+    renderMemberSheet();
+    loadMsInvites(fid).then(function(){ if(msFeedId === fid) renderMemberSheet(); }); // hold "sendt"-status frisk
+  }
 }
 /* Efter enhver vellykket governance-handling: hent feeds/posts igen, så pill + medlemmer opdaterer */
 async function refreshAfterGov(){
@@ -152,8 +177,9 @@ async function msAdd(btn){
     govErrToast(String(error.message || ""));
     return;
   }
-  btn.textContent = t("ms.invited"); // medlemslisten ændrer sig først, når invitationen accepteres
+  msInvited.add(btn.dataset.add); // medlemslisten ændrer sig først når invitationen accepteres
   toast(t("ms.invite_sent", { name: user(ID2H[btn.dataset.add] || "?").name }));
+  renderMemberSheet(); // personen vises nu vedvarende som "Invitation sendt ✓"
 }
 
 export function initKredse(){
