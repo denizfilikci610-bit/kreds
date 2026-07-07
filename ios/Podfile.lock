@@ -3,14 +3,22 @@ PODS:
     - Protobuf (= 3.29.3)
     - StackConsentManager (= 4.0.0)
     - StackModules (= 3.5.0)
+  - AppodealBidMachineAdapter (3.7.1.0):
+    - Appodeal (< 5.0.0, >= 4.0.0)
+    - BidMachine (= 3.7.1)
   - AppodealGoogleAdMobAdapter (12.13.0.0):
     - Appodeal (< 5.0.0, >= 4.0.0)
     - Bidon (= 0.15.0)
     - Google-Mobile-Ads-SDK (= 12.13.0)
+  - BidMachine (3.7.1):
+    - BidMachine/Static (= 3.7.1)
+  - BidMachine/Static (3.7.1):
+    - OMSDK_Appodeal/Static (= 1.6.3)
   - Bidon (0.15.0)
   - Google-Mobile-Ads-SDK (12.13.0):
     - GoogleUserMessagingPlatform (>= 1.1)
   - GoogleUserMessagingPlatform (3.1.0)
+  - OMSDK_Appodeal/Static (1.6.3)
   - Protobuf (3.29.3)
   - StackConsentManager (4.0.0):
     - GoogleUserMessagingPlatform (~> 3.1)
@@ -29,31 +37,38 @@ PODS:
 
 DEPENDENCIES:
   - Appodeal (= 4.2.0)
+  - AppodealBidMachineAdapter (= 3.7.1.0)
   - AppodealGoogleAdMobAdapter (= 12.13.0.0)
 
 SPEC REPOS:
   https://github.com/appodeal/CocoaPods.git:
+    - AppodealBidMachineAdapter
     - AppodealGoogleAdMobAdapter
     - StackConsentManager
   https://github.com/bidon-io/CocoaPods-Specs.git:
     - Bidon
   trunk:
     - Appodeal
+    - BidMachine
     - Google-Mobile-Ads-SDK
     - GoogleUserMessagingPlatform
+    - OMSDK_Appodeal
     - Protobuf
     - StackModules
 
 SPEC CHECKSUMS:
   Appodeal: 2a21b8a22455a3b881767f592dcacb7aa007dce2
+  AppodealBidMachineAdapter: bb5af4bcebb5613d4820616bf1d87ba63a16168e
   AppodealGoogleAdMobAdapter: f9a178c9aeaa15ff8e551776cfd68636c4b6d284
+  BidMachine: b3eca96870e834eb74a2e9dec44f99d9b5d3b7c1
   Bidon: 78b9e311d1961a5bedea4bbe58fc3c0d55da7159
   Google-Mobile-Ads-SDK: fa5e7457f7dcd55a1958c29e71cc67cd4f3f2de3
   GoogleUserMessagingPlatform: befe603da6501006420c206222acd449bba45a9c
+  OMSDK_Appodeal: e76e5c30dfd3081621a8cd393c45219edc84f1f2
   Protobuf: e2de96d939c642ce8da186343ff8929b35223212
   StackConsentManager: 3370ce78083a7463c5d26b1644449c428967b8a1
   StackModules: 5bd681a254d322dd67b84e8b0c40196ddebccd76
 
-PODFILE CHECKSUM: 3eb105dee87de965e926c0fe6ba85073e8c09843
+PODFILE CHECKSUM: 5fe8f0d90578dc9b2630279d90f3aec25a9b5dce
 
 COCOAPODS: 1.17.0
