@@ -242,6 +242,9 @@ const DA = {
   /* Kommentarer */
   "cmt.img_alt": "Billede i kommentar",
   "cmt.reply": "Svar",
+  "cmt.delete": "Slet",
+  "cmt.delete_confirm": "Slet?",
+  "cmt.deleted": "Kommentar slettet",
   "cmt.show": "Vis kommentarer ({n})",
   "cmt.hide": "Skjul kommentarer",
   "cmt.replying": "Svarer @{u}",
@@ -584,6 +587,9 @@ const EN = {
   /* Comments */
   "cmt.img_alt": "Image in comment",
   "cmt.reply": "Reply",
+  "cmt.delete": "Delete",
+  "cmt.delete_confirm": "Delete?",
+  "cmt.deleted": "Comment deleted",
   "cmt.show": "Show comments ({n})",
   "cmt.hide": "Hide comments",
   "cmt.replying": "Replying to @{u}",

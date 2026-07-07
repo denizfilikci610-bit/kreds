@@ -2,7 +2,7 @@ import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, expandedCmts, pv, cstate, curTab, setCurTab, setCfilePid, ID2H, FRIEND_SINCE } from "./store.js";
 import { el, esc, avaHTML, user, grad, toast, fmtTime, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
 import { t, likesLabel } from "./i18n.js";
-import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, cInput, cKey, clearReply, clearCImg } from "./comments.js";
+import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, deleteComment, cInput, cKey, clearReply, clearCImg } from "./comments.js";
 import { openFeedSheet, openMemberSheet } from "./kredse.js";
 import { openProfile, closeProfile, renderMyPosts, renderStories, refreshPv } from "./profile.js";
 import { renderSearch } from "./search.js";
@@ -930,6 +930,18 @@ function timelineClick(e){
     rerenderComposer(pid);
     const f = node.querySelector(".cfield");
     if(f) f.focus();
+    return;
+  }
+  const cd = e.target.closest(".cdel");
+  if(cd){
+    // To-tryk bekræftelse (ingen native confirm-dialog i WKWebView): første tryk
+    // arm'er knappen ("Slet?"), andet tryk inden 3 sek. sletter.
+    if(cd.classList.contains("confirm")){ deleteComment(cd.dataset.cid); }
+    else{
+      cd.classList.add("confirm");
+      cd.textContent = t("cmt.delete_confirm");
+      setTimeout(function(){ if(cd.isConnected){ cd.classList.remove("confirm"); cd.textContent = t("cmt.delete"); } }, 3000);
+    }
     return;
   }
   const cx = e.target.closest(".cchip-x");

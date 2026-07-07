@@ -47,6 +47,7 @@ function cmtRowHTML(item){
         '<span>'+esc(c.t)+'</span>'+
         '<span class="clc"'+(c.likeCount > 0 ? '' : ' style="display:none"')+'>'+likesLabel(c.likeCount)+'</span>'+
         '<button class="csvar" data-cid="'+c.id+'" data-u="'+esc(c.u)+'">'+t("cmt.reply")+'</button>'+
+        (me && c.u === me.handle ? '<button class="cdel" data-cid="'+c.id+'">'+t("cmt.delete")+'</button>' : '')+
         '<button class="likec'+(c.liked ? " on" : "")+'" data-cid="'+c.id+'" aria-label="'+t("aria.like")+'">'+HEART_SVG+'</button>'+
       '</div>'+
     '</div>'+
@@ -163,6 +164,48 @@ export async function toggleCmtLike(cid){
     applyCmtLikeUI(cid);
     toast(t("err.generic"));
   }
+}
+
+/* ================= Slet kommentar (kun forfatteren) ================= */
+// Kommentaren OG dens svar-undertræd (DB'en cascade-sletter parent_id-børn, Instagram-stil).
+function descendantIds(p, rootId){
+  const kids = {};
+  p.cmts.forEach(function(c){
+    if(c.parent != null){ (kids[c.parent] = kids[c.parent] || []).push(Number(c.id)); }
+  });
+  const out = new Set(), stack = [Number(rootId)];
+  while(stack.length){
+    const id = stack.pop();
+    if(out.has(id)) continue;
+    out.add(id);
+    (kids[id] || []).forEach(function(k){ stack.push(k); });
+  }
+  return out;
+}
+export async function deleteComment(cid){
+  cid = Number(cid);
+  if(!me) return;
+  const cs = findCommentAll(cid);
+  if(!cs.length || cs[0].u !== me.handle) return; // kun egen kommentar (RLS håndhæver også dette)
+  // Hent evt. billedsti til oprydning i storage, slet så rækken.
+  let paths = [];
+  const r = await sb.from("comments").select("image_path").eq("id", cid).maybeSingle();
+  if(!r.error && r.data && r.data.image_path) paths.push(r.data.image_path);
+  const del = await sb.from("comments").delete().eq("id", cid);
+  if(del.error){ console.error(del.error); toast(t("err.generic")); return; }
+  if(paths.length) sb.storage.from("post-images").remove(paths).catch(function(){});
+  // Fjern kommentaren + dens svar lokalt (matcher DB-cascade) og gen-render de ramte tråde.
+  const affected = new Set();
+  allPostArrays().forEach(function(arr){
+    arr.forEach(function(p){
+      const remove = descendantIds(p, cid);
+      const before = p.cmts.length;
+      p.cmts = p.cmts.filter(function(x){ return !remove.has(Number(x.id)); });
+      if(p.cmts.length !== before) affected.add(p.id);
+    });
+  });
+  affected.forEach(function(pid){ rerenderPostCmts(pid); });
+  toast(t("cmt.deleted"));
 }
 
 export function rerenderComposer(pid){
