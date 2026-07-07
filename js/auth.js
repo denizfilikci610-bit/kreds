@@ -128,7 +128,10 @@ export async function boot(session){
   renderComposeDest();
   renderStories();
   renderFeed();
-  switchTab("feed");
+  // Gendan den fane brugeren var på før et reload (pull-to-refresh); tom/ugyldig → feed.
+  // Alle data er hentet ovenfor, så det er sikkert at åbne enhver fane her.
+  let savedTab; try{ savedTab = sessionStorage.getItem("vf_cur_tab"); }catch(_e){}
+  switchTab(["feed", "search", "akt", "profil"].includes(savedTab) ? savedTab : "feed");
   subscribeRealtime();
   loadQuota();
   refreshNotifDot(); // tænd hjerte-prikken hvis nogen reagerede mens jeg var væk/logget ud
