@@ -227,8 +227,10 @@ final class AdsManager: NSObject, ObservableObject {
             // Obtain a card if we don't have one yet.
             if it.card == nil {
                 guard let card = makeCard(for: it, index: cards.firstIndex(where: { $0 === it }) ?? 0) else {
-                    // No ad available right now → collapse the placeholder, retry later.
-                    fillWeb(sid, false)
+                    // No ad READY yet (the load is async) — keep the placeholder
+                    // reserved; it fills on the next applyLayout when an ad arrives
+                    // (Appodeal queue delegate / Google loader). Do NOT collapse here,
+                    // or the slot vanishes before the load completes and can never fill.
                     continue
                 }
                 it.card = card
@@ -345,7 +347,7 @@ final class AdsManager: NSObject, ObservableObject {
 
 // MARK: - Google native test-ad loader (DEBUG only — a real test ad, not fake data)
 
-extension AdsManager: NativeAdLoaderDelegate {
+extension AdsManager: @preconcurrency NativeAdLoaderDelegate {
     func adLoader(_ adLoader: AdLoader, didReceive nativeAd: NativeAd) {
         testLoading = false
         testAds.append(nativeAd)

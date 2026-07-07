@@ -19,7 +19,7 @@ import Appodeal
 /// Height is content-driven (Auto Layout), so `AdsManager` can measure the exact
 /// height for a given width and have the web reserve precisely that much space — the
 /// card therefore never overflows its slot.
-final class NativeAdCardView: UIView, @preconcurrency APDNativeAdView {
+final class NativeAdCardView: UIView, APDNativeAdView {
 
     // MARK: - Asset views (bound by the SDK via the protocol getters)
 
