@@ -35,10 +35,12 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
       config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-      # Protobuf (pulled in by Google-Mobile-Ads) uses double-quoted includes in
-      # its framework headers; newer Xcode's framework-module verifier treats that
-      # as an error on device builds. Silence the pedantic pod-header check.
+      # Protobuf & Google-Mobile-Ads use double-quoted includes in their framework
+      # headers; newer Xcode's framework-module verifier treats that as an error.
+      # Silence the pedantic warning AND skip the VerifyModule build phase for pods
+      # (third-party frameworks we don't control) so it can't fail the build.
       config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+      config.build_settings['ENABLE_MODULE_VERIFIER'] = 'NO'
     end
   end
 end
