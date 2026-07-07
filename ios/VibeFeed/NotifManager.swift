@@ -44,10 +44,12 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
             }
         case "consent":
             // "personal" (personalized ads allowed) or "limited" (non-personalized
-            // only). Read by the ad SDK integration at initialization.
+            // only). Persisted for the ad SDK; AdsManager is notified so it can
+            // start ads on first choice (or request ATT on an upgrade at runtime).
             if let value = dict["value"] as? String {
-                UserDefaults.standard.set(value == "personal" ? "personal" : "limited",
-                                          forKey: "vf_consent")
+                let normalized = value == "personal" ? "personal" : "limited"
+                UserDefaults.standard.set(normalized, forKey: "vf_consent")
+                Task { @MainActor in AdsManager.shared.applyConsent(normalized) }
             }
         case "logout":
             UserDefaults.standard.removeObject(forKey: secretKey)
