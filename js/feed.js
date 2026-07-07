@@ -384,6 +384,19 @@ export async function loadFriends(){
   state.friends = hs;
   state.humanFriends = hs.filter(function(h){ return h !== OFFICIAL_HANDLE; });
   el("stat-friends").textContent = state.humanFriends.length;
+  await loadSentRequests();
+}
+/* Mine udgående (endnu ikke accepterede) ven-anmodninger → state.sentRequests (handles).
+   Bruges til at vise "Anmodning sendt" på profiler/søgeresultater. */
+export async function loadSentRequests(){
+  if(!me){ state.sentRequests = []; return; }
+  const { data, error } = await sb.from("friend_requests")
+    .select("to_profile:profiles!to_id(handle)")
+    .eq("from_id", me.id);
+  if(error){ console.error(error); return; }
+  state.sentRequests = (data || [])
+    .map(function(r){ return r.to_profile && r.to_profile.handle; })
+    .filter(Boolean);
 }
 export async function loadFeeds(){
   if(!me) return;

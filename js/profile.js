@@ -128,9 +128,12 @@ function renderPvRelation(h){
     since.style.display = "none";
     add.style.display = "";
     add.disabled = false;
-    add.classList.remove("done");
-    add.textContent = t("pv.add");
     unf.style.display = "none";
+    // Har jeg allerede en udestående anmodning til denne person?
+    const pending = state.sentRequests.indexOf(h) >= 0;
+    add.classList.remove("done");
+    add.classList.toggle("pending", pending);
+    add.textContent = pending ? t("pv.requested") : t("pv.add");
   }
 }
 
@@ -417,20 +420,38 @@ el("ufmenu").addEventListener("click", function(e){
 });
 el("uf-cancel").addEventListener("click", closeUnfriendMenu);
 el("uf-confirm").addEventListener("click", doRemoveFriend);
-/* ---- Ikke-ven: "Tilføj til din kreds" (optimistisk ✓, derefter refetch) ---- */
+/* ---- Ikke-ven: "Tilføj til din kreds" sender en anmodning; tryk igen fortryder ---- */
 el("pv-add").addEventListener("click", async function(){
   const h = pv.u;
   if(!me || !h || this.disabled) return;
   const btn = this;
+  // Udestående anmodning → tryk fortryder den
+  if(state.sentRequests.indexOf(h) >= 0){
+    btn.disabled = true;
+    const { error } = await sb.rpc("cancel_friend_request", { to_handle: h });
+    if(error){
+      console.error(error);
+      if(pv.u === h) btn.disabled = false;
+      toast(t("err.generic"));
+      return;
+    }
+    const i = state.sentRequests.indexOf(h);
+    if(i >= 0) state.sentRequests.splice(i, 1);
+    if(pv.u === h) renderPvRelation(h);
+    refreshSearchAfterFriendAdd(h);
+    toast(t("friend.request_cancelled", { name: user(h).name }));
+    return;
+  }
+  // Send anmodning (optimistisk "Anmodning sendt")
   btn.disabled = true;
-  btn.classList.add("done");
-  btn.textContent = t("pv.added");
+  btn.classList.add("pending");
+  btn.textContent = t("pv.requested");
   const { data, error } = await sb.rpc("add_friend", { friend_handle: h });
   if(error){
     console.error(error);
     if(pv.u === h){
       btn.disabled = false;
-      btn.classList.remove("done");
+      btn.classList.remove("pending");
       btn.textContent = t("pv.add");
     }
     const m = String(error.message || "");
@@ -439,16 +460,25 @@ el("pv-add").addEventListener("click", async function(){
     else toast(t("err.generic"));
     return;
   }
-  if(data) registerProfile(data);
-  await loadFriends();
-  refreshSearchAfterFriendAdd(h); // Søg-listen bag panelet: fjern stale "Tilføj …"-knap og vis den nye ven
-  renderStories();
-  loadPosts();
-  if(pv.u === h){
-    renderPvRelation(h); // nu ven: viser "I din kreds siden …"
-    loadPvPosts();       // RLS åbner for opslagene
+  const prof = data && data.profile;
+  if(prof) registerProfile(prof);
+  if(data && data.status === "friends"){
+    // Allerede venner (fx accepteret et andet sted) — vis venskabet
+    await loadFriends();
+    refreshSearchAfterFriendAdd(h);
+    renderStories();
+    loadPosts();
+    if(pv.u === h){ renderPvRelation(h); loadPvPosts(); }
+    toast(t("friend.added", { name: user(h).name }));
+    return;
   }
-  toast(t("friend.added", { name: user(h).name }));
+  if(state.sentRequests.indexOf(h) < 0) state.sentRequests.push(h);
+  if(pv.u === h){
+    btn.disabled = false; // "Anmodning sendt" kan trykkes for at fortryde
+    renderPvRelation(h);
+  }
+  refreshSearchAfterFriendAdd(h);
+  toast(t("friend.request_sent", { name: user(h).name }));
 });
 /* ================= Bobler: klik ================= */
 el("stories").addEventListener("click", function(e){

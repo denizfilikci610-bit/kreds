@@ -26,6 +26,11 @@ export function realtimeNotify(table, payload){
   }
   if(table === "kreds_invites"){
     if(row.user_id !== me.id) return; // kun invitationer TIL mig
+  } else if(table === "friend_requests"){
+    if(row.to_id !== me.id) return;   // kun ven-anmodninger TIL mig
+  } else if(table === "friendships"){
+    // Kun når nogen tilføjer/accepterer MIG (rækken hvor jeg er friend_id) — ikke mine egne handlinger
+    if(row.friend_id !== me.id || row.user_id === me.id) return;
   } else {
     const actor = row.user_id !== undefined ? row.user_id : row.author;
     if(actor === me.id) return; // egne likes/kommentarer/anmodninger tæller ikke
@@ -103,21 +108,47 @@ export async function loadNotifs(){
       '</div>'+
     '</div>';
   }
+  /* Ven-anmodning TIL mig (Accepter/Afvis) — handlingskrævende */
+  function freqRow(n){
+    const un = isUnread(n.at);
+    return '<div class="notif freq'+(un ? " unread" : "")+'" data-freqf="'+esc(n.u)+'">'+
+      (un ? '<span class="udot"></span>' : '')+
+      avaHTML(n.u, 32)+
+      '<div class="grow">'+
+        '<div class="ntext"><b>'+esc(user(n.u).name)+'</b> '+t("notif.friend_request")+'. <span class="nt">'+esc(fmtTime(n.at))+'</span></div>'+
+        '<div class="kbtns">'+
+          '<button class="kbtn kfacc">'+t("notif.accept")+'</button>'+
+          '<button class="kbtn kfdec">'+t("notif.decline")+'</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }
   try{
-    const mine = await sb.from("posts").select("id, text, image_path").eq("author", me.id);
+    // Mine opslag + mine kommentar-id'er (så svar PÅ mine kommentarer kan findes)
+    const [mine, myCmts] = await Promise.all([
+      sb.from("posts").select("id, text, image_path").eq("author", me.id),
+      sb.from("comments").select("id").eq("author", me.id)
+    ]);
     if(mine.error) throw mine.error;
+    if(myCmts.error) throw myCmts.error;
     const ids = (mine.data || []).map(function(p){ return p.id; });
+    const myCmtIds = (myCmts.data || []).map(function(c){ return c.id; });
     const textById = {};
     (mine.data || []).forEach(function(p){ textById[p.id] = p.text || (p.image_path ? t("notif.photo") : ""); });
 
     const reqs = [
       sb.from("friendships").select("created_at, from_profile:profiles!user_id(*)").eq("friend_id", me.id),
       sb.from("kreds_requests").select("created_at, feed_id, user_id, requester:profiles!user_id(*), feed:feeds!feed_id(name)").neq("user_id", me.id),
-      sb.from("kreds_invites").select("created_at, feed_id, feed:feeds!feed_id(name), inviter:profiles!invited_by(*)").eq("user_id", me.id)
+      sb.from("kreds_invites").select("created_at, feed_id, feed:feeds!feed_id(name), inviter:profiles!invited_by(*)").eq("user_id", me.id),
+      sb.from("friend_requests").select("created_at, from_profile:profiles!from_id(*)").eq("to_id", me.id)
     ];
+    let iLikes = -1, iCmts = -1, iReplies = -1;
     if(ids.length){
-      reqs.push(sb.from("likes").select("created_at, post_id, liker:profiles!user_id(*)").in("post_id", ids).neq("user_id", me.id));
-      reqs.push(sb.from("comments").select("created_at, post_id, text, image_path, author_profile:profiles!author(*)").in("post_id", ids).neq("author", me.id));
+      iLikes = reqs.push(sb.from("likes").select("created_at, post_id, liker:profiles!user_id(*)").in("post_id", ids).neq("user_id", me.id)) - 1;
+      iCmts  = reqs.push(sb.from("comments").select("id, created_at, post_id, text, image_path, author_profile:profiles!author(*)").in("post_id", ids).neq("author", me.id)) - 1;
+    }
+    if(myCmtIds.length){
+      iReplies = reqs.push(sb.from("comments").select("id, created_at, post_id, text, image_path, author_profile:profiles!author(*)").in("parent_id", myCmtIds).neq("author", me.id)) - 1;
     }
     const res = await Promise.all(reqs);
     for(const r of res){ if(r.error) throw r.error; }
@@ -138,27 +169,50 @@ export async function loadNotifs(){
         items.push({ type:"inv", u:r.inviter.handle, at:r.created_at, f:r.feed_id, k:(r.feed && r.feed.name) || "" });
       }
     });
-    if(ids.length){
-      (res[3].data || []).forEach(function(r){
+    (res[3].data || []).forEach(function(r){
+      if(r.from_profile){ registerProfile(r.from_profile); items.push({ type:"freq", u:r.from_profile.handle, at:r.created_at }); }
+    });
+    // Svar PÅ mine kommentarer først — så deres id'er kan udelukkes fra "kommentar på dit opslag"
+    const replyIds = new Set();
+    if(iReplies >= 0){
+      (res[iReplies].data || []).forEach(function(r){
+        if(r.author_profile){
+          registerProfile(r.author_profile);
+          replyIds.add(r.id);
+          items.push({ type:"reply", u:r.author_profile.handle, at:r.created_at, pid:r.post_id, snip:r.text || (r.image_path ? t("notif.photo") : "") });
+        }
+      });
+    }
+    if(iLikes >= 0){
+      (res[iLikes].data || []).forEach(function(r){
         if(r.liker){ registerProfile(r.liker); items.push({ type:"like", u:r.liker.handle, at:r.created_at, pid:r.post_id, snip:textById[r.post_id] || "" }); }
       });
-      (res[4].data || []).forEach(function(r){
-        if(r.author_profile){ registerProfile(r.author_profile); items.push({ type:"cmt", u:r.author_profile.handle, at:r.created_at, pid:r.post_id, snip:r.text || (r.image_path ? t("notif.photo") : "") }); }
+    }
+    if(iCmts >= 0){
+      (res[iCmts].data || []).forEach(function(r){
+        // Et svar på MIN kommentar (på mit eget opslag) vises som "svarede dig", ikke dobbelt
+        if(r.author_profile && !replyIds.has(r.id)){
+          registerProfile(r.author_profile);
+          items.push({ type:"cmt", u:r.author_profile.handle, at:r.created_at, pid:r.post_id, snip:r.text || (r.image_path ? t("notif.photo") : "") });
+        }
       });
     }
     items.sort(function(a,b){ return new Date(b.at) - new Date(a.at); });
     /* Invitationer/anmodninger er handlingskrævende — de må aldrig ryge ud af 30-loftet */
-    const acts = items.filter(function(n){ return n.type === "inv" || n.type === "kreq"; });
-    const rest = items.filter(function(n){ return n.type !== "inv" && n.type !== "kreq"; })
+    const isAct = function(n){ return n.type === "inv" || n.type === "kreq" || n.type === "freq"; };
+    const acts = items.filter(isAct);
+    const rest = items.filter(function(n){ return !isAct(n); })
       .slice(0, Math.max(0, 30 - acts.length));
     const top = acts.concat(rest);
     if(seq !== notifSeq) return; // et nyere kald er i gang — lad det vinde
     el("notifs").innerHTML = top.length
       ? top.map(function(n){
           if(n.type === "like")   return row(H, "heart",  n.u, t("notif.liked"), n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="like"', isUnread(n.at));
+          if(n.type === "reply")  return row(B, "bubble", n.u, t("notif.replied"),   n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "cmt")    return row(B, "bubble", n.u, t("notif.commented"),  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "kreq")   return kreqRow(n);
           if(n.type === "inv")    return invRow(n);
+          if(n.type === "freq")   return freqRow(n);
           return row(P, "friend", n.u, t("notif.friend"), "", fmtTime(n.at), ' data-friend="'+esc(n.u)+'"', isUnread(n.at));
         }).join("")
       : '<div class="emptynote">'+t("notif.empty")+'</div>';
@@ -235,8 +289,41 @@ async function handleInvite(row, accept){
   }
 }
 
+/* ---- Accepter/afvis ven-anmodning ---- */
+async function handleFriendReq(row, accept){
+  const h = row.dataset.freqf;
+  row.querySelectorAll(".kbtn").forEach(function(x){ x.disabled = true; });
+  const { error } = await sb.rpc(accept ? "accept_friend_request" : "decline_friend_request", { from_handle: h });
+  if(error){
+    console.error(error);
+    if(String(error.message || "").indexOf("no_request") >= 0){
+      removeNotifRow(row);
+      toast(t("notif.request_gone"));
+      return;
+    }
+    row.querySelectorAll(".kbtn").forEach(function(x){ x.disabled = false; });
+    toast(t("err.generic"));
+    return;
+  }
+  removeNotifRow(row);
+  if(accept){
+    toast(t("friend.added", { name: user(h).name }));
+    scheduleRefetch(); // venner + feed (den nye vens opslag) opdateres straks
+  } else {
+    toast(t("friend.req_declined"));
+  }
+}
+
 /* ---- Godkend/afvis kreds-anmodning (kun ejeren ser knapperne) ---- */
 async function notifClick(e){
+  const fq = e.target.closest(".kfacc, .kfdec");
+  if(fq){
+    if(fq.disabled || !me) return;
+    const frow = fq.closest(".notif");
+    if(!frow || !frow.dataset.freqf) return;
+    handleFriendReq(frow, fq.classList.contains("kfacc"));
+    return;
+  }
   const iv = e.target.closest(".kacc, .kdec");
   if(iv){
     if(iv.disabled || !me) return;
