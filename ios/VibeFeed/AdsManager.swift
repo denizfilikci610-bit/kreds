@@ -170,25 +170,36 @@ final class AdsManager: NSObject, ObservableObject {
         let root = Self.topViewController()
 
         // The web reports slot positions continuously (including during scroll), so
-        // the MRECs are repositioned to follow the feed and stay visible rather than
-        // hiding on every scroll.
-        let midY = overlay.bounds.midY
-        let chosen = lastSlots
-            .sorted { abs(($0.y + $0.h / 2) - midY) < abs(($1.y + $1.h / 2) - midY) }
-            .prefix(pool.count)
-        let chosenIds = Set(chosen.map { $0.id })
+        // the MRECs follow the feed and stay visible rather than hiding on scroll.
 
-        // Release pool items whose slot is no longer visible.
-        for item in pool where item.slotId != nil && !chosenIds.contains(item.slotId!) {
+        // Release a pool item only when ITS slot has genuinely left the feed — not
+        // merely because it drifted away from the viewport centre. Blanking a live
+        // ad on transient scroll churn is another way ads "disappear", so we hold on
+        // to an assigned slot as long as the web still reports it (sticky).
+        let visibleIds = Set(lastSlots.map { $0.id })
+        for item in pool where item.slotId != nil && !visibleIds.contains(item.slotId!) {
             item.slotId = nil
             item.mrec.alpha = 0
         }
 
+        // Give any free MREC the nearest still-unserved slot (nearest the viewport
+        // centre first). Already-assigned items keep their slot.
+        let midY = overlay.bounds.midY
+        let assignedIds = Set(pool.compactMap { $0.slotId })
+        var freeSlots = lastSlots
+            .filter { !assignedIds.contains($0.id) }
+            .sorted { abs(($0.y + $0.h / 2) - midY) < abs(($1.y + $1.h / 2) - midY) }
+            .makeIterator()
+        for item in pool where item.slotId == nil {
+            guard let slot = freeSlots.next() else { break }
+            item.slotId = slot.id
+        }
+
+        // Position + reveal every assigned MREC over its slot.
         let size = kAPDAdSize300x250
-        for slot in chosen {
-            let item = pool.first { $0.slotId == slot.id } ?? pool.first { $0.slotId == nil }
-            guard let it = item else { continue }
-            it.slotId = slot.id
+        for it in pool {
+            guard let sid = it.slotId,
+                  let slot = lastSlots.first(where: { $0.id == sid }) else { continue }
             it.mrec.rootViewController = root
             let fx = slot.x + (slot.w - size.width) / 2
             let fy = slot.y + (slot.h - size.height) / 2
@@ -201,7 +212,7 @@ final class AdsManager: NSObject, ObservableObject {
             // transient reload state — so a refresh in flight (poolItemExpired)
             // never blanks an ad that is already visible.
             it.mrec.alpha = it.hasCreative ? 1 : 0
-            if it.hasCreative { fillWeb(slot.id, true) }
+            if it.hasCreative { fillWeb(sid, true) }
         }
     }
 
@@ -290,21 +301,36 @@ final class MRECDelegateProxy: NSObject, APDBannerViewDelegate {
     init(index: Int) { self.index = index }
 
     nonisolated func bannerViewDidLoadAd(_ bannerView: APDBannerView, isPrecache precache: Bool) {
+        #if DEBUG
+        print("VF-ADS[\(index)] ✅ loaded (precache: \(precache))")
+        #endif
         let i = index
         Task { @MainActor in AdsManager.shared.poolItem(i, didLoad: true) }
     }
 
     nonisolated func bannerView(_ bannerView: APDBannerView, didFailToLoadAdWithError error: Error) {
+        // This is the NO-FILL path: the mediation waterfall returned nothing. If you
+        // see this repeatedly, the fix is on the Appodeal/AdMob side (empty waterfall
+        // / no MREC line-items), not in the app.
+        #if DEBUG
+        print("VF-ADS[\(index)] ⛔️ NO-FILL: \(error.localizedDescription)")
+        #endif
         let i = index
         Task { @MainActor in AdsManager.shared.poolItem(i, didLoad: false) }
     }
 
     nonisolated func bannerView(_ bannerView: APDBannerView, didFailToPresentWithError error: Error) {
+        #if DEBUG
+        print("VF-ADS[\(index)] ⚠️ present failed: \(error.localizedDescription)")
+        #endif
         let i = index
         Task { @MainActor in AdsManager.shared.poolItemExpired(i) }
     }
 
     nonisolated func bannerViewExpired(_ bannerView: APDBannerView) {
+        #if DEBUG
+        print("VF-ADS[\(index)] ♻️ expired (SDK will refresh)")
+        #endif
         let i = index
         Task { @MainActor in AdsManager.shared.poolItemExpired(i) }
     }
