@@ -721,8 +721,9 @@
     font-size:13px;font-weight:700;
   }
   .ms-btn.add{color:var(--red)}
-  /* Allerede inviteret: dæmpet, ikke-klikbar "Invitation sendt ✓" — tydeligt forskellig fra den røde Invitér */
-  .ms-btn.sent{opacity:.6;cursor:default;pointer-events:none}
+  /* Allerede inviteret: dæmpet status-tekst "Invitation sendt ✓" + evt. Fortryd-knap (inviter/ejer) */
+  .ms-sent{flex:0 0 auto;color:var(--gray);font-size:12px;font-weight:700;white-space:nowrap}
+  .ms-btn.cancel{background:none;color:var(--red);padding:6px 2px}
   .ms-btn:active{opacity:.7}
   .ms-btn:disabled{opacity:.5;cursor:default}
   .ms-leavezone{border-top:1px solid var(--line);margin-top:14px;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}

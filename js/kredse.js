@@ -52,24 +52,25 @@ function renderFsAll(){
 
 /* ================= Medlemmer (sheet, åbnes fra kredshead) ================= */
 let msFeedId = null;
-let msInvited = new Set(); // user_id'er med en afventende invitation til den viste kreds
+let msInvited = new Map(); // user_id → invited_by (afventende invitationer til den viste kreds)
 let msInvSeq = 0;          // generations-token: kun den NYESTE hentning må skrive msInvited
 
 /* Hent afventende invitationer for kredsen. RLS tillader medlemmer at læse
-   kreds_invites for deres egne kredse, så inviteren kan se hvem der er inviteret. */
+   kreds_invites for deres egne kredse, så inviteren kan se hvem der er inviteret.
+   Vi henter invited_by med, så kun inviteren/ejeren får en "Fortryd"-knap. */
 async function loadMsInvites(fid){
   const seq = ++msInvSeq;
-  const { data, error } = await sb.from("kreds_invites").select("user_id").eq("feed_id", fid);
+  const { data, error } = await sb.from("kreds_invites").select("user_id, invited_by").eq("feed_id", fid);
   if(error){ console.error(error); return; }
   if(msFeedId !== fid || seq !== msInvSeq) return; // lukket/skiftet — eller en nyere hentning vandt
-  msInvited = new Set((data || []).map(function(r){ return r.user_id; }));
+  msInvited = new Map((data || []).map(function(r){ return [r.user_id, r.invited_by]; }));
 }
 
 export async function openMemberSheet(){
   if(!me || state.currentFeed === "all" || !feedById(state.currentFeed)) return;
   msFeedId = state.currentFeed;
   const fid = msFeedId;
-  msInvited = new Set();
+  msInvited = new Map();
   el("ms-leave").style.display = "";
   el("ms-leave-confirm").style.display = "none";
   renderMemberSheet();
@@ -107,10 +108,15 @@ function renderMemberSheet(){
   el("ms-friends").innerHTML = cand.length
     ? cand.map(function(h){
         const uid = user(h).id;
-        // Allerede inviteret → tydeligt "Invitation sendt ✓" (ingen knap → kan ikke inviteres igen)
-        const action = msInvited.has(uid)
-          ? '<span class="ms-btn sent" aria-disabled="true">'+t("ms.invited")+'</span>'
-          : '<button class="ms-btn add" data-add="'+esc(uid)+'">'+t("ms.invite")+'</button>';
+        let action;
+        if(msInvited.has(uid)){
+          // Allerede inviteret → tydeligt "Invitation sendt ✓". Inviteren/ejeren kan fortryde.
+          const canCancel = msInvited.get(uid) === me.id || f.owner === me.id;
+          action = '<span class="ms-sent">'+t("ms.invited")+'</span>'+
+            (canCancel ? '<button class="ms-btn cancel" data-cancel="'+esc(uid)+'">'+t("ms.invite_cancel")+'</button>' : '');
+        } else {
+          action = '<button class="ms-btn add" data-add="'+esc(uid)+'">'+t("ms.invite")+'</button>';
+        }
         return '<div class="listrow">'+
           avaHTML(h, 44)+
           '<div class="grow"><div class="l1">'+esc(user(h).name)+'</div><div class="l2">@'+esc(h)+'</div></div>'+
@@ -177,9 +183,27 @@ async function msAdd(btn){
     govErrToast(String(error.message || ""));
     return;
   }
-  msInvited.add(btn.dataset.add); // medlemslisten ændrer sig først når invitationen accepteres
+  msInvited.set(btn.dataset.add, me.id); // medlemslisten ændrer sig først når invitationen accepteres
   toast(t("ms.invite_sent", { name: user(ID2H[btn.dataset.add] || "?").name }));
   renderMemberSheet(); // personen vises nu vedvarende som "Invitation sendt ✓"
+}
+/* Fortryd en sendt invitation (kun inviteren/ejeren; serveren håndhæver det også) */
+async function msCancel(btn){
+  const fid = msFeedId;
+  const f = feedById(fid);
+  if(!f || !me || btn.disabled) return;
+  btn.disabled = true;
+  const uid = btn.dataset.cancel;
+  const { error } = await sb.rpc("cancel_kreds_invite", { f: fid, u: uid });
+  if(error){
+    console.error(error);
+    btn.disabled = false;
+    govErrToast(String(error.message || ""));
+    return;
+  }
+  msInvited.delete(uid);
+  toast(t("ms.invite_cancelled", { name: user(ID2H[uid] || "?").name }));
+  renderMemberSheet(); // personen kan nu inviteres igen ("Invitér")
 }
 
 export function initKredse(){
@@ -230,6 +254,8 @@ el("msheet").addEventListener("click", function(e){
   if(rm){ msRemove(rm); return; }
   const ad = e.target.closest(".ms-btn[data-add]");
   if(ad){ msAdd(ad); return; }
+  const cx = e.target.closest(".ms-btn[data-cancel]");
+  if(cx){ msCancel(cx); return; }
 });
 el("ms-leave").addEventListener("click", function(){
   el("ms-leave").style.display = "none";
