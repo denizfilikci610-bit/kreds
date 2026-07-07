@@ -37,13 +37,16 @@ struct ContentView: View {
             WebView(model: model)
 
             if model.failed {
+                let danish = (UserDefaults.standard.string(forKey: "vf_lang") ?? "da") != "en"
                 VStack(spacing: 14) {
                     Text("VibeFeed.")
                         .font(.custom("Georgia-Bold", size: 40))
-                    Text("Kunne ikke oprette forbindelse.\nTjek din internetforbindelse.")
+                    Text(danish
+                        ? "Kunne ikke oprette forbindelse.\nTjek din internetforbindelse."
+                        : "Could not connect.\nCheck your internet connection.")
                         .multilineTextAlignment(.center)
                         .foregroundColor(.secondary)
-                    Button("Prøv igen") {
+                    Button(danish ? "Prøv igen" : "Try again") {
                         model.retry()
                     }
                     .buttonStyle(.borderedProminent)

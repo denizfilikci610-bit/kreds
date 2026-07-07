@@ -1,6 +1,7 @@
-import { sb, GENERIC_ERR } from "./config.js";
+import { sb } from "./config.js";
 import { me, expandedCmts, curTab } from "./store.js";
 import { el, esc, avaHTML, user, fmtTime, toast, registerProfile } from "./helpers.js";
+import { t } from "./i18n.js";
 import { scheduleRefetch } from "./realtime.js";
 import { switchTab, setFeed, resetBarHide } from "./feed.js";
 import { rerenderPostCmts } from "./comments.js";
@@ -36,16 +37,16 @@ export function realtimeNotify(table, payload){
 let notifTimer = null, notifSeq = 0;
 export async function loadNotifs(){
   if(!me) return;
-  const t = ++notifSeq; // sekvens-token: kun det nyeste kald må skrive resultatet
-  el("notifs").innerHTML = '<div class="emptynote">Henter …</div>';
+  const seq = ++notifSeq; // sekvens-token: kun det nyeste kald må skrive resultatet
+  el("notifs").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
   const H = '<svg viewBox="0 0 24 24"><path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
   const B = '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>';
   const P = '<svg viewBox="0 0 24 24"><g class="stroke"><circle cx="10" cy="8" r="3.4"/><path d="M3.8 19.5c.7-3.3 3.2-5 6.2-5s5.5 1.7 6.2 5"/><path d="M18.5 6.5v6M15.5 9.5h6"/></g></svg>';
-  function row(icon, cls, u, text, snip, t, attrs){
+  function row(icon, cls, u, text, snip, tm, attrs){
     return '<div class="notif"'+(attrs || "")+'>'+
       avaHTML(u, 32)+
       '<div class="grow">'+
-        '<div class="ntext"><b>'+esc(user(u).name)+'</b> '+text+'. <span class="nt">'+esc(t)+'</span></div>'+
+        '<div class="ntext"><b>'+esc(user(u).name)+'</b> '+text+'. <span class="nt">'+esc(tm)+'</span></div>'+
         (snip ? '<div class="nsnip">'+esc(snip)+'</div>' : '')+
       '</div>'+
       '<div class="nicon '+cls+'">'+icon+'</div>'+
@@ -56,10 +57,10 @@ export async function loadNotifs(){
     return '<div class="notif kinv" data-invf="'+esc(n.f)+'" data-k="'+esc(n.k)+'">'+
       avaHTML(n.u, 32)+
       '<div class="grow">'+
-        '<div class="ntext"><b>'+esc(user(n.u).name)+'</b> har inviteret dig til “'+esc(n.k)+'”. <span class="nt">'+esc(fmtTime(n.at))+'</span></div>'+
+        '<div class="ntext"><b>'+esc(user(n.u).name)+'</b> '+t("notif.invited", { k: esc(n.k) })+'. <span class="nt">'+esc(fmtTime(n.at))+'</span></div>'+
         '<div class="kbtns">'+
-          '<button class="kbtn kacc">Accepter</button>'+
-          '<button class="kbtn kdec">Afvis</button>'+
+          '<button class="kbtn kacc">'+t("notif.accept")+'</button>'+
+          '<button class="kbtn kdec">'+t("notif.decline")+'</button>'+
         '</div>'+
       '</div>'+
     '</div>';
@@ -69,10 +70,10 @@ export async function loadNotifs(){
     return '<div class="notif kreq" data-f="'+esc(n.f)+'" data-uid="'+esc(n.uid)+'" data-n="'+esc(user(n.u).name)+'" data-k="'+esc(n.k)+'">'+
       avaHTML(n.u, 32)+
       '<div class="grow">'+
-        '<div class="ntext"><b>'+esc(user(n.u).name)+'</b> vil være med i “'+esc(n.k)+'”. <span class="nt">'+esc(fmtTime(n.at))+'</span></div>'+
+        '<div class="ntext"><b>'+esc(user(n.u).name)+'</b> '+t("notif.request", { k: esc(n.k) })+'. <span class="nt">'+esc(fmtTime(n.at))+'</span></div>'+
         '<div class="kbtns">'+
-          '<button class="kbtn kap">Godkend</button>'+
-          '<button class="kbtn krej">Afvis</button>'+
+          '<button class="kbtn kap">'+t("notif.approve")+'</button>'+
+          '<button class="kbtn krej">'+t("notif.reject")+'</button>'+
         '</div>'+
       '</div>'+
     '</div>';
@@ -82,7 +83,7 @@ export async function loadNotifs(){
     if(mine.error) throw mine.error;
     const ids = (mine.data || []).map(function(p){ return p.id; });
     const textById = {};
-    (mine.data || []).forEach(function(p){ textById[p.id] = p.text || (p.image_path ? "📷 Billede" : ""); });
+    (mine.data || []).forEach(function(p){ textById[p.id] = p.text || (p.image_path ? t("notif.photo") : ""); });
 
     const reqs = [
       sb.from("friendships").select("created_at, from_profile:profiles!user_id(*)").eq("friend_id", me.id),
@@ -117,7 +118,7 @@ export async function loadNotifs(){
         if(r.liker){ registerProfile(r.liker); items.push({ type:"like", u:r.liker.handle, at:r.created_at, pid:r.post_id, snip:textById[r.post_id] || "" }); }
       });
       (res[4].data || []).forEach(function(r){
-        if(r.author_profile){ registerProfile(r.author_profile); items.push({ type:"cmt", u:r.author_profile.handle, at:r.created_at, pid:r.post_id, snip:r.text || (r.image_path ? "📷 Billede" : "") }); }
+        if(r.author_profile){ registerProfile(r.author_profile); items.push({ type:"cmt", u:r.author_profile.handle, at:r.created_at, pid:r.post_id, snip:r.text || (r.image_path ? t("notif.photo") : "") }); }
       });
     }
     items.sort(function(a,b){ return new Date(b.at) - new Date(a.at); });
@@ -126,28 +127,28 @@ export async function loadNotifs(){
     const rest = items.filter(function(n){ return n.type !== "inv" && n.type !== "kreq"; })
       .slice(0, Math.max(0, 30 - acts.length));
     const top = acts.concat(rest);
-    if(t !== notifSeq) return; // et nyere kald er i gang — lad det vinde
+    if(seq !== notifSeq) return; // et nyere kald er i gang — lad det vinde
     el("notifs").innerHTML = top.length
       ? top.map(function(n){
-          if(n.type === "like")   return row(H, "heart",  n.u, "likede dit opslag", n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="like"');
-          if(n.type === "cmt")    return row(B, "bubble", n.u, "svarede på dit opslag",  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"');
+          if(n.type === "like")   return row(H, "heart",  n.u, t("notif.liked"), n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="like"');
+          if(n.type === "cmt")    return row(B, "bubble", n.u, t("notif.commented"),  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"');
           if(n.type === "kreq")   return kreqRow(n);
           if(n.type === "inv")    return invRow(n);
-          return row(P, "friend", n.u, "er nu i din kreds", "", fmtTime(n.at), ' data-friend="'+esc(n.u)+'"');
+          return row(P, "friend", n.u, t("notif.friend"), "", fmtTime(n.at), ' data-friend="'+esc(n.u)+'"');
         }).join("")
-      : '<div class="emptynote">Ingen notifikationer endnu.</div>';
+      : '<div class="emptynote">'+t("notif.empty")+'</div>';
   }catch(err){
     console.error(err);
-    if(t !== notifSeq) return; // et forældet fejlsvar må ikke overskrive en frisk liste
-    el("notifs").innerHTML = '<div class="emptynote">Kunne ikke hente notifikationer. Prøv igen.</div>';
+    if(seq !== notifSeq) return; // et forældet fejlsvar må ikke overskrive en frisk liste
+    el("notifs").innerHTML = '<div class="emptynote">'+t("notif.load_failed")+'</div>';
   }
 }
 
 /* ---- Tap på en notifikation: hop til opslaget (eller profilen) ---- */
 async function openNotifPost(pid, isCmt){
   const { data, error } = await sb.from("posts").select("id, feed_id").eq("id", pid).maybeSingle();
-  if(error){ console.error(error); toast(GENERIC_ERR); return; }
-  if(!data){ toast("Opslaget findes ikke længere"); return; }
+  if(error){ console.error(error); toast(t("err.generic")); return; }
+  if(!data){ toast(t("notif.post_gone")); return; }
   switchTab("feed");
   await setFeed(data.feed_id || "all");
   if(isCmt){
@@ -156,7 +157,7 @@ async function openNotifPost(pid, isCmt){
     rerenderPostCmts(pid);
   }
   const node = document.querySelector('#feed .post[data-id="'+data.id+'"]');
-  if(!node){ toast("Opslaget kunne ikke vises i feedet"); return; }
+  if(!node){ toast(t("notif.post_not_visible")); return; }
   node.scrollIntoView({ block:"center" });
   resetBarHide(); // programmatisk hop må ikke skjule topbaren — genstart fra landingspositionen
   node.classList.add("flash");
@@ -167,7 +168,7 @@ async function openNotifPost(pid, isCmt){
 function removeNotifRow(row){
   row.remove();
   if(!el("notifs").querySelector(".notif, .emptynote"))
-    el("notifs").innerHTML = '<div class="emptynote">Ingen notifikationer endnu.</div>';
+    el("notifs").innerHTML = '<div class="emptynote">'+t("notif.empty")+'</div>';
 }
 
 /* ---- Accepter/afvis kreds-invitation ---- */
@@ -180,29 +181,29 @@ async function handleInvite(row, accept){
     const m = String(error.message || "");
     if(m.indexOf("no_invite") >= 0){
       removeNotifRow(row);
-      toast("Invitationen findes ikke længere");
+      toast(t("notif.invite_gone"));
       return;
     }
     if(m.indexOf("already_member") >= 0){
       removeNotifRow(row);
-      toast("Du er allerede med i “"+k+"” 🎉");
+      toast(t("notif.already_member", { k: k }));
       scheduleRefetch();
       return;
     }
     row.querySelectorAll(".kbtn").forEach(function(x){ x.disabled = false; });
-    toast(GENERIC_ERR);
+    toast(t("err.generic"));
     return;
   }
   removeNotifRow(row);
   if(!accept){
-    toast("Invitation afvist");
+    toast(t("notif.invite_declined"));
     return;
   }
   if(data === "member"){
-    toast("Du er nu med i “"+k+"” 🎉");
+    toast(t("notif.now_member", { k: k }));
     scheduleRefetch(); // feeds + opslag skal med det samme afspejle medlemskabet
   } else {
-    toast("Accepteret — kredsen stemmer nu om dig 🗳️");
+    toast(t("notif.vote_pending"));
   }
 }
 
@@ -235,15 +236,15 @@ async function notifClick(e){
     console.error(error);
     if(String(error.message || "").indexOf("no_request") >= 0){
       removeNotifRow(row);
-      toast("Anmodningen findes ikke længere");
+      toast(t("notif.request_gone"));
       return;
     }
     row.querySelectorAll(".kbtn").forEach(function(x){ x.disabled = false; });
-    toast(GENERIC_ERR);
+    toast(t("err.generic"));
     return;
   }
   removeNotifRow(row);
-  toast(approve ? row.dataset.n + " er nu med i " + row.dataset.k : "Anmodning afvist");
+  toast(approve ? t("notif.approved", { name: row.dataset.n, k: row.dataset.k }) : t("notif.request_rejected"));
   if(approve) scheduleRefetch(); // medlemslisten i kredshead/compose skal med
 }
 

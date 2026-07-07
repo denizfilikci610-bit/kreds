@@ -1,6 +1,7 @@
-import { sb, BLOCKED_MSG } from "./config.js";
+import { sb } from "./config.js";
 import { me, state } from "./store.js";
 import { el, esc, toast, uuid } from "./helpers.js";
+import { t } from "./i18n.js";
 import { feedById, setFeed, switchTab } from "./feed.js";
 
 /* ================= Skriv ================= */
@@ -32,14 +33,14 @@ export function canPost(){
 }
 let composeDest = "all";
 export function renderComposeDest(){
-  let html = '<span class="dlabel">Del til:</span>'+
-    '<button class="fpill'+(composeDest === "all" ? " on" : "")+'" data-d="all">Hele kredsen</button>';
+  let html = '<span class="dlabel">'+t("compose.dest")+'</span>'+
+    '<button class="fpill'+(composeDest === "all" ? " on" : "")+'" data-d="all">'+t("feedbar.all")+'</button>';
   state.feeds.forEach(function(f){
     html += '<button class="fpill'+(composeDest === f.id ? " on" : "")+'" data-d="'+esc(f.id)+'">'+esc(f.name)+'</button>';
   });
   el("compose-dest").innerHTML = html;
   const f = feedById(composeDest);
-  ta.placeholder = pollOn ? "Stil et spørgsmål ..." : (f ? "Skriv til "+f.name+" …" : "Hvad sker der?");
+  ta.placeholder = pollOn ? t("compose.ph.poll") : (f ? t("compose.ph.feed", { name: f.name }) : t("compose.ph.default"));
 }
 
 /* ---- Meningsmåling (poll-mode) ---- */
@@ -56,14 +57,14 @@ function renderPollBox(){
     return;
   }
   let html = "";
-  pollOpts.forEach(function(t, i){
+  pollOpts.forEach(function(txt, i){
     html += '<div class="pe-row">'+
-      '<input class="pe-inp" data-i="'+i+'" maxlength="80" placeholder="Svarmulighed '+(i+1)+'" value="'+esc(t)+'">'+
-      (pollOpts.length > 2 ? '<button class="pe-rm" data-i="'+i+'" aria-label="Fjern svarmulighed">✕</button>' : '')+
+      '<input class="pe-inp" data-i="'+i+'" maxlength="80" placeholder="'+t("poll.opt_ph", { n: i+1 })+'" value="'+esc(txt)+'">'+
+      (pollOpts.length > 2 ? '<button class="pe-rm" data-i="'+i+'" aria-label="'+t("poll.rm_aria")+'">✕</button>' : '')+
     '</div>';
   });
-  if(pollOpts.length < 4) html += '<button class="pe-add">+ Tilføj svarmulighed</button>';
-  html += '<button class="pe-off">Fjern meningsmåling</button>';
+  if(pollOpts.length < 4) html += '<button class="pe-add">'+t("poll.add")+'</button>';
+  html += '<button class="pe-off">'+t("poll.off")+'</button>';
   box.innerHTML = html;
   box.style.display = "block";
 }
@@ -123,7 +124,7 @@ function handleImageFile(file){
     c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
     URL.revokeObjectURL(url);
     c.toBlob(function(blob){
-      if(!blob){ toast("Kunne ikke læse billedet"); return; }
+      if(!blob){ toast(t("img.read_failed")); return; }
       const hadVid = !!pendingVid;
       clearImg();
       clearVid();
@@ -132,19 +133,19 @@ function handleImageFile(file){
       el("attach-img").src = purl;
       el("attach-img").style.display = "block";
       syncAttach();
-      if(hadVid) toast("Videoen blev fjernet — et opslag kan kun have ét medie");
+      if(hadVid) toast(t("compose.vid_removed"));
       canPost();
     }, "image/jpeg", 0.87);
   };
   img.onerror = function(){
     URL.revokeObjectURL(url);
-    toast("Kunne ikke læse billedet");
+    toast(t("img.read_failed"));
   };
   img.src = url;
 }
 
 function handleVideoFile(file){
-  if(file.size > MAX_VID_BYTES){ toast("Videoen er for stor"); return; }
+  if(file.size > MAX_VID_BYTES){ toast(t("vid.too_big")); return; }
   const url = URL.createObjectURL(file);
   const probe = document.createElement("video");
   probe.preload = "metadata";
@@ -154,12 +155,12 @@ function handleVideoFile(file){
     probe.removeAttribute("src");
     if(!isFinite(dur)){
       URL.revokeObjectURL(url);
-      toast("Kunne ikke læse videoen");
+      toast(t("vid.read_failed"));
       return;
     }
     if(dur > MAX_VID_SEC){
       URL.revokeObjectURL(url);
-      toast("Videoen må højst vare 6 sekunder");
+      toast(t("vid.too_long"));
       return;
     }
     const hadImg = !!pendingImg;
@@ -171,7 +172,7 @@ function handleVideoFile(file){
     v.style.display = "block";
     v.play().catch(function(){});
     syncAttach();
-    if(hadImg) toast("Billedet blev fjernet — et opslag kan kun have ét medie");
+    if(hadImg) toast(t("compose.img_removed"));
     canPost();
   }
   probe.onloadedmetadata = function(){
@@ -190,7 +191,7 @@ function handleVideoFile(file){
   probe.onerror = function(){
     probe.removeAttribute("src");
     URL.revokeObjectURL(url);
-    toast("Kunne ikke læse videoen");
+    toast(t("vid.read_failed"));
   };
   probe.src = url;
 }
@@ -211,7 +212,7 @@ el("compose-cancel").addEventListener("click", closeCompose);
 
 ta.addEventListener("input", function(){ updateRing(); canPost(); });
 el("imgbtn").addEventListener("click", function(){
-  if(pollOn){ toast("Fjern meningsmålingen først — et opslag kan ikke have både medie og meningsmåling"); return; }
+  if(pollOn){ toast(t("compose.conflict_media")); return; }
   openMediaMenu();
 });
 el("mediamenu").addEventListener("click", function(e){
@@ -223,8 +224,8 @@ el("mm-video").addEventListener("click", function(){ closeMediaMenu(); el("cam-v
 el("mm-lib").addEventListener("click", function(){ closeMediaMenu(); el("file-input").click(); });
 el("pollbtn").addEventListener("click", function(){
   if(pollOn){ resetPoll(); canPost(); return; }
-  if(pendingImg){ toast("Fjern billedet først — et opslag kan ikke have både billede og meningsmåling"); return; }
-  if(pendingVid){ toast("Fjern videoen først — et opslag kan ikke have både video og meningsmåling"); return; }
+  if(pendingImg){ toast(t("compose.conflict_img")); return; }
+  if(pendingVid){ toast(t("compose.conflict_vid")); return; }
   pollOn = true;
   renderPollBox();
   renderComposeDest();
@@ -310,12 +311,12 @@ el("compose-post").addEventListener("click", async function(){
       switchTab("feed");
       setFeed(dest);
       const dfp = feedById(dest);
-      toast(dfp ? "Delt i "+dfp.name : "Delt med hele kredsen");
+      toast(dfp ? t("compose.shared_in", { name: dfp.name }) : t("compose.shared_all"));
     }catch(err){
       console.error(err);
       toast(String((err && err.message) || "").indexOf("blocked_content") >= 0
-        ? BLOCKED_MSG
-        : "Kunne ikke oprette meningsmålingen. Prøv igen.");
+        ? t("err.blocked")
+        : t("poll.create_failed"));
     }finally{
       btn.disabled = false;
       canPost();
@@ -359,13 +360,13 @@ el("compose-post").addEventListener("click", async function(){
     switchTab("feed");
     setFeed(dest);
     const df = feedById(dest);
-    toast(df ? "Delt i "+df.name : "Delt med hele kredsen");
+    toast(df ? t("compose.shared_in", { name: df.name }) : t("compose.shared_all"));
   }catch(err){
     console.error(err);
     if(path){ sb.storage.from("post-images").remove([path]).catch(function(){}); }
     toast(String((err && err.message) || "").indexOf("blocked_content") >= 0
-      ? BLOCKED_MSG
-      : "Kunne ikke dele. Prøv igen.");
+      ? t("err.blocked")
+      : t("compose.share_failed"));
   }finally{
     btn.disabled = false;
     canPost();

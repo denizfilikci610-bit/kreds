@@ -1,15 +1,37 @@
-import { sb, GENERIC_ERR, recoveryMode, recoveryLinkError } from "./config.js";
+import { sb, recoveryMode, recoveryLinkError } from "./config.js";
+import { me, curTab } from "./store.js";
 import { el, toast } from "./helpers.js";
-import { initFeed, setTabIcons, switchTab, closePostEdit } from "./feed.js";
+import { t, initI18n, setLang, hasStoredLang } from "./i18n.js";
+import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, loadQuota } from "./feed.js";
 import { initComments } from "./comments.js";
 import { initKredse, closeFeedSheet, closeMemberSheet } from "./kredse.js";
-import { initCompose } from "./compose.js";
-import { initSearch } from "./search.js";
-import { initProfile, closeEditSheet, closeActivitySheet } from "./profile.js";
-import { initNotifs } from "./notifications.js";
+import { initCompose, renderComposeDest } from "./compose.js";
+import { initSearch, renderSearch } from "./search.js";
+import { initProfile, closeEditSheet, closeActivitySheet, renderStories, renderMyPosts, refreshPv } from "./profile.js";
+import { initNotifs, loadNotifs } from "./notifications.js";
 import { initLightbox } from "./lightbox.js";
-import { initRealtime } from "./realtime.js";
-import { initAuth, boot, showAuth, showRecovery, setAuthMode } from "./auth.js";
+import { initRealtime, scheduleRefetch } from "./realtime.js";
+import { initAuth, boot, showAuth, showRecovery, setAuthMode, refreshAuthMode, pushNativeCreds } from "./auth.js";
+
+/* ================= i18n =================
+   Callback ved sprogskifte: statisk markup er allerede opdateret af setLang
+   (applyStaticI18n) — her gen-renderes den dynamiske, synlige UI. */
+initI18n(function(){
+  refreshAuthMode(); // auth-skærmens JS-satte tekster følger den aktuelle tilstand
+  if(!me) return;
+  renderFeedbar();
+  renderKredshead();
+  renderStories();
+  renderFeed();
+  renderComposeDest();
+  loadQuota();
+  if(curTab === "akt") loadNotifs();
+  if(curTab === "profil") renderMyPosts();
+  if(el("view-search").classList.contains("active")) renderSearch();
+  refreshPv();
+  scheduleRefetch();   // relative tidsstempler m.m. genberegnes ved refetch
+  pushNativeCreds();   // native notifikationer skifter sprog (no-op i browsere)
+});
 
 /* ================= Wiring (samme lyttere som før, samlet her) ================= */
 initFeed();
@@ -25,12 +47,28 @@ initAuth();
 
 el("scrim").addEventListener("click", function(){ closeFeedSheet(); closeMemberSheet(); closeEditSheet(); closeActivitySheet(); closePostEdit(); });
 
-document.querySelectorAll(".tabbar [data-view]").forEach(function(t){
-  t.addEventListener("click", function(){ switchTab(t.dataset.view); });
+document.querySelectorAll(".tabbar [data-view]").forEach(function(tab){
+  tab.addEventListener("click", function(){ switchTab(tab.dataset.view); });
 });
 el("nosparkle").addEventListener("click", function(){
-  toast("Ingen algoritme her. Feedet er altid kronologisk.");
+  toast(t("nosparkle.toast"));
 });
+
+/* ================= Sprogvalg (kun første start — vf_lang mangler) ================= */
+function showLangPicker(){
+  return new Promise(function(resolve){
+    const lv = el("langview");
+    lv.classList.add("on");
+    lv.addEventListener("click", function onPick(e){
+      const b = e.target.closest("[data-lang]");
+      if(!b) return;
+      setLang(b.dataset.lang);
+      lv.classList.remove("on");
+      lv.removeEventListener("click", onPick);
+      resolve();
+    });
+  });
+}
 
 /* ================= Init ================= */
 window.addEventListener("hashchange", function(){
@@ -38,10 +76,11 @@ window.addEventListener("hashchange", function(){
 });
 setTabIcons("feed");
 (async function init(){
+  if(!hasStoredLang()) await showLangPicker(); // FØR auth/boot — intet skip
   if(recoveryLinkError){
     history.replaceState(null, "", location.pathname);
     setAuthMode("login");
-    showAuth('Linket er udløbet eller allerede brugt. Prøv "Glemt adgangskode?" igen.');
+    showAuth(t("auth.link_used"));
     return;
   }
   if(recoveryMode){
@@ -54,6 +93,6 @@ setTabIcons("feed");
     else showAuth();
   }catch(err){
     console.error(err);
-    showAuth(GENERIC_ERR);
+    showAuth(t("err.generic"));
   }
 })();

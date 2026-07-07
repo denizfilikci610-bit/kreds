@@ -1,6 +1,7 @@
-import { sb, GENERIC_ERR, BLOCKED_MSG, OFFICIAL_HANDLE } from "./config.js";
+import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, expandedCmts, pv, cstate, setCurTab, setCfilePid, ID2H, FRIEND_SINCE } from "./store.js";
-import { el, esc, avaHTML, user, grad, likesLabel, toast, fmtTime, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
+import { el, esc, avaHTML, user, grad, toast, fmtTime, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
+import { t, likesLabel } from "./i18n.js";
 import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, cInput, cKey, clearReply, clearCImg } from "./comments.js";
 import { openFeedSheet, openMemberSheet } from "./kredse.js";
 import { openProfile, closeProfile, renderMyPosts, renderStories, refreshPv } from "./profile.js";
@@ -39,7 +40,7 @@ export function mapPost(row){
     created: row.created_at,
     t: fmtTime(row.created_at),
     text: row.text || undefined,
-    img: row.image_path ? { src: imgUrl(row.image_path), alt: "Billede" } : undefined,
+    img: row.image_path ? { src: imgUrl(row.image_path), alt: t("media.image") } : undefined,
     video: row.video_path ? { src: imgUrl(row.video_path) } : undefined,
     liked: !!(me && likes.some(function(l){ return l.user_id === me.id; })),
     likeCount: likes.length,
@@ -124,15 +125,15 @@ export function postHTML(p){
   }
   return (
     '<article class="post" data-id="'+p.id+'">'+
-      '<button class="pavab" data-u="'+esc(p.u)+'" aria-label="Profil">'+
+      '<button class="pavab" data-u="'+esc(p.u)+'" aria-label="'+t("aria.profile")+'">'+
         avaHTML(p.u, 40)+
       '</button>'+
       '<div class="pcol">'+
         '<div class="phead">'+
           '<span class="nm">'+esc(user(p.u).name)+'</span>'+
-          '<span class="badge">'+BADGE+'</span>'+
+          '<span class="badge">'+BADGE()+'</span>'+
           '<span class="ph">@'+esc(p.u)+' · '+esc(p.t)+'</span>'+
-          '<button class="dots" data-id="'+p.id+'" aria-label="Mere">'+
+          '<button class="dots" data-id="'+p.id+'" aria-label="'+t("aria.more")+'">'+
             '<svg viewBox="0 0 24 24"><g class="fillic"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></g></svg>'+
           '</button>'+
         '</div>'+
@@ -140,15 +141,15 @@ export function postHTML(p){
         media+
         pollHTML(p)+
         '<div class="pactions">'+
-          '<button class="cmt-btn" data-id="'+p.id+'" aria-label="Kommentarer">'+
+          '<button class="cmt-btn" data-id="'+p.id+'" aria-label="'+t("aria.comments")+'">'+
             '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>'+
             cntHTML(p.cmts.length)+
           '</button>'+
-          '<button class="like-btn'+(p.liked ? " on" : "")+'" data-id="'+p.id+'" aria-pressed="'+p.liked+'" aria-label="Like">'+
+          '<button class="like-btn'+(p.liked ? " on" : "")+'" data-id="'+p.id+'" aria-pressed="'+p.liked+'" aria-label="'+t("aria.like")+'">'+
             HEART_SVG+
             cntHTML(p.likeCount)+
           '</button>'+
-          '<button class="share-btn" data-id="'+p.id+'" aria-label="Del">'+
+          '<button class="share-btn" data-id="'+p.id+'" aria-label="'+t("aria.share")+'">'+
             '<svg viewBox="0 0 24 24"><path class="stroke" d="M21.5 2.5 10.8 13.2M21.5 2.5l-6.8 19-3.9-8.3-8.3-3.9Z"/></svg>'+
           '</button>'+
         '</div>'+
@@ -162,24 +163,24 @@ export function postHTML(p){
 export function teaserHTML(p){
   const name = user(p.u).name;
   const btn = p.requested
-    ? '<button class="treq sent" data-f="'+esc(p.feedId)+'" disabled>Anmodning sendt ✓</button>'
-    : '<button class="treq" data-f="'+esc(p.feedId)+'">Anmod om at være med</button>';
+    ? '<button class="treq sent" data-f="'+esc(p.feedId)+'" disabled>'+t("teaser.sent")+'</button>'
+    : '<button class="treq" data-f="'+esc(p.feedId)+'">'+t("teaser.request")+'</button>';
   return (
     '<article class="post teaser" data-tid="'+esc(p.id)+'">'+
-      '<button class="pavab" data-u="'+esc(p.u)+'" aria-label="Profil">'+
+      '<button class="pavab" data-u="'+esc(p.u)+'" aria-label="'+t("aria.profile")+'">'+
         avaHTML(p.u, 40)+
       '</button>'+
       '<div class="pcol">'+
         '<div class="phead">'+
           '<span class="nm">'+esc(name)+'</span>'+
-          '<span class="badge">'+BADGE+'</span>'+
+          '<span class="badge">'+BADGE()+'</span>'+
           '<span class="ph">@'+esc(p.u)+' · '+esc(p.t)+'</span>'+
         '</div>'+
         '<div class="pmedia tmedia">'+
           '<div class="tblur" style="background:'+esc(grad(p.u))+'"></div>'+
           '<div class="tlock">'+
             '<span class="tic" aria-hidden="true">🔒</span>'+
-            '<span class="ttxt">'+esc(name)+' delte i den private kreds “'+esc(p.feedName)+'”</span>'+
+            '<span class="ttxt">'+t("teaser.shared", { name:esc(name), kreds:esc(p.feedName) })+'</span>'+
             btn+
           '</div>'+
         '</div>'+
@@ -192,7 +193,7 @@ function setTeaserReqUI(f, on){
   document.querySelectorAll('.treq[data-f="'+f+'"]').forEach(function(b){
     b.disabled = on;
     b.classList.toggle("sent", on);
-    b.textContent = on ? "Anmodning sendt ✓" : "Anmod om at være med";
+    b.textContent = on ? t("teaser.sent") : t("teaser.request");
   });
 }
 async function requestJoin(f){
@@ -205,13 +206,13 @@ async function requestJoin(f){
   const m = String(error.message || "");
   if(m.indexOf("already_member") >= 0){
     pendingReq.delete(f); // teaseren forsvinder alligevel
-    toast("Du er allerede med i kredsen 🎉");
+    toast(t("teaser.already"));
     scheduleRefetch();
     return;
   }
   pendingReq.delete(f);
   setTeaserReqUI(f, false);
-  toast(m.indexOf("not_allowed") >= 0 ? "Du kan ikke anmode om at være med i den kreds" : GENERIC_ERR);
+  toast(m.indexOf("not_allowed") >= 0 ? t("teaser.not_allowed") : t("err.generic"));
 }
 
 /* Bevar video-position hen over re-render af timeline-HTML
@@ -238,7 +239,7 @@ export function restoreVideos(container, snap){
 export function renderFeed(){
   let html = "";
   if(state.currentFeed === "all" && me && !state.humanFriends.length){
-    html += '<div class="emptynote" style="padding:24px 20px;text-align:center">Din kreds er tom endnu.<br>Find dine venner under Søg 🔍</div>';
+    html += '<div class="emptynote" style="padding:24px 20px;text-align:center">'+t("feed.empty_friends")+'</div>';
   }
   /* Fastgjorte opslag fra den officielle profil hejses op FØR teaser-flet (kun 'Hele kredsen') */
   let rest = state.posts, pinned = [];
@@ -250,12 +251,12 @@ export function renderFeed(){
     ? rest.concat(state.teasers).sort(function(a,b){ return new Date(b.created) - new Date(a.created); })
     : rest;
   pinned.forEach(function(p){
-    html += '<div class="pinlabel">📌 Fastgjort</div>' + postHTML(p);
+    html += '<div class="pinlabel">'+t("feed.pinned")+'</div>' + postHTML(p);
   });
   if(items.length){
     html += items.map(function(p){ return p.teaser ? teaserHTML(p) : postHTML(p); }).join("");
   } else if(!pinned.length && !(state.currentFeed === "all" && me && !state.humanFriends.length)){
-    html += '<div class="emptynote" style="padding:36px 20px;text-align:center">Ingen opslag i denne kreds endnu.<br>Vær den første ✍️</div>';
+    html += '<div class="emptynote" style="padding:36px 20px;text-align:center">'+t("feed.empty_kreds")+'</div>';
   }
   const f = document.activeElement && document.activeElement.closest ? document.activeElement.closest("#feed .cfield") : null;
   const fpid = f ? f.dataset.id : null, selS = f ? f.selectionStart : 0, selE = f ? f.selectionEnd : 0;
@@ -307,7 +308,7 @@ export async function loadPosts(){
     if(el("view-profil").classList.contains("active")) renderMyPosts();
   }catch(err){
     console.error(err);
-    toast("Kunne ikke hente opslag. Prøv igen.");
+    toast(t("feed.load_failed"));
   }
 }
 export async function loadFriends(){
@@ -315,7 +316,7 @@ export async function loadFriends(){
   const { data, error } = await sb.from("friendships")
     .select("created_at, friend_profile:profiles!friend_id(*)")
     .eq("user_id", me.id);
-  if(error){ console.error(error); toast(GENERIC_ERR); return; }
+  if(error){ console.error(error); toast(t("err.generic")); return; }
   const hs = [];
   (data || []).forEach(function(r){
     if(r.friend_profile){
@@ -332,7 +333,7 @@ export async function loadFriends(){
 export async function loadFeeds(){
   if(!me) return;
   const { data, error } = await sb.from("feeds").select("*, feed_members(user_id)");
-  if(error){ console.error(error); toast(GENERIC_ERR); return; }
+  if(error){ console.error(error); toast(t("err.generic")); return; }
   const feeds = (data || []).map(function(f){
     return { id:f.id, name:f.name, owner:f.owner, created:f.created_at, memberIds:(f.feed_members||[]).map(function(m){ return m.user_id; }) };
   });
@@ -368,13 +369,13 @@ export function resetFeedbarSearch(){
 const SEEK_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></g></svg>';
 const FBX_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><path d="M6 6l12 12M18 6 6 18"/></g></svg>';
 function fbPillsHTML(){
-  let html = '<button class="fpill'+(state.currentFeed === "all" ? " on" : "")+'" data-feed="all">Hele kredsen</button>';
+  let html = '<button class="fpill'+(state.currentFeed === "all" ? " on" : "")+'" data-feed="all">'+t("feedbar.all")+'</button>';
   const q = kseek.q.trim().toLowerCase();
   const matches = state.feeds.filter(function(f){ return f.name.toLowerCase().indexOf(q) >= 0; });
   matches.forEach(function(f){
     html += '<button class="fpill'+(state.currentFeed === f.id ? " on" : "")+'" data-feed="'+esc(f.id)+'">'+esc(f.name)+'</button>';
   });
-  if(q && !matches.length) html += '<span class="fbnone">Ingen kredse matcher</span>';
+  if(q && !matches.length) html += '<span class="fbnone">'+t("feedbar.no_match")+'</span>';
   return html;
 }
 export function renderFeedbar(){
@@ -390,20 +391,20 @@ export function renderFeedbar(){
     }
     bar.innerHTML =
       '<div class="fbsearch">'+SEEK_SVG+
-        '<input id="fb-input" type="text" placeholder="Søg i dine kredse ..." autocomplete="off" autocapitalize="none">'+
-        '<button class="fbx" id="fb-cancel" aria-label="Annuller søgning">'+FBX_SVG+'</button>'+
+        '<input id="fb-input" type="text" placeholder="'+t("feedbar.search_ph")+'" autocomplete="off" autocapitalize="none">'+
+        '<button class="fbx" id="fb-cancel" aria-label="'+t("feedbar.cancel_aria")+'">'+FBX_SVG+'</button>'+
       '</div>'+
       '<span class="fbpills" id="fb-pills"></span>';
     el("fb-input").value = kseek.q;
     el("fb-pills").innerHTML = fbPillsHTML();
     return;
   }
-  let html = '<button class="fbseek" aria-label="Søg i dine kredse">'+SEEK_SVG+'</button>';
-  html += '<button class="fpill'+(state.currentFeed === "all" ? " on" : "")+'" data-feed="all">Hele kredsen</button>';
+  let html = '<button class="fbseek" aria-label="'+t("feedbar.seek_aria")+'">'+SEEK_SVG+'</button>';
+  html += '<button class="fpill'+(state.currentFeed === "all" ? " on" : "")+'" data-feed="all">'+t("feedbar.all")+'</button>';
   state.feeds.forEach(function(f){
     html += '<button class="fpill'+(state.currentFeed === f.id ? " on" : "")+'" data-feed="'+esc(f.id)+'">'+esc(f.name)+'</button>';
   });
-  html += '<button class="fpill new" data-feed="__new">+ Ny kreds</button>';
+  html += '<button class="fpill new" data-feed="__new">'+t("feedbar.new")+'</button>';
   bar.innerHTML = html;
 }
 export function renderKredshead(){
@@ -420,7 +421,7 @@ export function renderKredshead(){
     return avaHTML(m, 30, "mav");
   }).join("");
   kh.innerHTML = '<div class="mstack">'+avs+'</div>'+
-    '<div class="ktxt"><b>'+f.members.length+' medlemmer</b><br>Privat kreds — kun jer kan se og skrive her.</div>';
+    '<div class="ktxt">'+t("kredshead.line", { n: f.members.length })+'</div>';
   kh.style.display = "flex";
 }
 export function setFeed(id){
@@ -429,7 +430,7 @@ export function setFeed(id){
   resetFeedbarSearch(); // kreds-søgningen lukkes/nulstilles ved feed-skift
   renderFeedbar();
   renderKredshead();
-  el("feed").innerHTML = '<div class="emptynote" style="text-align:center">Henter …</div>';
+  el("feed").innerHTML = '<div class="emptynote" style="text-align:center">'+t("common.loading")+'</div>';
   const done = loadPosts();
   el("app").scrollTop = 0;
   resetBarHide();
@@ -451,15 +452,15 @@ export async function fetchLikeBalance(){
 let quotaSeq = 0;
 export async function loadQuota(){
   if(!me){ el("qchip").classList.remove("on"); return; }
-  const t = ++quotaSeq;
+  const seq = ++quotaSeq;
   try{
     const b = await fetchLikeBalance();
-    if(t !== quotaSeq || !me || !b) return;
+    if(seq !== quotaSeq || !me || !b) return;
     el("qchip-n").textContent = b.room;
     el("qchip").classList.add("on");
     el("nik-saldo").innerHTML =
-      '<div class="nik1">Likes: givet <b>'+b.given+'</b> · modtaget <b>'+b.received+'</b> · plads til <b>'+b.room+'</b></div>'+
-      '<div class="nik2">Du kan modtage ét like mere, end du selv har givet.</div>';
+      '<div class="nik1">'+t("quota.line1", { given:b.given, received:b.received, room:b.room })+'</div>'+
+      '<div class="nik2">'+t("quota.line2")+'</div>';
   }catch(err){
     console.error(err);
   }
@@ -577,9 +578,9 @@ export async function setLike(id, force){
     applyLikeUI(id, cur);
     if(on && String(error.message || "").indexOf("like_quota") >= 0){
       const fname = (user(objs[0].u).name || objs[0].u).trim().split(/\s+/)[0];
-      toast(fname + " kan ikke modtage flere likes lige nu — de skal selv give likes for at få plads 😉");
+      toast(t("like.quota", { name: fname }));
     } else {
-      toast(GENERIC_ERR);
+      toast(t("err.generic"));
     }
   }
   loadQuota();
@@ -622,7 +623,7 @@ async function reportPost(){
   if(error && error.code !== "23505"){ // 23505 = allerede anmeldt — behandles som succes
     console.error(error);
     closeReportMenu();
-    toast(GENERIC_ERR);
+    toast(t("err.generic"));
     return;
   }
   closeReportMenu();
@@ -634,7 +635,7 @@ async function reportPost(){
   renderFeed();
   if(el("view-profil").classList.contains("active")) renderMyPosts();
   refreshPv();
-  toast("Tak. Opslaget er anmeldt og skjult for dig.");
+  toast(t("report.done"));
 }
 
 export function openPostEdit(id){
@@ -669,14 +670,14 @@ async function savePostEdit(){
   btn.disabled = false;
   if(error){
     console.error(error);
-    toast(String(error.message || "").indexOf("blocked_content") >= 0 ? BLOCKED_MSG : GENERIC_ERR);
+    toast(String(error.message || "").indexOf("blocked_content") >= 0 ? t("err.blocked") : t("err.generic"));
     return;
   }
   findPostAll(id).forEach(function(q){ q.text = text || undefined; });
   closePostEdit();
   renderFeed();
   if(el("view-profil").classList.contains("active")) renderMyPosts();
-  toast("Opslaget er opdateret");
+  toast(t("post.updated"));
 }
 
 async function deleteOwnPost(){
@@ -697,10 +698,10 @@ async function deleteOwnPost(){
     closePostMenu();
     await loadPosts();
     if(el("view-profil").classList.contains("active")) renderMyPosts();
-    toast("Opslaget er slettet");
+    toast(t("post.deleted"));
   }catch(err){
     console.error(err);
-    toast("Kunne ikke slette opslaget. Prøv igen.");
+    toast(t("post.delete_failed"));
   }finally{
     btn.disabled = false;
   }
@@ -710,27 +711,27 @@ async function deleteOwnPost(){
 export function sharePost(id){
   const p = findPost(id);
   if(!p) return;
-  if(p.feed){ toast("Privat kreds — ingen deling udenfor 🤫"); return; }
+  if(p.feed){ toast(t("share.private")); return; }
   const name = user(p.u).name || p.u;
-  const text = name + " på VibeFeed" + (p.text ? ": " + p.text.slice(0, 120) : "");
+  const text = t("share.byline", { name: name }) + (p.text ? ": " + p.text.slice(0, 120) : "");
   const url = "https://vibefeed.dk";
   if(navigator.share){
     navigator.share({ title:"VibeFeed", text:text, url:url }).catch(function(err){
       if(!err || err.name !== "AbortError"){
         console.error(err);
-        toast(GENERIC_ERR);
+        toast(t("err.generic"));
       }
     });
     return;
   }
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(text + " " + url).then(function(){
-      toast("Kopieret til udklipsholderen");
+      toast(t("share.copied"));
     }, function(){
-      toast(GENERIC_ERR);
+      toast(t("err.generic"));
     });
   } else {
-    toast(GENERIC_ERR);
+    toast(t("err.generic"));
   }
 }
 
@@ -857,7 +858,7 @@ el("feedbar").addEventListener("input", function(e){
 });
 el("qchip").addEventListener("click", function(){
   const n = parseInt(el("qchip-n").textContent, 10) || 0;
-  toast("Du kan modtage "+likesLabel(n)+" mere. Giv likes til andre for at få plads til flere.");
+  toast(t("quota.toast", { likes: likesLabel(n) }));
 });
 ["feed","myposts","pv-posts"].forEach(function(id){
   el(id).addEventListener("click", timelineClick);

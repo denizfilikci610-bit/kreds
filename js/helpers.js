@@ -1,5 +1,6 @@
 import { sb } from "./config.js";
 import { USERS, ID2H } from "./store.js";
+import { t, dateLocale } from "./i18n.js";
 
 /* ================= Helpers ================= */
 export function esc(s){
@@ -52,17 +53,14 @@ export function avaHTML(h, size, cls){
   const fs = Math.max(8, Math.round(size * 0.38));
   return '<span class="'+c+'" style="'+style+'font-size:'+fs+'px;background:'+esc(grad(h))+'">'+ini(h)+'</span>';
 }
-export function likesLabel(n){ return n + (n === 1 ? " like" : " likes"); }
-
-const MONTHS = ["januar","februar","marts","april","maj","juni","juli","august","september","oktober","november","december"];
 export function fmtTime(iso){
   const d = new Date(iso);
   const s = Math.max(0, (Date.now() - d.getTime())/1000);
-  if(s < 60) return "nu";
-  if(s < 3600) return Math.floor(s/60)+"m";
-  if(s < 86400) return Math.floor(s/3600)+"t";
-  if(s < 7*86400) return Math.floor(s/86400)+"d";
-  return d.getDate()+". "+MONTHS[d.getMonth()];
+  if(s < 60) return t("time.now");
+  if(s < 3600) return Math.floor(s/60)+t("time.m");
+  if(s < 86400) return Math.floor(s/3600)+t("time.h");
+  if(s < 7*86400) return Math.floor(s/86400)+t("time.d");
+  return d.toLocaleDateString(dateLocale(), { day:"numeric", month:"long" });
 }
 export function imgUrl(path){
   return sb.storage.from("post-images").getPublicUrl(path).data.publicUrl;
@@ -75,7 +73,10 @@ export function uuid(){
   });
 }
 
-export const BADGE = '<svg viewBox="0 0 24 24" aria-label="I din kreds"><circle cx="12" cy="12" r="10" fill="#E0402F"/><path d="M17 9l-6.2 6.2L7 11.4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+/* Funktion (ikke konstant): aria-label skal følge det aktive sprog */
+export function BADGE(){
+  return '<svg viewBox="0 0 24 24" aria-label="'+t("badge.aria")+'"><circle cx="12" cy="12" r="10" fill="#E0402F"/><path d="M17 9l-6.2 6.2L7 11.4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
 let toastTimer = null;
 export function toast(msg){
   const t = el("toast");

@@ -17,6 +17,7 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
     private let pollURL = URL(string: "https://iduotqxkohuezxkveawc.supabase.co/functions/v1/notif-poll")!
     private let secretKey = "vf_device_secret"
     private let lastCheckKey = "vf_last_check"
+    private let langKey = "vf_lang"
 
     private var secret: String? {
         UserDefaults.standard.string(forKey: secretKey)
@@ -35,6 +36,9 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
             if let s = dict["secret"] as? String, !s.isEmpty {
                 UserDefaults.standard.set(s, forKey: secretKey)
                 UserDefaults.standard.set(isoNow(), forKey: lastCheckKey)
+                if let lang = dict["lang"] as? String {
+                    UserDefaults.standard.set(lang == "en" ? "en" : "da", forKey: langKey)
+                }
                 requestPermission()
                 scheduleRefresh()
             }
@@ -88,6 +92,7 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
         request.httpBody = try? JSONSerialization.data(withJSONObject: [
             "secret": secret,
             "since": since,
+            "lang": UserDefaults.standard.string(forKey: langKey) ?? "da",
         ])
         request.timeoutInterval = 20
 

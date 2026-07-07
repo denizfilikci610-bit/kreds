@@ -1,6 +1,7 @@
-import { sb, GENERIC_ERR, BLOCKED_MSG, OFFICIAL_HANDLE } from "./config.js";
+import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab } from "./store.js";
 import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime } from "./helpers.js";
+import { t, setLang } from "./i18n.js";
 import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts } from "./feed.js";
 import { openCompose } from "./compose.js";
 import { renderSearch, refreshSearchAfterFriendAdd } from "./search.js";
@@ -13,7 +14,7 @@ export function renderStories(){
     '<button class="story" data-u="'+esc(me.handle)+'" data-me="1">'+
       '<div class="ringwrap"><div class="bub">'+avaHTML(me.handle, 56)+'</div>'+
       '<span class="plusb">+</span></div>'+
-      '<span class="lbl">Dig</span>'+
+      '<span class="lbl">'+t("profile.you")+'</span>'+
     '</button>';
   state.friends.forEach(function(h){
     html +=
@@ -35,7 +36,7 @@ export async function renderMyPosts(){
   const vsnap = snapVideos(el("myposts"));
   el("myposts").innerHTML = mine.length
     ? mine.map(postHTML).join("")
-    : '<div class="emptynote">Du har ikke delt noget endnu. Tryk på + og del et billede eller en tanke.</div>';
+    : '<div class="emptynote">'+t("myposts.empty")+'</div>';
   restoreVideos(el("myposts"), vsnap);
   loadQuota();
   const r = await sb.from("posts").select("id", { count:"exact", head:true }).eq("author", me.id).is("feed_id", null);
@@ -70,30 +71,29 @@ export function closeActivitySheet(){
     el("scrim").classList.remove("on");
 }
 async function openActivitySheet(h){
-  el("as-title").textContent = user(h).name + "s aktivitet";
-  el("as-list").innerHTML = '<div class="emptynote">Henter …</div>';
+  el("as-title").textContent = t("act.title", { name: user(h).name });
+  el("as-list").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
   el("scrim").classList.add("on");
   el("asheet").classList.add("on");
   const { data, error } = await sb.rpc("activity_of", { u: user(h).id });
   if(!el("asheet").classList.contains("on")) return; // lukket imens
   if(error){
     console.error(error);
-    el("as-list").innerHTML = '<div class="emptynote">Kunne ikke hente aktiviteten. Prøv igen.</div>';
+    el("as-list").innerHTML = '<div class="emptynote">'+t("act.load_failed")+'</div>';
     return;
   }
   const rows = data || [];
   el("as-list").innerHTML = rows.length
     ? rows.map(function(r){
         const like = r.kind === "like";
-        const txt = like
-          ? 'Likede '+esc(r.target_name)+'s opslag'+(r.snippet ? ': “'+esc(r.snippet)+'”' : '')
-          : 'Kommenterede hos '+esc(r.target_name)+(r.snippet ? ': “'+esc(r.snippet)+'”' : '');
+        const txt = t(like ? "act.liked" : "act.commented", { name: esc(r.target_name) })
+          + (r.snippet ? ': “'+esc(r.snippet)+'”' : '');
         return '<div class="notif">'+
           '<div class="nicon '+(like ? "heart" : "bubble")+'">'+(like ? ACT_H : ACT_B)+'</div>'+
           '<div class="grow"><div class="ntext">'+txt+' <span class="nt">'+esc(fmtTime(r.created_at))+'</span></div></div>'+
         '</div>';
       }).join("")
-    : '<div class="emptynote">Ingen aktivitet endnu.</div>';
+    : '<div class="emptynote">'+t("act.empty")+'</div>';
 }
 
 /* ---- Slet konto (popup) ---- */
@@ -113,18 +113,18 @@ function renderPvRelation(h){
   const since = el("pv-since"), add = el("pv-add");
   if(pvIsFriend(h)){
     since.style.display = "";
-    since.textContent = "I din kreds siden "+(FRIEND_SINCE[h] || user(h).since || "i dag")+" · Gensidig ven";
+    since.textContent = t("pv.since", { year: FRIEND_SINCE[h] || user(h).since || t("pv.today") });
     add.style.display = "none";
   } else {
     since.style.display = "none";
     add.style.display = "";
     add.disabled = false;
     add.classList.remove("done");
-    add.textContent = "Tilføj til din kreds";
+    add.textContent = t("pv.add");
   }
 }
 function pvEmptyNote(h){
-  return '<div class="emptynote">'+(pvIsFriend(h) ? "Ingen opslag endnu." : "Bliv venner for at se opslag")+'</div>';
+  return '<div class="emptynote">'+(pvIsFriend(h) ? t("pv.empty_friend") : t("pv.empty_stranger"))+'</div>';
 }
 export async function openProfile(h){
   if(!user(h).id){
@@ -134,7 +134,7 @@ export async function openProfile(h){
     if(r.data) registerProfile(r.data);
   }
   const u = user(h);
-  if(!u.id){ toast("Kunne ikke finde profilen"); return; }
+  if(!u.id){ toast(t("pv.not_found")); return; }
   pv.u = h;
   pv.posts = [];
   el("pv-name").textContent = u.name;
@@ -153,7 +153,7 @@ export async function openProfile(h){
   const act = el("pv-act");
   act.style.display = (me && h !== me.handle && h !== OFFICIAL_HANDLE) ? "" : "none";
   act.disabled = false;
-  el("pv-posts").innerHTML = '<div class="emptynote">Henter …</div>';
+  el("pv-posts").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
   el("pv-body").scrollTop = 0;
   el("profileview").classList.add("on");
   sb.rpc("friends_count_of", { u: u.id }).then(function(r){
@@ -175,11 +175,11 @@ export async function loadPvPosts(){
   if(pv.u !== h) return;
   if(error){
     console.error(error);
-    el("pv-posts").innerHTML = '<div class="emptynote">Kunne ikke hente opslag. Prøv igen.</div>';
+    el("pv-posts").innerHTML = '<div class="emptynote">'+t("feed.load_failed")+'</div>';
     return;
   }
   pv.posts = (data || []).map(mapPost);
-  el("pv-count").textContent = pv.posts.length + " opslag";
+  el("pv-count").textContent = t("pv.count", { n: pv.posts.length });
   el("pv-stat-posts").textContent = pv.posts.length;
   const vsnap = snapVideos(el("pv-posts"));
   el("pv-posts").innerHTML = pv.posts.length
@@ -192,7 +192,7 @@ export function closeProfile(){
 }
 export function refreshPv(){
   if(pv.u && el("profileview").classList.contains("on")){
-    el("pv-count").textContent = pv.posts.length + " opslag";
+    el("pv-count").textContent = t("pv.count", { n: pv.posts.length });
     el("pv-stat-posts").textContent = pv.posts.length;
     const vsnap = snapVideos(el("pv-posts"));
     el("pv-posts").innerHTML = pv.posts.length
@@ -228,7 +228,7 @@ el("ep-save").addEventListener("click", async function(){
   this.disabled = false;
   if(error){
     console.error(error);
-    toast(String(error.message || "").indexOf("blocked_content") >= 0 ? BLOCKED_MSG : GENERIC_ERR);
+    toast(String(error.message || "").indexOf("blocked_content") >= 0 ? t("err.blocked") : t("err.generic"));
     return;
   }
   me.name = name;
@@ -240,8 +240,11 @@ el("ep-save").addEventListener("click", async function(){
   renderFeed();
   renderStories();
   renderMyPosts();
-  toast("Profil opdateret");
+  toast(t("profile.updated"));
 });
+/* ---- Sprog (per enhed — gemmes i localStorage, ikke i profilen) ---- */
+el("lang-da").addEventListener("click", function(){ setLang("da"); });
+el("lang-en").addEventListener("click", function(){ setLang("en"); });
 /* ---- Profilbillede ---- */
 el("ep-pic").addEventListener("click", function(){ el("ep-file").click(); });
 el("ep-file").addEventListener("change", function(){
@@ -256,7 +259,7 @@ el("ep-file").addEventListener("change", function(){
     c.getContext("2d").drawImage(img, (img.width - side)/2, (img.height - side)/2, side, side, 0, 0, 512, 512);
     URL.revokeObjectURL(url);
     c.toBlob(async function(blob){
-      if(!blob){ toast("Kunne ikke læse billedet"); return; }
+      if(!blob){ toast(t("img.read_failed")); return; }
       if(!me) return;
       const old = me.avatar_path;
       let path = me.id + "/avatar-" + uuid() + ".jpg";
@@ -271,7 +274,7 @@ el("ep-file").addEventListener("change", function(){
         }
       }catch(err){
         console.error(err);
-        toast("Kunne ikke opdatere profilbilledet. Prøv igen.");
+        toast(t("avatar.failed"));
         el("ep-file").value = "";
         return;
       }
@@ -287,12 +290,12 @@ el("ep-file").addEventListener("change", function(){
       refreshPv();
       if(el("view-search").classList.contains("active")) renderSearch();
       el("ep-file").value = "";
-      toast("Profilbillede opdateret");
+      toast(t("avatar.updated"));
     }, "image/jpeg", 0.85);
   };
   img.onerror = function(){
     URL.revokeObjectURL(url);
-    toast("Kunne ikke læse billedet");
+    toast(t("img.read_failed"));
   };
   img.src = url;
 });
@@ -321,10 +324,10 @@ el("del-btn").addEventListener("click", async function(){
     closeEditSheet();
     resetApp();
     showAuth();
-    toast("Din konto er slettet");
+    toast(t("account.deleted"));
   }catch(err){
     console.error(err);
-    toast("Kunne ikke slette kontoen. Prøv igen.");
+    toast(t("account.delete_failed"));
     btn.disabled = false;
   }
 });
@@ -332,7 +335,7 @@ el("del-btn").addEventListener("click", async function(){
 el("logoutbtn").addEventListener("click", async function(){
   nativeLogout(); // tilbagekald device-token + besked til appen FØR sessionen ryddes
   const { error } = await sb.auth.signOut();
-  if(error){ console.error(error); toast(GENERIC_ERR); }
+  if(error){ console.error(error); toast(t("err.generic")); }
 });
 el("pv-back").addEventListener("click", closeProfile);
 /* ---- "Se aktivitet": samtykke-tjek via RPC, derefter fladt bottom sheet ---- */
@@ -345,10 +348,10 @@ el("pv-act").addEventListener("click", async function(){
   btn.disabled = true;
   const { data, error } = await sb.rpc("activity_allowed", { u: u.id });
   btn.disabled = false;
-  if(error){ console.error(error); toast(GENERIC_ERR); return; }
-  if(data === "self_off"){ toast("Slå “Del min aktivitet” til for at se andres."); return; }
-  if(data === "target_off"){ toast(u.name + " deler ikke sin aktivitet."); return; }
-  if(data !== "ok"){ toast(GENERIC_ERR); return; }
+  if(error){ console.error(error); toast(t("err.generic")); return; }
+  if(data === "self_off"){ toast(t("act.self_off")); return; }
+  if(data === "target_off"){ toast(t("act.target_off", { name: u.name })); return; }
+  if(data !== "ok"){ toast(t("err.generic")); return; }
   if(pv.u !== h) return;
   openActivitySheet(h);
 });
@@ -359,19 +362,19 @@ el("pv-add").addEventListener("click", async function(){
   const btn = this;
   btn.disabled = true;
   btn.classList.add("done");
-  btn.textContent = "I din kreds ✓";
+  btn.textContent = t("pv.added");
   const { data, error } = await sb.rpc("add_friend", { friend_handle: h });
   if(error){
     console.error(error);
     if(pv.u === h){
       btn.disabled = false;
       btn.classList.remove("done");
-      btn.textContent = "Tilføj til din kreds";
+      btn.textContent = t("pv.add");
     }
     const m = String(error.message || "");
-    if(m.indexOf("not_found") >= 0) toast("Ingen bruger med det navn");
-    else if(m.indexOf("self") >= 0) toast("Det er dig selv 😄");
-    else toast(GENERIC_ERR);
+    if(m.indexOf("not_found") >= 0) toast(t("friend.not_found"));
+    else if(m.indexOf("self") >= 0) toast(t("friend.self"));
+    else toast(t("err.generic"));
     return;
   }
   if(data) registerProfile(data);
@@ -383,7 +386,7 @@ el("pv-add").addEventListener("click", async function(){
     renderPvRelation(h); // nu ven: viser "I din kreds siden …"
     loadPvPosts();       // RLS åbner for opslagene
   }
-  toast(user(h).name + " er nu i din kreds");
+  toast(t("friend.added", { name: user(h).name }));
 });
 /* ================= Bobler: klik ================= */
 el("stories").addEventListener("click", function(e){

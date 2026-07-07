@@ -1,6 +1,7 @@
-import { sb, GENERIC_ERR } from "./config.js";
+import { sb } from "./config.js";
 import { me, state } from "./store.js";
 import { el, esc, avaHTML, user, toast, registerProfile, BADGE } from "./helpers.js";
+import { t } from "./i18n.js";
 import { loadFriends, loadPosts } from "./feed.js";
 import { renderStories, openProfile } from "./profile.js";
 
@@ -18,7 +19,7 @@ export function renderSearch(){
   let html = list.map(function(h){
     return '<div class="listrow tap" data-open="'+esc(h)+'">'+
              avaHTML(h, 44)+
-             '<div class="grow"><div class="l1">'+esc(user(h).name)+' '+BADGE+'</div><div class="l2">@'+esc(h)+'</div></div>'+
+             '<div class="grow"><div class="l1">'+esc(user(h).name)+' '+BADGE()+'</div><div class="l2">@'+esc(h)+'</div></div>'+
            '</div>';
   }).join("");
   if(q && q === globalQ && globalResults.length){
@@ -26,12 +27,12 @@ export function renderSearch(){
       html += '<div class="listrow tap" data-open="'+esc(p.handle)+'">'+
                 avaHTML(p.handle, 44)+
                 '<div class="grow"><div class="l1">'+esc(p.name || p.handle)+'</div>'+
-                '<button class="addaction" data-add="'+esc(p.handle)+'">Tilføj @'+esc(p.handle)+' til din kreds</button></div>'+
+                '<button class="addaction" data-add="'+esc(p.handle)+'">'+t("search.add", { h: esc(p.handle) })+'</button></div>'+
               '</div>';
     });
   }
   if(!html){
-    html = '<div class="emptynote">'+(q ? "Ingen i din kreds matcher." : "Din kreds er tom endnu. Søg efter dine venner her 🔍")+'</div>';
+    html = '<div class="emptynote">'+(q ? t("search.no_match") : t("search.empty"))+'</div>';
   }
   el("search-list").innerHTML = html;
 }
@@ -80,9 +81,9 @@ el("search-list").addEventListener("click", async function(e){
     if(error){
       a.disabled = false;
       const m = String(error.message || "");
-      if(m.indexOf("not_found") >= 0) toast("Ingen bruger med det navn");
-      else if(m.indexOf("self") >= 0) toast("Det er dig selv 😄");
-      else toast(GENERIC_ERR);
+      if(m.indexOf("not_found") >= 0) toast(t("friend.not_found"));
+      else if(m.indexOf("self") >= 0) toast(t("friend.self"));
+      else toast(t("err.generic"));
       return;
     }
     if(data) registerProfile(data);
@@ -92,7 +93,7 @@ el("search-list").addEventListener("click", async function(e){
     renderSearch();
     renderStories();
     loadPosts();
-    toast(user(h).name + " er nu i din kreds");
+    toast(t("friend.added", { name: user(h).name }));
     return;
   }
   /* Tap på selve rækken: åbn profilpanelet (venner OG globale resultater) */

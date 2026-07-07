@@ -23,11 +23,11 @@
     <header class="topbar">
       <div class="wordmark">VibeFeed<span class="prik">.</span></div>
       <div class="tright">
-        <button class="qchip" id="qchip" aria-label="Likes du kan modtage">
+        <button class="qchip" id="qchip" aria-label="Likes du kan modtage" data-i18n-aria="quota.aria">
           <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
           <span id="qchip-n">0</span>
         </button>
-        <button class="nosparkle" id="nosparkle" aria-label="Feed-indstillinger" title="Altid kronologisk">
+        <button class="nosparkle" id="nosparkle" aria-label="Feed-indstillinger" data-i18n-aria="nosparkle.aria" title="Altid kronologisk" data-i18n-title="nosparkle.title">
           <svg viewBox="0 0 24 24"><g class="stroke"><path d="M12 3.5 13.8 8.2 18.5 10 13.8 11.8 12 16.5 10.2 11.8 5.5 10 10.2 8.2Z"/><path d="M18.5 15.5 19.3 17.7 21.5 18.5 19.3 19.3 18.5 21.5 17.7 19.3 15.5 18.5 17.7 17.7Z"/><path d="M3.5 3.5 20.5 20.5" stroke-width="2.2"/></g></svg>
         </button>
       </div>
@@ -37,14 +37,14 @@
     <section class="view active" id="view-feed">
       <div class="feedbar" id="feedbar"></div>
       <div class="stories" id="stories"></div>
-      <div class="kredshead" id="kredshead" style="display:none" role="button" tabindex="0" aria-label="Kredsens medlemmer"></div>
+      <div class="kredshead" id="kredshead" style="display:none" role="button" tabindex="0" aria-label="Kredsens medlemmer" data-i18n-aria="kredshead.aria"></div>
       <div id="feed"></div>
       <div class="caughtup">
         <div class="ring"><div class="inner">
           <svg viewBox="0 0 24 24"><path d="M20 6 9.5 16.5 4 11"/></svg>
         </div></div>
-        <h3>Du er helt opdateret</h3>
-        <p>Alle opslag fra din kreds — nyeste øverst, altid.</p>
+        <h3 data-i18n="caughtup.title">Du er helt opdateret</h3>
+        <p data-i18n="caughtup.sub">Alle opslag fra din kreds — nyeste øverst, altid.</p>
       </div>
     </section>
 
@@ -53,16 +53,16 @@
       <div class="searchhead">
         <div class="searchbox">
           <svg viewBox="0 0 24 24"><g class="stroke"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></g></svg>
-          <input id="search-input" placeholder="Søg i din kreds" autocomplete="off">
+          <input id="search-input" placeholder="Søg i din kreds" data-i18n-ph="search.ph" autocomplete="off">
         </div>
       </div>
-      <div class="sectionlabel">Din kreds</div>
+      <div class="sectionlabel" data-i18n="search.section">Din kreds</div>
       <div id="search-list"></div>
     </section>
 
     <!-- NOTIFIKATIONER -->
     <section class="view" id="view-akt">
-      <div class="pagetitle">Notifikationer</div>
+      <div class="pagetitle" data-i18n="tab.notifs">Notifikationer</div>
       <div id="notifs"></div>
     </section>
 
@@ -71,9 +71,9 @@
       <div class="phead-own">
         <div id="own-ava" style="display:flex;flex:0 0 auto"></div>
         <div class="pstats">
-          <div class="stat"><b id="stat-posts">0</b><span>Opslag</span></div>
-          <div class="stat"><b id="stat-friends">0</b><span>Venner</span></div>
-          <div class="stat"><b id="stat-kredse">0</b><span>Kredse</span></div>
+          <div class="stat"><b id="stat-posts">0</b><span data-i18n="stats.posts">Opslag</span></div>
+          <div class="stat"><b id="stat-friends">0</b><span data-i18n="stats.friends">Venner</span></div>
+          <div class="stat"><b id="stat-kredse">0</b><span data-i18n="stats.kredse">Kredse</span></div>
         </div>
       </div>
       <div class="pinfo">
@@ -85,30 +85,30 @@
         <div class="niksaldo" id="nik-saldo"></div>
       </div>
       <div class="pbtns">
-        <button class="chipbtn" id="editprof">Rediger profil</button>
-        <button class="chipbtn" id="logoutbtn">Log ud</button>
+        <button class="chipbtn" id="editprof" data-i18n="profile.edit">Rediger profil</button>
+        <button class="chipbtn" id="logoutbtn" data-i18n="profile.logout">Log ud</button>
       </div>
-      <div class="ptl">Dine opslag</div>
+      <div class="ptl" data-i18n="profile.myposts">Dine opslag</div>
       <div id="myposts"></div>
       <div style="height:40px"></div>
     </section>
 
     <!-- Tabbar -->
     <nav class="tabbar" aria-label="Navigation">
-      <button data-view="feed" class="active" aria-label="Hjem">
+      <button data-view="feed" class="active" aria-label="Hjem" data-i18n-aria="tab.home">
         <svg viewBox="0 0 24 24" id="ic-home"></svg>
       </button>
-      <button data-view="search" aria-label="Søg">
+      <button data-view="search" aria-label="Søg" data-i18n-aria="tab.search">
         <svg viewBox="0 0 24 24" id="ic-search"></svg>
       </button>
-      <button id="tab-compose" aria-label="Nyt opslag">
+      <button id="tab-compose" aria-label="Nyt opslag" data-i18n-aria="tab.compose">
         <svg viewBox="0 0 24 24"><g class="stroke"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M12 8.4v7.2M8.4 12h7.2"/></g></svg>
       </button>
-      <button data-view="akt" aria-label="Notifikationer">
+      <button data-view="akt" aria-label="Notifikationer" data-i18n-aria="tab.notifs">
         <svg viewBox="0 0 24 24" id="ic-bell"></svg>
         <span class="tabdot" id="tabdot"></span>
       </button>
-      <button data-view="profil" aria-label="Profil">
+      <button data-view="profil" aria-label="Profil" data-i18n-aria="aria.profile">
         <span class="tabava" id="tab-ava" style="display:none"></span>
         <svg viewBox="0 0 24 24" id="ic-user"></svg>
       </button>
@@ -118,50 +118,50 @@
   <div class="scrim" id="scrim"></div>
 
   <!-- Ny kreds -->
-  <div class="fsheet" id="fsheet" role="dialog" aria-label="Ny kreds">
+  <div class="fsheet" id="fsheet" role="dialog" aria-label="Ny kreds" data-i18n-aria="fs.title">
     <div class="cmt-grab"></div>
-    <div class="cmt-title">Ny kreds</div>
+    <div class="cmt-title" data-i18n="fs.title">Ny kreds</div>
     <div class="fs-name">
-      <input id="fs-name" placeholder="Hvad skal kredsen hedde?" maxlength="30">
+      <input id="fs-name" placeholder="Hvad skal kredsen hedde?" data-i18n-ph="fs.name_ph" maxlength="30">
     </div>
     <div class="fs-labelrow">
-      <div class="fs-label">Vælg venner</div>
+      <div class="fs-label" data-i18n="fs.pick">Vælg venner</div>
       <button class="fs-all" id="fs-all" type="button" style="display:none">Vælg alle</button>
     </div>
     <div class="fs-list" id="fs-list"></div>
     <div class="fs-foot">
-      <button class="fs-create" id="fs-create" disabled>Opret kreds</button>
+      <button class="fs-create" id="fs-create" disabled data-i18n="fs.create">Opret kreds</button>
     </div>
   </div>
 
   <!-- Skriv -->
-  <div class="compose" id="compose" role="dialog" aria-label="Nyt opslag">
+  <div class="compose" id="compose" role="dialog" aria-label="Nyt opslag" data-i18n-aria="tab.compose">
     <div class="compose-head">
-      <button class="cancel" id="compose-cancel">Annuller</button>
-      <span class="ctitle">Nyt opslag</span>
-      <button class="postbtn" id="compose-post" disabled>Del</button>
+      <button class="cancel" id="compose-cancel" data-i18n="common.cancel">Annuller</button>
+      <span class="ctitle" data-i18n="compose.title">Nyt opslag</span>
+      <button class="postbtn" id="compose-post" disabled data-i18n="compose.post">Del</button>
     </div>
     <div class="compose-dest" id="compose-dest"></div>
     <div class="compose-body">
       <div id="compose-me-ava" style="display:flex;flex:0 0 auto;align-self:flex-start"></div>
       <div class="col">
-        <label for="compose-field" style="position:absolute;left:-9999px">Skriv et opslag</label>
-        <textarea id="compose-field" placeholder="Hvad sker der?" maxlength="280"></textarea>
+        <label for="compose-field" style="position:absolute;left:-9999px" data-i18n="compose.label">Skriv et opslag</label>
+        <textarea id="compose-field" placeholder="Hvad sker der?" data-i18n-ph="compose.ph.default" maxlength="280"></textarea>
         <div class="pollbox" id="pollbox" style="display:none"></div>
         <div class="attach" id="attach">
-          <img id="attach-img" alt="Valgt billede">
+          <img id="attach-img" alt="Valgt billede" data-i18n-alt="attach.alt">
           <video id="attach-vid" playsinline muted loop style="display:none"></video>
-          <button id="attach-remove" aria-label="Fjern medie">
+          <button id="attach-remove" aria-label="Fjern medie" data-i18n-aria="attach.remove">
             <svg viewBox="0 0 24 24"><g class="stroke"><path d="M6 6l12 12M18 6 6 18"/></g></svg>
           </button>
         </div>
       </div>
     </div>
     <div class="compose-foot">
-      <button class="imgbtn" id="imgbtn" aria-label="Tilføj billede eller video">
+      <button class="imgbtn" id="imgbtn" aria-label="Tilføj billede eller video" data-i18n-aria="compose.media_aria">
         <svg viewBox="0 0 24 24"><g class="stroke"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.7" cy="8.7" r="1.7"/><path d="M21 15.3 16 10.3 5 21"/></g></svg>
       </button>
-      <button class="imgbtn" id="pollbtn" aria-label="Tilføj meningsmåling">
+      <button class="imgbtn" id="pollbtn" aria-label="Tilføj meningsmåling" data-i18n-aria="compose.poll_aria">
         <svg viewBox="0 0 24 24"><g class="stroke"><path d="M5.5 20V10.5M12 20V4.5M18.5 20v-7.5"/></g></svg>
       </button>
       <span class="spacer"></span>
@@ -179,19 +179,19 @@
   </div>
 
   <!-- Medie-menu (compose) -->
-  <div class="modal" id="mediamenu" role="dialog" aria-label="Tilføj medie">
+  <div class="modal" id="mediamenu" role="dialog" aria-label="Tilføj medie" data-i18n-aria="mm.aria">
     <div class="modal-card">
-      <button class="mrow" id="mm-photo">Tag et billede</button>
-      <button class="mrow" id="mm-video">Optag video</button>
-      <button class="mrow" id="mm-lib">Vælg fra biblioteket</button>
-      <button class="mrow" id="mm-cancel">Annuller</button>
+      <button class="mrow" id="mm-photo" data-i18n="mm.photo">Tag et billede</button>
+      <button class="mrow" id="mm-video" data-i18n="mm.video">Optag video</button>
+      <button class="mrow" id="mm-lib" data-i18n="mm.lib">Vælg fra biblioteket</button>
+      <button class="mrow" id="mm-cancel" data-i18n="common.cancel">Annuller</button>
     </div>
   </div>
 
   <!-- Ven-profil -->
-  <div class="profileview" id="profileview" role="dialog" aria-label="Profil">
+  <div class="profileview" id="profileview" role="dialog" aria-label="Profil" data-i18n-aria="aria.profile">
     <div class="pv-head">
-      <button class="back" id="pv-back" aria-label="Tilbage">
+      <button class="back" id="pv-back" aria-label="Tilbage" data-i18n-aria="common.back">
         <svg viewBox="0 0 24 24"><path class="stroke" d="M15 5l-7 7 7 7"/></svg>
       </button>
       <div>
@@ -203,9 +203,9 @@
       <div class="phead-own">
         <span id="pv-ava" style="display:flex;flex:0 0 auto"></span>
         <div class="pstats">
-          <div class="stat"><b id="pv-stat-posts">0</b><span>Opslag</span></div>
-          <div class="stat"><b id="pv-stat-friends">0</b><span>Venner</span></div>
-          <div class="stat"><b id="pv-stat-kredse">–</b><span>Kredse</span></div>
+          <div class="stat"><b id="pv-stat-posts">0</b><span data-i18n="stats.posts">Opslag</span></div>
+          <div class="stat"><b id="pv-stat-friends">0</b><span data-i18n="stats.friends">Venner</span></div>
+          <div class="stat"><b id="pv-stat-kredse">–</b><span data-i18n="stats.kredse">Kredse</span></div>
         </div>
       </div>
       <div class="pinfo">
@@ -216,133 +216,138 @@
         <div class="bio" id="pv-bio" style="display:none"></div>
         <div class="since" id="pv-since"></div>
         <button class="pv-add" id="pv-add" style="display:none">Tilføj til din kreds</button>
-        <button class="pv-actbtn" id="pv-act" style="display:none">Se aktivitet</button>
+        <button class="pv-actbtn" id="pv-act" style="display:none" data-i18n="pv.act">Se aktivitet</button>
       </div>
-      <div class="ptl">Opslag</div>
+      <div class="ptl" data-i18n="stats.posts">Opslag</div>
       <div id="pv-posts"></div>
       <div style="height:40px"></div>
     </div>
   </div>
 
   <!-- Rediger profil -->
-  <div class="fsheet" id="esheet" role="dialog" aria-label="Rediger profil">
+  <div class="fsheet" id="esheet" role="dialog" aria-label="Rediger profil" data-i18n-aria="profile.edit">
     <div class="cmt-grab"></div>
-    <div class="cmt-title">Rediger profil</div>
+    <div class="cmt-title" data-i18n="profile.edit">Rediger profil</div>
     <div class="ep-scroll" style="flex:1;overflow-y:auto;min-height:0">
       <div class="ep-avarow">
         <span id="ep-ava" style="display:flex;flex:0 0 auto"></span>
-        <button class="pic" id="ep-pic">Skift profilbillede</button>
+        <button class="pic" id="ep-pic" data-i18n="ep.pic">Skift profilbillede</button>
       </div>
-      <div class="fs-label">Dit navn</div>
+      <div class="fs-label" data-i18n="ep.name">Dit navn</div>
       <div class="fs-name">
-        <input id="ep-name" placeholder="Dit navn" maxlength="40">
+        <input id="ep-name" placeholder="Dit navn" data-i18n-ph="ep.name_ph" maxlength="40">
       </div>
-      <div class="fs-label">Din bio</div>
+      <div class="fs-label" data-i18n="ep.bio">Din bio</div>
       <div class="fs-name">
-        <textarea id="ep-bio" placeholder="Skriv lidt om dig selv ..." maxlength="160" rows="3"></textarea>
+        <textarea id="ep-bio" placeholder="Skriv lidt om dig selv ..." data-i18n-ph="ep.bio_ph" maxlength="160" rows="3"></textarea>
       </div>
-      <div class="fs-label">Aktivitet</div>
+      <div class="fs-label" data-i18n="ep.activity">Aktivitet</div>
       <div class="ep-actrow">
         <label class="eptoggle">
-          <span>Del min aktivitet</span>
+          <span data-i18n="ep.share">Del min aktivitet</span>
           <input type="checkbox" id="ep-share">
           <span class="epswitch" aria-hidden="true"></span>
         </label>
-        <div class="ep-actnote">Slår du den fra, kan du heller ikke se andres aktivitet.</div>
+        <div class="ep-actnote" data-i18n="ep.share_note">Slår du den fra, kan du heller ikke se andres aktivitet.</div>
+      </div>
+      <div class="fs-label" data-i18n="ep.lang">Sprog / Language</div>
+      <div class="ep-langrow">
+        <button class="langchip" id="lang-da" type="button">Dansk</button>
+        <button class="langchip" id="lang-en" type="button">English</button>
       </div>
       <div class="fs-foot" style="padding-bottom:4px">
-        <button class="fs-create" id="ep-save" disabled>Gem</button>
+        <button class="fs-create" id="ep-save" disabled data-i18n="common.save">Gem</button>
       </div>
       <div class="delzone">
-        <button class="del-open" id="del-open">Slet konto</button>
+        <button class="del-open" id="del-open" data-i18n="del.title">Slet konto</button>
       </div>
     </div>
     <input type="file" id="ep-file" accept="image/*" style="display:none">
   </div>
 
   <!-- Rediger opslag -->
-  <div class="fsheet" id="edsheet" role="dialog" aria-label="Rediger opslag">
+  <div class="fsheet" id="edsheet" role="dialog" aria-label="Rediger opslag" data-i18n-aria="ed.title">
     <div class="cmt-grab"></div>
-    <div class="cmt-title">Rediger opslag</div>
+    <div class="cmt-title" data-i18n="ed.title">Rediger opslag</div>
     <div class="ed-body">
-      <textarea id="ed-field" placeholder="Skriv et opslag ..." maxlength="280" rows="4"></textarea>
+      <textarea id="ed-field" placeholder="Skriv et opslag ..." data-i18n-ph="ed.ph" maxlength="280" rows="4"></textarea>
     </div>
-    <div class="ed-hint" id="ed-hint" style="display:none">Opslaget skal have tekst (1-280 tegn).</div>
+    <div class="ed-hint" id="ed-hint" style="display:none" data-i18n="ed.hint">Opslaget skal have tekst (1-280 tegn).</div>
     <div class="fs-foot">
-      <button class="fs-create" id="ed-save">Gem</button>
+      <button class="fs-create" id="ed-save" data-i18n="common.save">Gem</button>
     </div>
   </div>
 
   <!-- Kredsens medlemmer (sheet) -->
-  <div class="fsheet" id="msheet" role="dialog" aria-label="Kredsens medlemmer">
+  <div class="fsheet" id="msheet" role="dialog" aria-label="Kredsens medlemmer" data-i18n-aria="kredshead.aria">
     <div class="cmt-grab"></div>
     <div class="cmt-title" id="ms-title"></div>
     <div class="ep-scroll" style="flex:1;overflow-y:auto;min-height:0">
-      <div class="fs-label">Medlemmer</div>
+      <div class="fs-label" data-i18n="ms.members">Medlemmer</div>
       <div id="ms-members"></div>
-      <div class="fs-label">Invitér ven</div>
+      <div class="fs-label" data-i18n="ms.invite_label">Invitér ven</div>
       <div id="ms-friends"></div>
       <div class="ms-leavezone">
-        <button class="ms-leave" id="ms-leave">Forlad kreds</button>
+        <button class="ms-leave" id="ms-leave" data-i18n="ms.leave">Forlad kreds</button>
         <div id="ms-leave-confirm" style="display:none">
-          <div class="ms-confirmtxt">Vil du forlade kredsen? Er kredsen tom bagefter, slettes den.</div>
-          <button class="fs-create" id="ms-leave2">Ja, forlad kredsen</button>
-          <button class="del-cancel" id="ms-leave-cancel">Annuller</button>
+          <div class="ms-confirmtxt" data-i18n="ms.leave_confirm">Vil du forlade kredsen? Er kredsen tom bagefter, slettes den.</div>
+          <button class="fs-create" id="ms-leave2" data-i18n="ms.leave_yes">Ja, forlad kredsen</button>
+          <button class="del-cancel" id="ms-leave-cancel" data-i18n="common.cancel">Annuller</button>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Aktivitet (sheet, åbnes fra ven-profilen) -->
-  <div class="fsheet" id="asheet" role="dialog" aria-label="Aktivitet">
+  <div class="fsheet" id="asheet" role="dialog" aria-label="Aktivitet" data-i18n-aria="ep.activity">
     <div class="cmt-grab"></div>
     <div class="cmt-title" id="as-title"></div>
     <div class="ep-scroll" id="as-list" style="flex:1;overflow-y:auto;min-height:120px"></div>
   </div>
 
   <!-- Opslag-menu (egne opslag) -->
-  <div class="modal" id="pmenu" role="dialog" aria-label="Opslag">
+  <div class="modal" id="pmenu" role="dialog" aria-label="Opslag" data-i18n-aria="pm.aria">
     <div class="modal-card">
       <div id="pmenu-main">
-        <button class="mrow" id="pm-edit">Rediger</button>
-        <button class="mrow danger" id="pm-delete">Slet opslag</button>
-        <button class="mrow" id="pm-cancel">Annuller</button>
+        <button class="mrow" id="pm-edit" data-i18n="pm.edit">Rediger</button>
+        <button class="mrow danger" id="pm-delete" data-i18n="pm.delete">Slet opslag</button>
+        <button class="mrow" id="pm-cancel" data-i18n="common.cancel">Annuller</button>
       </div>
       <div id="pmenu-confirm" style="display:none">
-        <div class="mtitle">Slet opslaget permanent?</div>
-        <button class="mrow danger" id="pm-del2">Slet</button>
-        <button class="mrow" id="pm-del-cancel">Annuller</button>
+        <div class="mtitle" data-i18n="pm.confirm">Slet opslaget permanent?</div>
+        <button class="mrow danger" id="pm-del2" data-i18n="pm.del">Slet</button>
+        <button class="mrow" id="pm-del-cancel" data-i18n="common.cancel">Annuller</button>
       </div>
     </div>
   </div>
 
   <!-- Anmeld opslag (andres opslag, popup) -->
-  <div class="modal" id="rmenu" role="dialog" aria-label="Anmeld opslag">
+  <div class="modal" id="rmenu" role="dialog" aria-label="Anmeld opslag" data-i18n-aria="rm.report">
     <div class="modal-card">
       <div id="rmenu-main">
-        <button class="mrow danger" id="rm-report">Anmeld opslag</button>
-        <button class="mrow" id="rm-cancel">Annuller</button>
+        <button class="mrow danger" id="rm-report" data-i18n="rm.report">Anmeld opslag</button>
+        <button class="mrow" id="rm-cancel" data-i18n="common.cancel">Annuller</button>
       </div>
       <div id="rmenu-confirm" style="display:none">
-        <div class="mtitle">Anmeld dette opslag?</div>
-        <p class="mtext">Ved 2 anmeldelser skjules det for alle.</p>
-        <button class="mrow danger" id="rm-report2">Anmeld</button>
-        <button class="mrow" id="rm-cancel2">Annuller</button>
+        <div class="mtitle" data-i18n="rm.confirm">Anmeld dette opslag?</div>
+        <p class="mtext" data-i18n="rm.note">Ved 2 anmeldelser skjules det for alle.</p>
+        <button class="mrow danger" id="rm-report2" data-i18n="rm.do">Anmeld</button>
+        <button class="mrow" id="rm-cancel2" data-i18n="common.cancel">Annuller</button>
       </div>
     </div>
   </div>
 
   <!-- Slet konto (popup) -->
-  <div class="modal" id="delmodal" role="dialog" aria-label="Slet konto">
+  <div class="modal" id="delmodal" role="dialog" aria-label="Slet konto" data-i18n-aria="del.title">
     <div class="modal-card">
-      <div class="mtitle">Er du sikker?</div>
-      <p class="mtext">Dette sletter din profil, dine opslag, kommentarer og billeder permanent. Det kan ikke fortrydes. Skriv SLET for at bekræfte.</p>
+      <div class="mtitle" data-i18n="del.sure">Er du sikker?</div>
+      <p class="mtext" data-i18n="del.text">Dette sletter din profil, dine opslag, kommentarer og billeder permanent. Det kan ikke fortrydes. Skriv SLET for at bekræfte.</p>
       <div class="fs-name" style="margin:0 16px 12px">
         <input id="del-input" placeholder="SLET" autocomplete="off" autocapitalize="characters">
       </div>
       <div class="mfoot">
-        <button class="fs-create" id="del-btn" disabled>Slet min konto permanent</button>
-        <button class="del-cancel" id="del-cancel">Annuller</button>
+        <button class="fs-create" id="del-btn" disabled data-i18n="del.btn">Slet min konto permanent</button>
+        <button class="del-cancel" id="del-cancel" data-i18n="common.cancel">Annuller</button>
       </div>
     </div>
   </div>
@@ -351,52 +356,62 @@
   <div class="authview" id="authview">
     <div class="auth-inner">
     <div class="wordmark">VibeFeed<span class="prik">.</span></div>
-    <div class="auth-tag">Ingen algoritme. Bare din kreds.</div>
+    <div class="auth-tag" data-i18n="auth.tag">Ingen algoritme. Bare din kreds.</div>
 
     <form class="auth-form" id="auth-login" autocomplete="on">
-      <input type="email" id="li-email" placeholder="E-mail" autocomplete="email" required>
-      <input type="password" id="li-pass" placeholder="Adgangskode" autocomplete="current-password" required>
-      <button type="button" class="auth-forgot" id="li-forgot">Glemt adgangskode?</button>
+      <input type="email" id="li-email" placeholder="E-mail" data-i18n-ph="auth.email" autocomplete="email" required>
+      <input type="password" id="li-pass" placeholder="Adgangskode" data-i18n-ph="auth.pass" autocomplete="current-password" required>
+      <button type="button" class="auth-forgot" id="li-forgot" data-i18n="auth.forgot">Glemt adgangskode?</button>
       <div class="auth-err" id="li-err"></div>
-      <button class="auth-btn" id="li-btn" type="submit">Log ind</button>
+      <button class="auth-btn" id="li-btn" type="submit" data-i18n="auth.login">Log ind</button>
     </form>
 
     <form class="auth-form" id="auth-reset" style="display:none">
-      <div class="auth-note">Skriv din e-mail, så sender vi dig et link til at vælge en ny adgangskode.</div>
-      <input type="email" id="fp-email" placeholder="E-mail" autocomplete="email" required>
+      <div class="auth-note" data-i18n="auth.reset_note">Skriv din e-mail, så sender vi dig et link til at vælge en ny adgangskode.</div>
+      <input type="email" id="fp-email" placeholder="E-mail" data-i18n-ph="auth.email" autocomplete="email" required>
       <div class="auth-err" id="fp-err" aria-live="polite"></div>
-      <button class="auth-btn" id="fp-btn" type="submit">Send link</button>
-      <button type="button" class="auth-back" id="fp-back">Tilbage til log ind</button>
+      <button class="auth-btn" id="fp-btn" type="submit" data-i18n="auth.send_link">Send link</button>
+      <button type="button" class="auth-back" id="fp-back" data-i18n="auth.back_login">Tilbage til log ind</button>
     </form>
 
     <form class="auth-form" id="auth-recover" style="display:none">
-      <div class="auth-note">Vælg ny adgangskode</div>
-      <input type="password" id="rc-pass1" placeholder="Ny adgangskode" autocomplete="new-password" required>
-      <input type="password" id="rc-pass2" placeholder="Gentag adgangskode" autocomplete="new-password" required>
+      <div class="auth-note" data-i18n="auth.rc_note">Vælg ny adgangskode</div>
+      <input type="password" id="rc-pass1" placeholder="Ny adgangskode" data-i18n-ph="auth.rc_p1" autocomplete="new-password" required>
+      <input type="password" id="rc-pass2" placeholder="Gentag adgangskode" data-i18n-ph="auth.rc_p2" autocomplete="new-password" required>
       <div class="auth-err" id="rc-err" aria-live="polite"></div>
-      <button class="auth-btn" id="rc-btn" type="submit">Gem adgangskode</button>
-      <button type="button" class="auth-back" id="rc-back">Tilbage til log ind</button>
+      <button class="auth-btn" id="rc-btn" type="submit" data-i18n="auth.rc_save">Gem adgangskode</button>
+      <button type="button" class="auth-back" id="rc-back" data-i18n="auth.back_login">Tilbage til log ind</button>
     </form>
 
     <form class="auth-form" id="auth-signup" style="display:none" autocomplete="on">
-      <input type="text" id="su-name" placeholder="Navn" autocomplete="name" maxlength="40" required>
-      <input type="text" id="su-handle" placeholder="Brugernavn" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" required>
-      <input type="email" id="su-email" placeholder="E-mail" autocomplete="email" required>
-      <input type="password" id="su-pass" placeholder="Adgangskode (mindst 6 tegn)" autocomplete="new-password" required>
+      <input type="text" id="su-name" placeholder="Navn" data-i18n-ph="auth.name" autocomplete="name" maxlength="40" required>
+      <input type="text" id="su-handle" placeholder="Brugernavn" data-i18n-ph="auth.handle" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" required>
+      <input type="email" id="su-email" placeholder="E-mail" data-i18n-ph="auth.email" autocomplete="email" required>
+      <input type="password" id="su-pass" placeholder="Adgangskode (mindst 6 tegn)" data-i18n-ph="auth.pass_min" autocomplete="new-password" required>
       <div class="auth-err" id="su-err"></div>
-      <button class="auth-btn" id="su-btn" type="submit">Opret profil</button>
+      <button class="auth-btn" id="su-btn" type="submit" data-i18n="auth.signup">Opret profil</button>
     </form>
 
     <div class="auth-alt" id="auth-alt"><span id="auth-alt-txt">Har du ikke en profil?</span> <button type="button" id="auth-toggle">Opret en</button></div>
     </div>
   </div>
 
+  <!-- Sprogvalg (kun første start — før auth/boot) -->
+  <div class="langview" id="langview" role="dialog" aria-label="Vælg sprog · Choose language">
+    <div class="lang-inner">
+      <div class="wordmark">VibeFeed<span class="prik">.</span></div>
+      <div class="lang-tag" data-i18n="lang.title">Vælg sprog · Choose language</div>
+      <button class="lang-btn" type="button" data-lang="da">Dansk 🇩🇰</button>
+      <button class="lang-btn" type="button" data-lang="en">English 🇬🇧</button>
+    </div>
+  </div>
+
   <input type="file" id="cfile" accept="image/*" style="display:none">
 
   <!-- Fuldskærms-lightbox (billede med pinch-zoom / video med lyd og controls) -->
-  <div class="lightbox" id="lightbox" role="dialog" aria-label="Medie i fuld skærm" aria-hidden="true">
+  <div class="lightbox" id="lightbox" role="dialog" aria-label="Medie i fuld skærm" data-i18n-aria="lb.aria" aria-hidden="true">
     <div class="lb-stage" id="lb-stage"></div>
-    <button class="lb-close" id="lb-close" aria-label="Luk">
+    <button class="lb-close" id="lb-close" aria-label="Luk" data-i18n-aria="lb.close">
       <svg viewBox="0 0 24 24"><g class="stroke"><path d="M6 6l12 12M18 6 6 18"/></g></svg>
     </button>
   </div>

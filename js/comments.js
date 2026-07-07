@@ -1,6 +1,7 @@
-import { sb, GENERIC_ERR, BLOCKED_MSG } from "./config.js";
+import { sb } from "./config.js";
 import { me, expandedCmts, composers, cstate, cfilePid } from "./store.js";
-import { el, esc, avaHTML, likesLabel, toast, uuid, HEART_SVG } from "./helpers.js";
+import { el, esc, avaHTML, toast, uuid, HEART_SVG } from "./helpers.js";
+import { t, likesLabel } from "./i18n.js";
 import { findPost, findPostAll, allPostArrays, mapComment } from "./feed.js";
 
 /* ================= Kommentartråd (inline, sammenklappet som standard) ================= */
@@ -39,12 +40,12 @@ function cmtRowHTML(item){
     avaHTML(c.u, 28)+
     '<div class="cbody">'+
       '<div class="ctext"><b>'+esc(c.u)+'</b>'+prefix+(c.text ? esc(c.text) : '')+'</div>'+
-      (c.img ? '<img class="cimg" src="'+esc(c.img)+'" alt="Billede i kommentar">' : '')+
+      (c.img ? '<img class="cimg" src="'+esc(c.img)+'" alt="'+t("cmt.img_alt")+'">' : '')+
       '<div class="cmeta">'+
         '<span>'+esc(c.t)+'</span>'+
         '<span class="clc"'+(c.likeCount > 0 ? '' : ' style="display:none"')+'>'+likesLabel(c.likeCount)+'</span>'+
-        '<button class="csvar" data-cid="'+c.id+'" data-u="'+esc(c.u)+'">Svar</button>'+
-        '<button class="likec'+(c.liked ? " on" : "")+'" data-cid="'+c.id+'" aria-label="Like">'+HEART_SVG+'</button>'+
+        '<button class="csvar" data-cid="'+c.id+'" data-u="'+esc(c.u)+'">'+t("cmt.reply")+'</button>'+
+        '<button class="likec'+(c.liked ? " on" : "")+'" data-cid="'+c.id+'" aria-label="'+t("aria.like")+'">'+HEART_SVG+'</button>'+
       '</div>'+
     '</div>'+
   '</div>';
@@ -56,10 +57,10 @@ export function threadHTML(p){
 function cmtSectionInner(p){
   const n = p.cmts.length;
   if(!expandedCmts.has(Number(p.id))){
-    return n > 0 ? '<button class="cmt-toggle" data-id="'+p.id+'">Vis kommentarer ('+n+')</button>' : '';
+    return n > 0 ? '<button class="cmt-toggle" data-id="'+p.id+'">'+t("cmt.show", { n:n })+'</button>' : '';
   }
   return (n > 0
-      ? '<button class="cmt-toggle" data-id="'+p.id+'">Skjul kommentarer</button>'+threadHTML(p)
+      ? '<button class="cmt-toggle" data-id="'+p.id+'">'+t("cmt.hide")+'</button>'+threadHTML(p)
       : '')+
     composerHTML(p.id);
 }
@@ -77,20 +78,20 @@ export function composerHTML(pid){
   if(!me) return "";
   const s = cstate(pid);
   const chip = s.replyTo
-    ? '<div class="cchiprow"><span class="cchip">Svarer @'+esc(s.replyTo.u)+'<button class="cchip-x" data-id="'+pid+'" aria-label="Annuller svar">✕</button></span></div>'
+    ? '<div class="cchiprow"><span class="cchip">'+t("cmt.replying", { u: esc(s.replyTo.u) })+'<button class="cchip-x" data-id="'+pid+'" aria-label="'+t("cmt.cancel_reply")+'">✕</button></span></div>'
     : '';
   const prev = s.img
-    ? '<div class="cprevrow"><span class="cprev"><img src="'+esc(s.img.url)+'" alt="Valgt billede"><button class="cprev-x" data-id="'+pid+'" aria-label="Fjern billede">✕</button></span></div>'
+    ? '<div class="cprevrow"><span class="cprev"><img src="'+esc(s.img.url)+'" alt="'+t("attach.alt")+'"><button class="cprev-x" data-id="'+pid+'" aria-label="'+t("cmt.rm_img")+'">✕</button></span></div>'
     : '';
   const dis = (!s.text.trim() && !s.img) ? " disabled" : "";
   return '<div class="cbox" data-id="'+pid+'">'+chip+prev+
     '<div class="ccomposer">'+
       avaHTML(me.handle, 28)+
-      '<input class="cfield" data-id="'+pid+'" placeholder="Tilføj en kommentar ..." maxlength="280" value="'+esc(s.text)+'">'+
-      '<button class="cimgb" data-id="'+pid+'" aria-label="Tilføj billede">'+
+      '<input class="cfield" data-id="'+pid+'" placeholder="'+t("cmt.ph")+'" maxlength="280" value="'+esc(s.text)+'">'+
+      '<button class="cimgb" data-id="'+pid+'" aria-label="'+t("cmt.add_img")+'">'+
         '<svg viewBox="0 0 24 24"><g class="stroke"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.7" cy="8.7" r="1.7"/><path d="M21 15.3 16 10.3 5 21"/></g></svg>'+
       '</button>'+
-      '<button class="csend" data-id="'+pid+'"'+dis+'>Send</button>'+
+      '<button class="csend" data-id="'+pid+'"'+dis+'>'+t("cmt.send")+'</button>'+
     '</div>'+
   '</div>';
 }
@@ -158,7 +159,7 @@ export async function toggleCmtLike(cid){
     console.error(error);
     cs.forEach(function(c){ c.liked = !on; c.likeCount = Math.max(0, c.likeCount + (on ? -1 : 1)); });
     applyCmtLikeUI(cid);
-    toast(GENERIC_ERR);
+    toast(t("err.generic"));
   }
 }
 
@@ -214,8 +215,8 @@ export async function sendComment(pid){
     console.error(err);
     if(path){ sb.storage.from("post-images").remove([path]).catch(function(){}); }
     toast(String((err && err.message) || "").indexOf("blocked_content") >= 0
-      ? BLOCKED_MSG
-      : "Kunne ikke sende kommentaren. Prøv igen.");
+      ? t("err.blocked")
+      : t("cmt.send_failed"));
     updateSendState(pid);
   }finally{
     s.busy = false;
@@ -249,7 +250,7 @@ el("cfile").addEventListener("change", function(){
     c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
     URL.revokeObjectURL(url);
     c.toBlob(function(blob){
-      if(!blob){ toast("Kunne ikke læse billedet"); return; }
+      if(!blob){ toast(t("img.read_failed")); return; }
       const st = cstate(pid);
       if(st.img && st.img.url) URL.revokeObjectURL(st.img.url);
       st.img = { blob:blob, url:URL.createObjectURL(blob) };
@@ -258,7 +259,7 @@ el("cfile").addEventListener("change", function(){
   };
   img.onerror = function(){
     URL.revokeObjectURL(url);
-    toast("Kunne ikke læse billedet");
+    toast(t("img.read_failed"));
   };
   img.src = url;
   this.value = "";

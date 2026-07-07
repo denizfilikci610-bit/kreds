@@ -1,11 +1,11 @@
 import { sb } from "./config.js";
 import { me } from "./store.js";
 import { esc, toast } from "./helpers.js";
+import { t, stemmerLabel } from "./i18n.js";
 import { findPostAll } from "./feed.js";
 import { scheduleRefetch } from "./realtime.js";
 
-/* ================= Meningsmålinger ================= */
-export function stemmerLabel(n){ return n === 1 ? "1 stemme" : n + " stemmer"; }
+/* ================= Meningsmålinger (stemmerLabel bor nu i i18n.js) ================= */
 
 /* Rå posts-række -> poll-view-model (null hvis opslaget ikke har svarmuligheder) */
 export function mapPoll(row){
@@ -23,7 +23,9 @@ export function mapPoll(row){
   return { options: options, total: total, myVote: myVote };
 }
 
-const CHECK = '<svg class="pcheck" viewBox="0 0 24 24" aria-label="Din stemme"><circle cx="12" cy="12" r="10" fill="#E0402F"/><path d="M17 9l-6.2 6.2L7 11.4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function CHECK(){
+  return '<svg class="pcheck" viewBox="0 0 24 24" aria-label="'+t("poll.mine_aria")+'"><circle cx="12" cy="12" r="10" fill="#E0402F"/><path d="M17 9l-6.2 6.2L7 11.4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
 
 export function pollHTML(p){
   const poll = p.poll;
@@ -34,9 +36,9 @@ export function pollHTML(p){
     poll.options.forEach(function(o){
       const pct = poll.total ? Math.round(o.votes / poll.total * 100) : 0;
       const mine = poll.myVote === o.id;
-      html += '<button class="poll-res'+(mine ? " mine" : "")+'" data-vote="'+o.id+'" data-pid="'+p.id+'" aria-label="Stem på '+esc(o.text)+'">'+
+      html += '<button class="poll-res'+(mine ? " mine" : "")+'" data-vote="'+o.id+'" data-pid="'+p.id+'" aria-label="'+t("poll.vote_aria", { opt: esc(o.text) })+'">'+
         '<span class="pfill" style="width:'+pct+'%"></span>'+
-        '<span class="ptxt">'+esc(o.text)+(mine ? CHECK : '')+'</span>'+
+        '<span class="ptxt">'+esc(o.text)+(mine ? CHECK() : '')+'</span>'+
         '<span class="ppct">'+pct+'%</span>'+
       '</button>';
     });
@@ -96,9 +98,9 @@ export async function votePoll(pid, oid){
     // Fejlet upsert udløser ingen realtime-hændelse — hent server-tilstand igen
     scheduleRefetch();
     const m = String(error.message || "");
-    if(m.indexOf("not_eligible") >= 0) toast("Du kan ikke stemme i en afstemning om dig selv.");
-    else if(m.indexOf("poll_closed") >= 0) toast("Afstemningen er afgjort.");
-    else if(m.indexOf("bad_option") >= 0) toast("Den svarmulighed hører ikke til meningsmålingen.");
-    else toast("Kunne ikke gemme din stemme. Prøv igen.");
+    if(m.indexOf("not_eligible") >= 0) toast(t("poll.not_eligible"));
+    else if(m.indexOf("poll_closed") >= 0) toast(t("poll.closed"));
+    else if(m.indexOf("bad_option") >= 0) toast(t("poll.bad_option"));
+    else toast(t("poll.vote_failed"));
   }
 }

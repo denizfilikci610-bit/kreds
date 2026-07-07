@@ -902,6 +902,43 @@
   .auth-back{color:var(--gray);font-size:13px;font-weight:600;margin-top:10px}
   .auth-err.ok{color:var(--gray)}
 
+  /* ---- Sprogvalg (første start — over authview) ---- */
+  .langview{
+    position:absolute;inset:0;z-index:250;
+    background:var(--bg);
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    padding:calc(34px + env(safe-area-inset-top)) 30px calc(30px + env(safe-area-inset-bottom));
+  }
+  .langview.on{display:flex}
+  .langview .lang-inner{margin:auto;width:100%;max-width:420px;display:flex;flex-direction:column}
+  .langview .wordmark{font-size:44px;text-align:center}
+  .lang-tag{text-align:center;color:var(--gray);font-size:14.5px;margin:6px 0 30px}
+  .lang-btn{
+    background:var(--chip);color:var(--ink);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px 0;
+    font-weight:700;font-size:17px;
+    text-align:center;
+    margin-bottom:12px;
+  }
+  .lang-btn:active{opacity:.7}
+
+  /* ---- Sprog-chips (Rediger profil) ---- */
+  .ep-langrow{display:flex;gap:8px;padding:8px 18px 4px}
+  .langchip{
+    flex:1;
+    background:var(--chip);color:var(--ink);
+    border-radius:8px;
+    padding:9px 0;
+    font-weight:700;font-size:14px;
+    text-align:center;
+  }
+  .langchip:active{opacity:.7}
+  .langchip.on{background:var(--ink);color:var(--bg)}
+
   /* ---- Ingen synlige scrollbars i appen (kun indikatoren skjules — scroll uændret) ---- */
   .app,.pv-body,.fs-list,.compose-body,.ep-scroll,.authview,textarea{scrollbar-width:none;-ms-overflow-style:none}
   .app::-webkit-scrollbar,.pv-body::-webkit-scrollbar,.fs-list::-webkit-scrollbar,
