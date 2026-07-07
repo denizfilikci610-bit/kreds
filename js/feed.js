@@ -611,12 +611,15 @@ export async function fetchLikeBalance(){
   if(!me) return null;
   const res = await Promise.all([
     sb.from("likes").select("*", { count:"exact", head:true }).eq("user_id", me.id),
-    sb.from("likes").select("*, posts!inner(author)", { count:"exact", head:true }).eq("posts.author", me.id)
+    sb.from("likes").select("*, posts!inner(author)", { count:"exact", head:true }).eq("posts.author", me.id),
+    sb.rpc("my_like_bonus")   // video-tjent ekstra kapacitet (+20 pr. video)
   ]);
   for(const r of res){ if(r.error) throw r.error; }
   const given = res[0].count || 0;
   const received = res[1].count || 0;
-  return { given: given, received: received, room: Math.max(0, given + 1 - received) };
+  const bonus = res[2].data || 0;
+  return { given: given, received: received, bonus: bonus,
+           room: Math.max(0, given + 1 + bonus - received) };
 }
 let quotaSeq = 0;
 export async function loadQuota(){
@@ -1038,10 +1041,7 @@ el("feedbar").addEventListener("input", function(e){
     if(fp) fp.innerHTML = fbPillsHTML();
   }
 });
-el("qchip").addEventListener("click", function(){
-  const n = parseInt(el("qchip-n").textContent, 10) || 0;
-  toast(t("quota.toast", { likes: likesLabel(n) }));
-});
+/* Hjerte-chippens klik håndteres i rewarded.js (video-genvej i appen, saldo-toast i browseren). */
 ["feed","myposts","pv-posts"].forEach(function(id){
   el(id).addEventListener("click", timelineClick);
   el(id).addEventListener("input", cInput);

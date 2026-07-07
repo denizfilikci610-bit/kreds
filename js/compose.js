@@ -3,6 +3,7 @@ import { me, state } from "./store.js";
 import { el, esc, toast, uuid } from "./helpers.js";
 import { t } from "./i18n.js";
 import { feedById, setFeed, switchTab } from "./feed.js";
+import { offerRewardAfterPost } from "./rewarded.js";
 
 /* ================= Skriv ================= */
 let pendingImg = null; // { blob, url }
@@ -312,6 +313,7 @@ el("compose-post").addEventListener("click", async function(){
       setFeed(dest);
       const dfp = feedById(dest);
       toast(dfp ? t("compose.shared_in", { name: dfp.name }) : t("compose.shared_all"));
+      offerRewardAfterPost(); // tilbyd video for +20 like-plads (max 1/time)
     }catch(err){
       console.error(err);
       toast(String((err && err.message) || "").indexOf("blocked_content") >= 0
@@ -361,6 +363,7 @@ el("compose-post").addEventListener("click", async function(){
     setFeed(dest);
     const df = feedById(dest);
     toast(df ? t("compose.shared_in", { name: df.name }) : t("compose.shared_all"));
+    offerRewardAfterPost(); // tilbyd video for +20 like-plads (max 1/time)
   }catch(err){
     console.error(err);
     if(path){ sb.storage.from("post-images").remove([path]).catch(function(){}); }

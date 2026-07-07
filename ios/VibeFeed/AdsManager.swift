@@ -140,7 +140,51 @@ final class AdsManager: NSObject, ObservableObject {
         #endif
 
         Appodeal.setInitializationDelegate(self)
-        Appodeal.initialize(withApiKey: appKey, types: [.MREC])
+        Appodeal.setRewardedVideoDelegate(self)
+        Appodeal.initialize(withApiKey: appKey, types: [.MREC, .rewardedVideo])
+
+        if useTestAds { loadGoogleRewarded() } // DEBUG: preload a real Google test rewarded
+    }
+
+    // MARK: - Rewarded video (earns +20 like-capacity; web asks, native shows)
+
+    #if DEBUG
+    private var googleRewarded: RewardedAd?
+    private func loadGoogleRewarded() {
+        MobileAds.shared.start(completionHandler: nil)
+        RewardedAd.load(with: "ca-app-pub-3940256099942544/1712485313", // Google's public rewarded test unit
+                        request: Request()) { [weak self] ad, _ in
+            self?.googleRewarded = ad
+        }
+    }
+    #endif
+
+    /// Called from the web (via the bridge) when the user chooses to watch a video.
+    /// Shows a rewarded video; on full watch we tell the web the reward was earned so
+    /// it can grant +20 like-capacity. If none is available, we report that too.
+    func showRewarded() {
+        guard let root = Self.topViewController() else { rewardWeb(false); return }
+        #if DEBUG
+        if let ad = googleRewarded {
+            googleRewarded = nil
+            ad.present(from: root) { [weak self] in self?.rewardWeb(true) }
+            loadGoogleRewarded() // preload the next
+        } else {
+            rewardWeb(false)     // not ready yet
+            loadGoogleRewarded()
+        }
+        #else
+        if Appodeal.canShow(.rewardedVideo, forPlacement: "default") {
+            Appodeal.showAd(.rewardedVideo, rootViewController: root)
+        } else {
+            rewardWeb(false)     // no fill
+        }
+        #endif
+    }
+
+    private func rewardWeb(_ earned: Bool) {
+        let js = "window.VibeFeedAds && window.VibeFeedAds.rewardEarned(\(earned ? "true" : "false"))"
+        webView?.evaluateJavaScript(js, completionHandler: nil)
     }
 
     // MARK: - Overlay + web view wiring (called from SwiftUI on the main actor)
@@ -413,4 +457,22 @@ extension AdsManager: AppodealInitializationDelegate {
             self.applyLayout()
         }
     }
+}
+
+// MARK: - Appodeal rewarded video delegate (production)
+//
+// Fires on the main thread; hop to the main actor to reach @MainActor state. The
+// reward callback (rewardedVideoDidFinish) means the user watched to completion →
+// tell the web to grant +20 like-capacity. Present/expiry failures → not earned.
+
+extension AdsManager: AppodealRewardedVideoDelegate {
+    nonisolated func rewardedVideoDidFinish(_ rewardAmount: Float, name: String?) {
+        Task { @MainActor in AdsManager.shared.rewardWeb(true) }
+    }
+    nonisolated func rewardedVideoDidFailToPresent(withError error: Error) {
+        // Only fires for an actual show attempt → report "not earned".
+        Task { @MainActor in AdsManager.shared.rewardWeb(false) }
+    }
+    // Note: no rewardedVideoDidFailToLoadAd handler on purpose — that's a background
+    // load failure, not tied to a user tapping "watch", so it must not tell the web.
 }

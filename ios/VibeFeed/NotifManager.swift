@@ -58,6 +58,12 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
         case "logout":
             UserDefaults.standard.removeObject(forKey: secretKey)
             UserDefaults.standard.removeObject(forKey: lastCheckKey)
+        case "rewarded":
+            // The user chose to watch a rewarded video to earn +20 like-capacity.
+            // Native shows it; on full watch it calls back window.VibeFeedAds.rewardEarned.
+            if (dict["action"] as? String) == "show" {
+                Task { @MainActor in AdsManager.shared.showRewarded() }
+            }
         case "ads":
             // The web feed reports the on-screen positions of its sponsored slots
             // so the native MRECs can be laid over them. Slot values are plain

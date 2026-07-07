@@ -12,6 +12,7 @@ import { initNotifs, loadNotifs } from "./notifications.js";
 import { initLightbox } from "./lightbox.js";
 import { initRealtime, scheduleRefetch } from "./realtime.js";
 import { initAuth, boot, showAuth, showRecovery, setAuthMode, refreshAuthMode, pushNativeCreds } from "./auth.js";
+import { initRewarded } from "./rewarded.js";
 
 /* ================= i18n =================
    Callback ved sprogskifte: statisk markup er allerede opdateret af setLang
@@ -44,6 +45,7 @@ initNotifs();
 initLightbox();
 initRealtime();
 initAuth();
+initRewarded(); // rewarded-video-genvej + belønnings-bro (no-op i browsere)
 
 el("scrim").addEventListener("click", function(){ closeFeedSheet(); closeMemberSheet(); closeEditSheet(); closeActivitySheet(); closePostEdit(); });
 
