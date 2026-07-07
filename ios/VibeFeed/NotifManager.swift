@@ -62,8 +62,19 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
             // The web feed reports the on-screen positions of its sponsored slots
             // so the native MRECs can be laid over them. Slot values are plain
             // numbers/strings (Sendable), so we can hop to the ad actor cleanly.
-            guard (dict["action"] as? String) == "layout" else { break }
+            let action = dict["action"] as? String
+
+            // Lightweight per-frame scroll update: just the feed's scroll offset, so
+            // native can glide the already-placed ads with the feed at full frame rate.
+            if action == "scroll" {
+                let scrollY = ((dict["scrollY"] as? NSNumber)?.doubleValue) ?? 0
+                Task { @MainActor in AdsManager.shared.updateScroll(scrollY: CGFloat(scrollY)) }
+                break
+            }
+
+            guard action == "layout" else { break }
             let scrolling = (dict["scrolling"] as? Bool) ?? false
+            let scrollY = ((dict["scrollY"] as? NSNumber)?.doubleValue) ?? 0
             let raw = (dict["slots"] as? [[String: Any]]) ?? []
             let slots: [AdSlot] = raw.compactMap { s in
                 guard let id = s["id"] as? String,
@@ -74,7 +85,7 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
                 return AdSlot(id: id, x: CGFloat(x), y: CGFloat(y), w: CGFloat(w), h: CGFloat(h))
             }
             Task { @MainActor in
-                AdsManager.shared.updateLayout(slots: slots, scrolling: scrolling)
+                AdsManager.shared.updateLayout(slots: slots, scrolling: scrolling, scrollY: CGFloat(scrollY))
             }
         default:
             break

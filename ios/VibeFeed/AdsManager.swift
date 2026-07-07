@@ -72,6 +72,10 @@ final class AdsManager: NSObject, ObservableObject {
     private let poolSize = 3
     private var lastSlots: [AdSlot] = []
     private var lastScrolling = false
+    // The feed scroll offset at which the MRECs were last authoritatively placed.
+    // While scrolling we glide them by (scrollY - baseScrollY) instead of re-laying
+    // out, so they track the feed smoothly; each layout message re-bases this.
+    private var baseScrollY: CGFloat = 0
 
     // In DEBUG we lay Google's guaranteed test MREC over the slots so the feed
     // visibly renders an ad even before the live waterfall has any inventory.
@@ -187,11 +191,25 @@ final class AdsManager: NSObject, ObservableObject {
 
     // MARK: - Layout updates from the web feed
 
-    func updateLayout(slots: [AdSlot], scrolling: Bool) {
+    func updateLayout(slots: [AdSlot], scrolling: Bool, scrollY: CGFloat) {
         lastSlots = slots
         lastScrolling = scrolling
+        baseScrollY = scrollY
         buildPoolIfPossible()
         applyLayout()
+    }
+
+    /// Cheap per-frame scroll update while the feed scrolls: glide the already-placed
+    /// ads with the feed by offsetting them from the position they were last
+    /// authoritatively laid out at (baseScrollY). No re-layout, no alpha changes —
+    /// pure transform, so the ad tracks the scroll smoothly instead of stepping
+    /// behind the heavier layout messages. Reconciled to exact frames on settle.
+    func updateScroll(scrollY: CGFloat) {
+        let t = CGAffineTransform(translationX: 0, y: -(scrollY - baseScrollY))
+        for it in pool where it.slotId != nil {
+            it.mrec.transform = t
+            it.testBanner?.transform = t
+        }
     }
 
     private func applyLayout() {
@@ -209,7 +227,9 @@ final class AdsManager: NSObject, ObservableObject {
         for item in pool where item.slotId != nil && !visibleIds.contains(item.slotId!) {
             item.slotId = nil
             item.mrec.alpha = 0
+            item.mrec.transform = .identity
             item.testBanner?.alpha = 0
+            item.testBanner?.transform = .identity
         }
 
         // Give any free MREC the nearest still-unserved slot (nearest the viewport
@@ -236,6 +256,9 @@ final class AdsManager: NSObject, ObservableObject {
 
             // DEBUG: a guaranteed test ad always fills, so just place and show it.
             if let banner = it.testBanner {
+                // Reset any scroll transform BEFORE setting the authoritative frame
+                // (UIKit frame is undefined under a non-identity transform).
+                banner.transform = .identity
                 banner.frame = frame
                 banner.rootViewController = root
                 banner.alpha = 1
@@ -244,6 +267,8 @@ final class AdsManager: NSObject, ObservableObject {
                 continue
             }
 
+            // Reset any scroll transform before setting the authoritative frame.
+            it.mrec.transform = .identity
             it.mrec.rootViewController = root
             it.mrec.frame = frame
             if !it.loadStarted {

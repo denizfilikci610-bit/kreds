@@ -76,13 +76,19 @@ function collectSlots(){
   return { vw: Math.round(vw), vh: Math.round(vh), slots: slots };
 }
 
+/* Feedets aktuelle scroll-offset (den indre #app-container er selve scrolleren). */
+function scrollPos(){
+  const app = el("app");
+  return app ? Math.round(app.scrollTop) : 0;
+}
+
 function send(scrolling){
   const b = bridge();
   if(!b) return;
   const data = collectSlots();
   const payload = {
     type: "ads", action: "layout", scrolling: !!scrolling,
-    vw: data.vw, vh: data.vh, slots: data.slots
+    vw: data.vw, vh: data.vh, scrollY: scrollPos(), slots: data.slots
   };
   const key = JSON.stringify(payload);
   if(key === lastPayload) return; // uændret → undgå unødig native-arbejde
@@ -90,20 +96,31 @@ function send(scrolling){
   try{ b.postMessage(payload); }catch(_e){ /* broen må aldrig vælte web-appen */ }
 }
 
-/* Kaldes efter render, ved resize, faneskift osv. */
-export function reportAdLayout(){
-  if(!adsEnabled()) return;
-  send(isScrolling);
+/* Letvægts-rapport UNDER scroll: kun scroll-offset — ingen måling af huller. Så
+   kan native lade den allerede-placerede annonce glide med feedet ved fuld
+   billedrate i stedet for at træde bagefter de tungere layout-beskeder. */
+function sendScroll(){
+  const b = bridge();
+  if(!b) return;
+  try{ b.postMessage({ type: "ads", action: "scroll", scrollY: scrollPos() }); }catch(_e){}
 }
 
-/* rAF-throttlet rapport under scroll; når scroll falder til ro sender vi
-   scrolling:false, hvorefter native placerer og viser annoncen. */
+/* Kaldes efter render, ved resize, faneskift osv. Under scroll nøjes vi med den
+   billige scroll-besked (ingen re-layout → intet hop midt i et scroll). */
+export function reportAdLayout(){
+  if(!adsEnabled()) return;
+  if(isScrolling) sendScroll(); else send(false);
+}
+
+/* rAF-throttlet rapport under scroll: kun scroll-offset, så annoncen glider med.
+   Når scroll falder til ro sender vi en fuld layout (scrolling:false), hvorefter
+   native låser annoncen præcist på plads igen. */
 function onScroll(){
   if(!adsEnabled()) return;
   isScrolling = true;
   if(!rafPending){
     rafPending = true;
-    requestAnimationFrame(function(){ rafPending = false; send(true); });
+    requestAnimationFrame(function(){ rafPending = false; sendScroll(); });
   }
   clearTimeout(scrollEndTimer);
   scrollEndTimer = setTimeout(function(){
