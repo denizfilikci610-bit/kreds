@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import WebKit
 import BackgroundTasks
 import UserNotifications
@@ -15,9 +16,11 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
     static let taskId = "dk.vibefeed.app.refresh"
 
     private let pollURL = URL(string: "https://iduotqxkohuezxkveawc.supabase.co/functions/v1/notif-poll")!
+    private let registerPushURL = URL(string: "https://iduotqxkohuezxkveawc.supabase.co/functions/v1/register-push")!
     private let secretKey = "vf_device_secret"
     private let lastCheckKey = "vf_last_check"
     private let langKey = "vf_lang"
+    private let pushTokenKey = "vf_push_token"
 
     private var secret: String? {
         UserDefaults.standard.string(forKey: secretKey)
@@ -41,6 +44,7 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
                 }
                 requestPermission()
                 scheduleRefresh()
+                sendPushRegistration() // if a push token already arrived, register it now
             }
         case "consent":
             // "personal" (personalized ads allowed) or "limited" (non-personalized
@@ -81,7 +85,36 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
 
     func requestPermission() {
         UNUserNotificationCenter.current()
-            .requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
+            .requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
+                if granted {
+                    DispatchQueue.main.async { UIApplication.shared.registerForRemoteNotifications() }
+                }
+            }
+    }
+
+    // MARK: - Push notifications (APNs)
+
+    /// Called by the app delegate when APNs hands us a device token.
+    func setPushToken(_ hex: String) {
+        UserDefaults.standard.set(hex, forKey: pushTokenKey)
+        sendPushRegistration()
+    }
+
+    /// Send {device secret, APNs token} to the backend so it can push to this device.
+    /// No-op until BOTH the login secret and the APNs token are known.
+    private func sendPushRegistration() {
+        guard let secret = secret,
+              let token = UserDefaults.standard.string(forKey: pushTokenKey), !token.isEmpty else { return }
+        var request = URLRequest(url: registerPushURL)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "secret": secret,
+            "token": token,
+            "lang": UserDefaults.standard.string(forKey: langKey) ?? "da",
+        ])
+        request.timeoutInterval = 20
+        URLSession.shared.dataTask(with: request).resume()
     }
 
     func register() {
