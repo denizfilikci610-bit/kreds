@@ -16,33 +16,43 @@ struct AdSlot: Sendable {
     let h: CGFloat
 }
 
-/// One slot in the small pool of native ad cards.
+/// One reusable native MREC (300×250) in the pool. Holds a strong reference to
+/// its delegate proxy (the ad view's `delegate` is weak).
 @MainActor
-final class AdCardItem {
+final class AdPoolItem {
+    let mrec: APDMRECView
+    let proxy: MRECDelegateProxy
     var slotId: String?
-    var card: NativeAdCardView?       // the on-screen card (added to the overlay)
-    var nativeAd: APDNativeAd?        // strong ref keeps a real (non-DEBUG) ad alive
-    var height: CGFloat = 0           // measured card height == height reserved in web
-    var measuredWidth: CGFloat = 0    // slot width the height was measured at
+    // True once this MREC has loaded at least one creative. Appodeal then keeps a
+    // creative in the view and refreshes it on its own timer, so visibility keys off
+    // THIS (a stable fact) rather than the momentary "is a load in flight" state —
+    // otherwise a routine refresh would blank an ad that is already on screen.
+    var hasCreative = false
+    var loadStarted = false
+    // DEBUG only: a guaranteed-fill Google test MREC used to visibly prove the ad
+    // pipeline while the live waterfall has no inventory yet. nil in Release.
+    var testBanner: BannerView?
+
+    init(mrec: APDMRECView, proxy: MRECDelegateProxy) {
+        self.mrec = mrec
+        self.proxy = proxy
+    }
 }
 
 /// Owns the Appodeal ad SDK for VibeFeed and drives the inline feed ads.
 ///
-/// Ads are shown as **native "sponsored posts"** (X/Twitter-style): the advertiser
-/// supplies raw parts (icon, headline, body, image, CTA) and the app renders them in
-/// its own post-style `NativeAdCardView`, laid over a blank placeholder the web feed
-/// reserves between posts. Because a post card is taller/variable-height, native
-/// measures the card and tells the web the exact height to reserve (setSlotHeight),
-/// so the card can never overflow its slot. The card follows the feed on scroll via
-/// the same transform-glide used before.
-///
 /// Design goals — the app must stay fully usable even if ads never work:
-///   • Nothing here runs until the app is active AND the user's ads-consent choice
-///     is known (posted by the web app via NotifManager → "vf_consent").
-///   • Every SDK call is best-effort; any failure is swallowed. With no fill, the
-///     sponsored placeholder simply collapses away.
-///   • Consent maps to iOS reality: "personal" → ask App Tracking Transparency first
-///     (IDFA → personalised ads); "limited" → never ask (non-personalised).
+///   • Nothing here runs until the app is active AND the user's ads-consent
+///     choice is known (posted by the web app via NotifManager → "vf_consent").
+///   • Every SDK call is best-effort; any failure is swallowed and never reaches
+///     the UI. With no ad fill, the sponsored card simply collapses away.
+///   • Consent maps to iOS reality: "personal" → ask App Tracking Transparency
+///     first (IDFA → personalised ads); "limited" → never ask (non-personalised).
+///
+/// Ads are shown as MREC (300×250) rectangles laid over "Sponsoreret" cards that
+/// the web feed draws between posts. The web reports each slot's position; this
+/// class positions a small pool of MRECs over the slots nearest the viewport and
+/// reveals them when scrolling settles (hidden mid-scroll to avoid lag).
 @MainActor
 final class AdsManager: NSObject, ObservableObject {
     static let shared = AdsManager()
@@ -58,38 +68,35 @@ final class AdsManager: NSObject, ObservableObject {
     // Inline feed ads
     private weak var overlay: UIView?
     private weak var webView: WKWebView?
-    private var cards: [AdCardItem] = []
+    private var pool: [AdPoolItem] = []
     private let poolSize = 3
     private var lastSlots: [AdSlot] = []
     private var lastScrolling = false
-    // The feed scroll offset the cards were last authoritatively placed at. While
-    // scrolling we glide them by (scrollY - baseScrollY) instead of re-laying out, so
-    // they track the feed smoothly; each layout message re-bases this.
+    // The feed scroll offset at which the MRECs were last authoritatively placed.
+    // While scrolling we glide them by (scrollY - baseScrollY) instead of re-laying
+    // out, so they track the feed smoothly; each layout message re-bases this.
     private var baseScrollY: CGFloat = 0
 
-    // Live native-ad queue (production).
-    private var queue: APDNativeAdQueue?
-
-    // In DEBUG we fetch a REAL Google native TEST ad (guaranteed fill) so a genuine
-    // ad renders on-device before live native demand is set up — same idea as the
-    // Google test banner used for MREC. Compiled OUT of Release (real ads only there).
+    // In DEBUG we lay Google's guaranteed test MREC over the slots so the feed
+    // visibly renders an ad even before the live waterfall has any inventory.
+    // Compiled OUT of Release (App Store) builds — real users only ever see live ads.
     #if DEBUG
-    private let useTestAd = true
+    private let useTestAds = true
     #else
-    private let useTestAd = false
+    private let useTestAds = false
     #endif
-    private var testLoader: AdLoader?
-    private var testAds: [NativeAd] = []
-    private var testLoading = false
 
     private override init() { super.init() }
 
     // MARK: - Lifecycle entry points
 
-    func appDidBecomeActive() { start() }
+    /// Called from the SwiftUI scene when it becomes active.
+    func appDidBecomeActive() {
+        start()
+    }
 
-    /// Begins SDK setup. No-op until the user's consent choice is known, and only ever
-    /// runs once. Safe to call repeatedly.
+    /// Begins SDK setup. No-op until the user's consent choice is known, and only
+    /// ever runs once. Safe to call repeatedly.
     func start() {
         guard !started else { return }
         guard let consent = UserDefaults.standard.string(forKey: "vf_consent") else { return }
@@ -98,7 +105,8 @@ final class AdsManager: NSObject, ObservableObject {
         if consent == "personal" {
             requestATT { [weak self] in self?.initializeAppodeal() }
         } else {
-            initializeAppodeal() // "limited": skip ATT → no IDFA → non-personalised
+            // "limited": skip ATT entirely → no IDFA → non-personalised ads.
+            initializeAppodeal()
         }
     }
 
@@ -132,14 +140,14 @@ final class AdsManager: NSObject, ObservableObject {
         #endif
 
         Appodeal.setInitializationDelegate(self)
-        Appodeal.initialize(withApiKey: appKey, types: [.nativeAd])
+        Appodeal.initialize(withApiKey: appKey, types: [.MREC])
     }
 
-    // MARK: - Overlay + web view wiring (main actor)
+    // MARK: - Overlay + web view wiring (called from SwiftUI on the main actor)
 
     func attachOverlay(_ view: UIView) {
         overlay = view
-        buildIfPossible()
+        buildPoolIfPossible()
         applyLayout()
     }
 
@@ -147,37 +155,38 @@ final class AdsManager: NSObject, ObservableObject {
         if let wv = wv { webView = wv }
     }
 
-    // MARK: - Pool + queue setup
+    // MARK: - MREC pool
 
-    private func buildIfPossible() {
-        guard isInitialized, overlay != nil, cards.isEmpty else { return }
-        for _ in 0..<poolSize { cards.append(AdCardItem()) }
+    private func buildPoolIfPossible() {
+        guard isInitialized, let overlay = overlay, pool.isEmpty else { return }
+        let root = Self.topViewController()
+        if useTestAds { MobileAds.shared.start(completionHandler: nil) }
+        for index in 0..<poolSize {
+            // ObjC `-init` is imported as optional (no nullability annotation);
+            // it never actually returns nil.
+            guard let mrec = APDMRECView() else { continue }
+            let proxy = MRECDelegateProxy(index: index)
+            mrec.rootViewController = root
+            mrec.alpha = 0
+            overlay.addSubview(mrec)
+            let item = AdPoolItem(mrec: mrec, proxy: proxy)
 
-        if useTestAd {
-            // DEBUG: fetch REAL Google native test ads (guaranteed fill).
-            MobileAds.shared.start(completionHandler: nil)
-            let loader = AdLoader(adUnitID: "ca-app-pub-3940256099942544/3986624511", // Google's public native test unit
-                                  rootViewController: Self.topViewController(),
-                                  adTypes: [.native], options: nil)
-            loader.delegate = self
-            testLoader = loader
-            refillTestAds()
-        } else {
-            // Production: live native ads from the Appodeal mediation queue.
-            let settings = APDNativeAdSettings.default()
-            settings.adViewClass = NativeAdCardView.self
-            settings.type = .noVideo // simpler, tighter-height card at launch (no video)
-            let q = APDNativeAdQueue(sdk: nil, settings: settings,
-                                     delegate: self, autocache: true)
-            q.loadAd()
-            queue = q
+            if useTestAds {
+                // Lay a guaranteed Google test MREC over the slot; leave the live
+                // Appodeal MREC inert (no delegate, never loaded) so its no-fill can't
+                // collapse the card out from under the test ad.
+                let banner = BannerView(adSize: AdSizeMediumRectangle)
+                banner.adUnitID = "ca-app-pub-3940256099942544/2934735716" // Google's public test unit
+                banner.rootViewController = root
+                banner.alpha = 0
+                overlay.addSubview(banner)
+                banner.load(Request())
+                item.testBanner = banner
+            } else {
+                mrec.delegate = proxy
+            }
+            pool.append(item)
         }
-    }
-
-    private func refillTestAds() {
-        guard useTestAd, let loader = testLoader, !testLoading, testAds.count < poolSize else { return }
-        testLoading = true
-        loader.load(Request())
     }
 
     // MARK: - Layout updates from the web feed
@@ -186,148 +195,152 @@ final class AdsManager: NSObject, ObservableObject {
         lastSlots = slots
         lastScrolling = scrolling
         baseScrollY = scrollY
-        buildIfPossible()
+        buildPoolIfPossible()
         applyLayout()
     }
 
-    /// Cheap per-frame scroll update: glide the placed cards with the feed by
-    /// offsetting them from where they were last laid out (baseScrollY). No re-layout.
+    /// Cheap per-frame scroll update while the feed scrolls: glide the already-placed
+    /// ads with the feed by offsetting them from the position they were last
+    /// authoritatively laid out at (baseScrollY). No re-layout, no alpha changes —
+    /// pure transform, so the ad tracks the scroll smoothly instead of stepping
+    /// behind the heavier layout messages. Reconciled to exact frames on settle.
     func updateScroll(scrollY: CGFloat) {
         let t = CGAffineTransform(translationX: 0, y: -(scrollY - baseScrollY))
-        for it in cards where it.slotId != nil { it.card?.transform = t }
+        for it in pool where it.slotId != nil {
+            it.mrec.transform = t
+            it.testBanner?.transform = t
+        }
     }
 
     private func applyLayout() {
-        guard isInitialized, let overlay = overlay, !cards.isEmpty else { return }
+        guard isInitialized, let overlay = overlay, !pool.isEmpty else { return }
+        let root = Self.topViewController()
 
-        // Release a card only when ITS slot has genuinely left the feed (sticky) — not
-        // on transient scroll churn.
+        // The web reports slot positions continuously (including during scroll), so
+        // the MRECs follow the feed and stay visible rather than hiding on scroll.
+
+        // Release a pool item only when ITS slot has genuinely left the feed — not
+        // merely because it drifted away from the viewport centre. Blanking a live
+        // ad on transient scroll churn is another way ads "disappear", so we hold on
+        // to an assigned slot as long as the web still reports it (sticky).
         let visibleIds = Set(lastSlots.map { $0.id })
-        for item in cards where item.slotId != nil && !visibleIds.contains(item.slotId!) {
-            release(item)
+        for item in pool where item.slotId != nil && !visibleIds.contains(item.slotId!) {
+            item.slotId = nil
+            item.mrec.alpha = 0
+            item.mrec.transform = .identity
+            item.testBanner?.alpha = 0
+            item.testBanner?.transform = .identity
         }
 
-        // Assign any free card slot to the nearest still-unserved slot.
+        // Give any free MREC the nearest still-unserved slot (nearest the viewport
+        // centre first). Already-assigned items keep their slot.
         let midY = overlay.bounds.midY
-        let assignedIds = Set(cards.compactMap { $0.slotId })
+        let assignedIds = Set(pool.compactMap { $0.slotId })
         var freeSlots = lastSlots
             .filter { !assignedIds.contains($0.id) }
             .sorted { abs(($0.y + $0.h / 2) - midY) < abs(($1.y + $1.h / 2) - midY) }
             .makeIterator()
-        for item in cards where item.slotId == nil {
+        for item in pool where item.slotId == nil {
             guard let slot = freeSlots.next() else { break }
             item.slotId = slot.id
         }
 
-        // Fill + position + reveal.
-        for it in cards {
+        // Position + reveal every assigned MREC over its slot.
+        let size = kAPDAdSize300x250
+        for it in pool {
             guard let sid = it.slotId,
                   let slot = lastSlots.first(where: { $0.id == sid }) else { continue }
+            let fx = slot.x + (slot.w - size.width) / 2
+            let fy = slot.y + (slot.h - size.height) / 2
+            let frame = CGRect(x: fx, y: fy, width: size.width, height: size.height)
 
-            // Obtain a card if we don't have one yet.
-            if it.card == nil {
-                guard let card = makeCard(for: it, index: cards.firstIndex(where: { $0 === it }) ?? 0) else {
-                    // No ad READY yet (the load is async) — keep the placeholder
-                    // reserved; it fills on the next applyLayout when an ad arrives
-                    // (Appodeal queue delegate / Google loader). Do NOT collapse here,
-                    // or the slot vanishes before the load completes and can never fill.
-                    continue
-                }
-                it.card = card
-                card.alpha = 0
-                overlay.addSubview(card)
-            }
-
-            guard let card = it.card else { continue }
-
-            // (Re)measure the card height for this slot width, and reserve it in web.
-            if it.measuredWidth != slot.w {
-                card.frame = CGRect(x: 0, y: 0, width: slot.w, height: 10)
-                it.height = measuredHeight(card, width: slot.w)
-                it.measuredWidth = slot.w
-                setSlotHeight(sid, it.height)
+            // DEBUG: a guaranteed test ad always fills, so just place and show it.
+            if let banner = it.testBanner {
+                // Reset any scroll transform BEFORE setting the authoritative frame
+                // (UIKit frame is undefined under a non-identity transform).
+                banner.transform = .identity
+                banner.frame = frame
+                banner.rootViewController = root
+                banner.alpha = 1
+                it.mrec.alpha = 0
                 fillWeb(sid, true)
+                continue
             }
 
-            // Place at the reported slot; reveal only once the web has reserved the
-            // height (so it never overflows into the next post).
-            card.transform = .identity
-            card.frame = CGRect(x: slot.x, y: slot.y, width: slot.w, height: it.height)
-            card.alpha = (slot.h >= it.height - 6) ? 1 : 0
+            // Reset any scroll transform before setting the authoritative frame.
+            it.mrec.transform = .identity
+            it.mrec.rootViewController = root
+            it.mrec.frame = frame
+            if !it.loadStarted {
+                it.loadStarted = true
+                it.mrec.loadAd()
+            }
+            // Show the ad whenever this MREC has ever loaded a creative — NOT the
+            // transient reload state — so a refresh in flight (poolItemExpired)
+            // never blanks an ad that is already visible.
+            it.mrec.alpha = it.hasCreative ? 1 : 0
+            if it.hasCreative { fillWeb(sid, true) }
         }
     }
 
-    /// Pull a card for this slot: a real Google native TEST ad in DEBUG, else the next
-    /// live native ad from the Appodeal queue.
-    private func makeCard(for item: AdCardItem, index: Int) -> NativeAdCardView? {
-        if useTestAd {
-            guard let ad = testAds.first else { refillTestAds(); return nil }
-            testAds.removeFirst()
-            let card = NativeAdCardView()
-            card.populate(title: ad.headline ?? "Annonce",
-                          body: ad.body,
-                          cta: ad.callToAction ?? "Åbn",
-                          image: ad.images?.first?.image,
-                          icon: ad.icon?.image)
-            refillTestAds()
-            return card
+    // MARK: - Delegate callbacks (hopped to the main actor by the proxy)
+
+    func poolItem(_ index: Int, didLoad ok: Bool) {
+        guard index >= 0, index < pool.count else { return }
+        let it = pool[index]
+
+        if ok {
+            it.hasCreative = true
+            it.loadStarted = true
+            if let sid = it.slotId {
+                it.mrec.alpha = 1
+                fillWeb(sid, true) // reveal — also un-collapses the card if it was collapsed
+            }
+            return
         }
-        guard let q = queue, q.currentAdCount > 0,
-              let ad = q.getNativeAds(ofCount: 1).first,
-              let root = Self.topViewController(),
-              let view = ad.getViewFor(root) as? NativeAdCardView else { return nil }
-        ad.delegate = self
-        view.applyTemplate(hasBody: !ad.descriptionText.isEmpty,
-                           hasMedia: ad.mainImage != nil,
-                           hasIcon: ad.iconImage != nil)
-        item.nativeAd = ad
-        return view
+
+        // A load came up empty. If this MREC has shown an ad before, this is just a
+        // failed refresh — keep the card and the existing creative on screen
+        // (collapsing here is exactly the "ad appeared then vanished" the owner saw)
+        // and retry quietly. Only collapse when we have never had an ad to show, so
+        // no empty box is left behind.
+        it.loadStarted = false
+        if !it.hasCreative, let sid = it.slotId {
+            it.mrec.alpha = 0
+            fillWeb(sid, false)
+        }
+        let index = index
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+            guard let self = self, index < self.pool.count else { return }
+            let item = self.pool[index]
+            if !item.loadStarted {
+                item.loadStarted = true
+                item.mrec.loadAd()
+            }
+        }
     }
 
-    private func release(_ item: AdCardItem) {
-        item.card?.removeFromSuperview()
-        item.card = nil
-        item.nativeAd = nil
-        item.slotId = nil
-        item.height = 0
-        item.measuredWidth = 0
-    }
-
-    private func measuredHeight(_ card: NativeAdCardView, width: CGFloat) -> CGFloat {
-        let target = CGSize(width: width, height: UIView.layoutFittingCompressedSize.height)
-        let size = card.systemLayoutSizeFitting(target,
-                                                withHorizontalFittingPriority: .required,
-                                                verticalFittingPriority: .fittingSizeLevel)
-        return ceil(size.height)
+    /// An ad expired (normal — banners refresh on a timer) or failed to present.
+    /// This is NOT a no-fill: keep the sponsored card and load a fresh creative, so
+    /// the ad refreshes in place instead of disappearing. The card re-reveals when
+    /// the new ad loads (`poolItem(_:didLoad:)`).
+    func poolItemExpired(_ index: Int) {
+        guard index >= 0, index < pool.count else { return }
+        let it = pool[index]
+        // Transient: load a fresh creative but leave `hasCreative` and alpha as-is,
+        // so the current ad stays visible until the new one arrives. Dropping
+        // visibility here (directly, or via applyLayout reading a reset flag) is
+        // what made ads flicker away on the refresh timer.
+        it.loadStarted = true
+        it.mrec.loadAd()
     }
 
     // MARK: - Native → web
 
     private func fillWeb(_ id: String, _ filled: Bool) {
+        // ids are the numeric slot indices the web assigned — safe to interpolate.
         let js = "window.VibeFeedAds && window.VibeFeedAds.fill(\"\(id)\", \(filled ? "true" : "false"))"
         webView?.evaluateJavaScript(js, completionHandler: nil)
-    }
-
-    /// Tell the web how tall to make the reserved placeholder so the native card fits
-    /// exactly (fixes the "ad floats over its frame" problem — native owns the height).
-    private func setSlotHeight(_ id: String, _ h: CGFloat) {
-        let js = "window.VibeFeedAds && window.VibeFeedAds.setSlotHeight(\"\(id)\", \(Int(h.rounded())))"
-        webView?.evaluateJavaScript(js, completionHandler: nil)
-    }
-
-    // MARK: - Native-ad expiry (from the presentation delegate)
-
-    func nativeAdExpired(_ adId: ObjectIdentifier) {
-        // Drop the expired card so applyLayout re-fills the slot with a fresh ad.
-        guard let item = cards.first(where: { $0.nativeAd.map(ObjectIdentifier.init) == adId }) else { return }
-        let slotId = item.slotId
-        item.card?.removeFromSuperview()
-        item.card = nil
-        item.nativeAd = nil
-        item.measuredWidth = 0
-        if let sid = slotId { fillWeb(sid, false) }
-        queue?.loadAd()
-        applyLayout()
     }
 
     // MARK: - Helpers
@@ -342,61 +355,51 @@ final class AdsManager: NSObject, ObservableObject {
         while let presented = top?.presentedViewController { top = presented }
         return top
     }
-
 }
 
-// MARK: - Google native test-ad loader (DEBUG only — a real test ad, not fake data)
+// MARK: - Per-MREC delegate proxy
+//
+// Appodeal delivers banner/MREC callbacks on the main thread, but the protocol
+// methods are not main-actor annotated. Each pool MREC gets its own lightweight
+// proxy that captures only its integer index (Sendable) and hops to the main
+// actor — so no non-Sendable ad object ever crosses an isolation boundary.
+final class MRECDelegateProxy: NSObject, APDBannerViewDelegate {
+    let index: Int
+    init(index: Int) { self.index = index }
 
-extension AdsManager: @preconcurrency NativeAdLoaderDelegate {
-    func adLoader(_ adLoader: AdLoader, didReceive nativeAd: NativeAd) {
-        testLoading = false
-        testAds.append(nativeAd)
-        applyLayout()
-        refillTestAds()
-    }
-    func adLoader(_ adLoader: AdLoader, didFailToReceiveAdWithError error: Error) {
-        testLoading = false
+    nonisolated func bannerViewDidLoadAd(_ bannerView: APDBannerView, isPrecache precache: Bool) {
         #if DEBUG
-        print("VF-ADS google test native failed: \(error.localizedDescription)")
+        print("VF-ADS[\(index)] ✅ loaded (precache: \(precache))")
         #endif
+        let i = index
+        Task { @MainActor in AdsManager.shared.poolItem(i, didLoad: true) }
     }
-}
 
-// MARK: - Native ad queue delegate
-
-extension AdsManager: APDNativeAdQueueDelegate {
-    nonisolated func adQueueAdIsAvailable(_ adQueue: APDNativeAdQueue, ofCount count: UInt) {
+    nonisolated func bannerView(_ bannerView: APDBannerView, didFailToLoadAdWithError error: Error) {
+        // This is the NO-FILL path: the mediation waterfall returned nothing. If you
+        // see this repeatedly, the fix is on the Appodeal/AdMob side (empty waterfall
+        // / no MREC line-items), not in the app.
         #if DEBUG
-        print("VF-ADS native available: \(count)")
+        print("VF-ADS[\(index)] ⛔️ NO-FILL: \(error.localizedDescription)")
         #endif
-        Task { @MainActor in self.applyLayout() }
+        let i = index
+        Task { @MainActor in AdsManager.shared.poolItem(i, didLoad: false) }
     }
 
-    nonisolated func adQueue(_ adQueue: APDNativeAdQueue, failedWithError error: Error) {
-        // No-fill / mediation error. Fix is on the Appodeal/AdMob side (native format
-        // + demand for app 782028), not in the app. Cards simply stay collapsed.
+    nonisolated func bannerView(_ bannerView: APDBannerView, didFailToPresentWithError error: Error) {
         #if DEBUG
-        print("VF-ADS native ⛔️ no-fill: \(error.localizedDescription)")
+        print("VF-ADS[\(index)] ⚠️ present failed: \(error.localizedDescription)")
         #endif
+        let i = index
+        Task { @MainActor in AdsManager.shared.poolItemExpired(i) }
     }
-}
 
-// MARK: - Native ad presentation delegate (impression / interaction / expiry)
-
-extension AdsManager: APDNativeAdPresentationDelegate {
-    nonisolated func nativeAdDidExpired(_ nativeAd: APDNativeAd) {
-        let id = ObjectIdentifier(nativeAd)
-        Task { @MainActor in self.nativeAdExpired(id) }
-    }
-    nonisolated func nativeAdWillLogImpression(_ nativeAd: APDNativeAd) {
+    nonisolated func bannerViewExpired(_ bannerView: APDBannerView) {
         #if DEBUG
-        print("VF-ADS native ✅ impression")
+        print("VF-ADS[\(index)] ♻️ expired (SDK will refresh)")
         #endif
-    }
-    nonisolated func nativeAdWillLogUserInteraction(_ nativeAd: APDNativeAd) {
-        #if DEBUG
-        print("VF-ADS native 👆 tap")
-        #endif
+        let i = index
+        Task { @MainActor in AdsManager.shared.poolItemExpired(i) }
     }
 }
 
@@ -406,7 +409,7 @@ extension AdsManager: AppodealInitializationDelegate {
     nonisolated func appodealSDKDidInitialize() {
         Task { @MainActor in
             self.isInitialized = true
-            self.buildIfPossible()
+            self.buildPoolIfPossible()
             self.applyLayout()
         }
     }

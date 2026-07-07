@@ -230,13 +230,31 @@
   .post>.pavab{flex:0 0 auto;display:flex;padding:0;align-self:flex-start}
   .pcol{flex:1;min-width:0}
 
-  /* ===== Reklame-plads (native "sponsoreret opslag" mellem posts) =====
-     Tom, højde-styret plads. HELE kortet (avatar, navn, "Annonce", overskrift,
-     billede, CTA) tegnes NATIVT og lægges ovenpå; native reserverer den præcise
-     højde via setSlotHeight, så kortet aldrig flyder over til næste opslag. */
-  .adslot{display:block;border-bottom:1px solid var(--line)}
-  .adslot.collapsed{display:none} /* intet fill → skjul hele pladsen */
-  .adhole{width:100%;min-height:60px}
+  /* ===== Reklame-kort (sponsoreret opslag mellem posts) =====
+     Én kolonne, side-padding 10px så et 300px MREC-hul lige går op på iPhone SE
+     (10+300+10 = 320pt). Den native annonce lægges oven på .adhole. */
+  .adslot{display:block;padding:12px 10px;border-bottom:1px solid var(--line)}
+  .adslot.collapsed{display:none} /* intet fill → skjul hele kortet */
+  .adcol{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+  .adhead{display:flex;align-items:center;gap:7px;padding:0 6px}
+  .adhead .adtag{
+    font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--gray);border:1px solid var(--line);border-radius:5px;padding:2px 6px;line-height:1
+  }
+  .adhead .adspon{font-size:13px;color:var(--gray);font-weight:600}
+  .adhole{
+    position:relative;width:300px;height:250px;margin:0 auto;
+    border-radius:12px;overflow:hidden;background:var(--chip)
+  }
+  /* Skeletten shimrer altid i hullet; den ugennemsigtige native-annonce dækker
+     den når den vises, og den træder frem igen under scroll (annoncen skjules). */
+  .adskel{
+    position:absolute;inset:0;
+    background:linear-gradient(100deg,var(--chip) 30%,var(--line) 50%,var(--chip) 70%);
+    background-size:200% 100%;animation:adshimmer 1.3s ease-in-out infinite
+  }
+  @keyframes adshimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  @media (prefers-reduced-motion: reduce){.adskel{animation:none}}
   .phead{display:flex;align-items:center;gap:5px;min-width:0}
   .phead .nm{font-weight:700;font-size:15px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0}
   .phead .badge{flex:0 0 auto;display:flex}

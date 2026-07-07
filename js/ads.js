@@ -23,15 +23,21 @@ export function adsEnabled(){
   return !!bridge() && !!getConsent();
 }
 
-/* Slot-markup: en TOM, højde-styret plads. Hele annonce-kortet (avatar, navn,
-   "Annonce", overskrift, billede, CTA) tegnes NATIVT og lægges ovenpå; native måler
-   kortet og fortæller os den præcise højde at reservere via setSlotHeight — så kortet
-   kan aldrig flyde over sin plads. data-ad-hole er det element vi måler og rapporterer.
-   Splices kun i appen (renderFeed kalder kun adsEnabled()-gatede kort). */
+/* Slot-markup: et opslags-lignende kort med tydelig "Reklame · Sponsoreret"-header
+   og et reserveret 300×250-hul (med skeleton-shimmer indtil annoncen ligger ovenpå).
+   data-ad-hole er det element vi måler og rapporterer til native. */
 export function adSlotHTML(i){
   return (
-    '<article class="adslot" data-ad="'+i+'">'+
-      '<div class="adhole" data-ad-hole="'+i+'"></div>'+
+    '<article class="post adslot" data-ad="'+i+'">'+
+      '<div class="adcol">'+
+        '<div class="adhead">'+
+          '<span class="adtag">'+t("ad.label")+'</span>'+
+          '<span class="adspon">'+t("ad.sponsored")+'</span>'+
+        '</div>'+
+        '<div class="adhole" data-ad-hole="'+i+'">'+
+          '<div class="adskel" aria-hidden="true"></div>'+
+        '</div>'+
+      '</div>'+
     '</article>'
   );
 }
@@ -146,20 +152,6 @@ export function initAds(){
   if(!bridge()) return; // almindelig browser
   window.VibeFeedAds = window.VibeFeedAds || {};
   window.VibeFeedAds.fill = function(id, filled){ try{ setFill(id, !!filled); }catch(_e){} };
-  /* Native fortæller os den præcise højde det native kort fylder → vi reserverer
-     nøjagtig så meget plads, så kortet aldrig flyder over til næste opslag. */
-  window.VibeFeedAds.setSlotHeight = function(id, px){
-    try{
-      const sel = '#feed .adhole[data-ad-hole="' + (window.CSS && CSS.escape ? CSS.escape(String(id)) : String(id)) + '"]';
-      const hole = document.querySelector(sel);
-      if(!hole) return;
-      const h = parseInt(px, 10) || 0;
-      if(h > 0) hole.style.height = h + "px";
-      const card = hole.closest('.adslot');
-      if(card) card.classList.remove('collapsed');
-      requestAnimationFrame(reportAdLayout);
-    }catch(_e){}
-  };
 
   const app = el("app"); // scroll-containeren
   if(app) app.addEventListener("scroll", onScroll, { passive: true });
