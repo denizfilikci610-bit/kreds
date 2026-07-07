@@ -330,6 +330,10 @@ const DA = {
   "consent.personal": "OK — også personlige reklamer",
   "consent.limited": "Kun ikke-personlige reklamer",
 
+  /* Reklamer i feedet (sponsoreret opslag) */
+  "ad.label": "Reklame",
+  "ad.sponsored": "Sponsoreret",
+
   /* Privatliv (Rediger profil) */
   "ep.privacy": "Privatliv",
   "ep.ads_personal": "Personlige reklamer",
@@ -659,6 +663,10 @@ const EN = {
   "consent.policy": "Privacy policy",
   "consent.personal": "OK — personalized ads too",
   "consent.limited": "Only non-personalized ads",
+
+  /* Ads in the feed (sponsored post) */
+  "ad.label": "Ad",
+  "ad.sponsored": "Sponsored",
 
   /* Privacy (Edit profile) */
   "ep.privacy": "Privacy",

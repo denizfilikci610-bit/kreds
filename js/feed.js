@@ -10,6 +10,7 @@ import { loadNotifs, setNotifDot } from "./notifications.js";
 import { scheduleRefetch } from "./realtime.js";
 import { mapPoll, pollHTML, votePoll } from "./polls.js";
 import { openLightbox } from "./lightbox.js";
+import { AD_EVERY, adsEnabled, adSlotHTML, reportAdLayout, initAds } from "./ads.js";
 
 export const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id), poll_options(*, poll_votes(user_id))";
 
@@ -255,7 +256,17 @@ export function renderFeed(){
     html += '<div class="pinlabel">'+t("feed.pinned")+'</div>' + postHTML(p);
   });
   if(items.length){
-    html += items.map(function(p){ return p.teaser ? teaserHTML(p) : postHTML(p); }).join("");
+    /* Flet reklame-kort ind efter hver AD_EVERY opslag (kun i appen + med samtykke).
+       Ikke efter det allersidste opslag, så feedet ikke slutter på en reklame. */
+    const withAds = adsEnabled();
+    let adIdx = 0;
+    html += items.map(function(p, idx){
+      let card = p.teaser ? teaserHTML(p) : postHTML(p);
+      if(withAds && (idx + 1) % AD_EVERY === 0 && (idx + 1) < items.length){
+        card += adSlotHTML(adIdx++);
+      }
+      return card;
+    }).join("");
   } else if(!pinned.length && !(state.currentFeed === "all" && me && !state.humanFriends.length)){
     html += '<div class="emptynote" style="padding:36px 20px;text-align:center">'+t("feed.empty_kreds")+'</div>';
   }
@@ -268,6 +279,8 @@ export function renderFeed(){
     const nf = el("feed").querySelector('.cbox[data-id="'+fpid+'"] .cfield');
     if(nf){ nf.focus(); try{ nf.setSelectionRange(selS, selE); }catch(_){} }
   }
+  /* Nye annonce-huller er i DOM'en nu — fortæl native hvor de sidder. */
+  reportAdLayout();
 }
 
 /* ================= Nye opslag i feedet (NY-mærke) =================
@@ -949,6 +962,7 @@ function timelineClick(e){
 
 export function initFeed(){
 el("app").addEventListener("scroll", appScrolled, { passive:true });
+initAds(); // reklamer i feedet (no-op uden for iOS-appen)
 el("feedbar").addEventListener("click", function(e){
   if(e.target.closest(".fbseek")){
     kseek.on = true;

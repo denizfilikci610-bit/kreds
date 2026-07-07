@@ -54,6 +54,24 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
         case "logout":
             UserDefaults.standard.removeObject(forKey: secretKey)
             UserDefaults.standard.removeObject(forKey: lastCheckKey)
+        case "ads":
+            // The web feed reports the on-screen positions of its sponsored slots
+            // so the native MRECs can be laid over them. Slot values are plain
+            // numbers/strings (Sendable), so we can hop to the ad actor cleanly.
+            guard (dict["action"] as? String) == "layout" else { break }
+            let scrolling = (dict["scrolling"] as? Bool) ?? false
+            let raw = (dict["slots"] as? [[String: Any]]) ?? []
+            let slots: [AdSlot] = raw.compactMap { s in
+                guard let id = s["id"] as? String,
+                      let x = (s["x"] as? NSNumber)?.doubleValue,
+                      let y = (s["y"] as? NSNumber)?.doubleValue,
+                      let w = (s["w"] as? NSNumber)?.doubleValue,
+                      let h = (s["h"] as? NSNumber)?.doubleValue else { return nil }
+                return AdSlot(id: id, x: CGFloat(x), y: CGFloat(y), w: CGFloat(w), h: CGFloat(h))
+            }
+            Task { @MainActor in
+                AdsManager.shared.updateLayout(slots: slots, scrolling: scrolling)
+            }
         default:
             break
         }

@@ -53,6 +53,8 @@ struct WebView: UIViewRepresentable {
         webView.scrollView.refreshControl = refresh
 
         model.webView = webView
+        // Let the ad manager call back into the page (fill/collapse slots).
+        AdsManager.shared.setWebView(webView)
         webView.load(URLRequest(url: vibefeedURL))
         return webView
     }

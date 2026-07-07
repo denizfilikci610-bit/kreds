@@ -1,79 +1,83 @@
 import SwiftUI
 import UIKit
+import WebKit
 import AppTrackingTransparency
 import Appodeal
 
-/// Owns the Appodeal ad SDK for VibeFeed.
+/// Geometry of one sponsored slot as reported by the web feed. Coordinates are
+/// CSS px (== WKWebView points) relative to the viewport's top-left, which is
+/// exactly the overlay's coordinate space.
+struct AdSlot: Sendable {
+    let id: String
+    let x: CGFloat
+    let y: CGFloat
+    let w: CGFloat
+    let h: CGFloat
+}
+
+/// One reusable native MREC (300×250) in the pool. Holds a strong reference to
+/// its delegate proxy (the ad view's `delegate` is weak).
+@MainActor
+final class AdPoolItem {
+    let mrec: APDMRECView
+    let proxy: MRECDelegateProxy
+    var slotId: String?
+    var loaded = false
+    var loadStarted = false
+
+    init(mrec: APDMRECView, proxy: MRECDelegateProxy) {
+        self.mrec = mrec
+        self.proxy = proxy
+    }
+}
+
+/// Owns the Appodeal ad SDK for VibeFeed and drives the inline feed ads.
 ///
 /// Design goals — the app must stay fully usable even if ads never work:
-///   • Nothing here is called until the app is active AND the user's ads-consent
+///   • Nothing here runs until the app is active AND the user's ads-consent
 ///     choice is known (posted by the web app via NotifManager → "vf_consent").
-///   • Every SDK call is best-effort; a failure to initialise, load or show an
-///     ad is swallowed and never propagates to the UI.
+///   • Every SDK call is best-effort; any failure is swallowed and never reaches
+///     the UI. With no ad fill, the sponsored card simply collapses away.
 ///   • Consent maps to iOS reality: "personal" → ask App Tracking Transparency
-///     first (IDFA → personalised ads); "limited" → never ask, so no IDFA is
-///     available and networks fall back to non-personalised/contextual ads.
+///     first (IDFA → personalised ads); "limited" → never ask (non-personalised).
 ///
-/// The banner is a native `APDBannerView` displayed BELOW the web view (see
-/// ContentView), so it can never cover the app's own tab bar inside the page.
-/// Interstitials are paced very conservatively — this is a friends-and-family
-/// community, not a game.
+/// Ads are shown as MREC (300×250) rectangles laid over "Sponsoreret" cards that
+/// the web feed draws between posts. The web reports each slot's position; this
+/// class positions a small pool of MRECs over the slots nearest the viewport and
+/// reveals them when scrolling settles (hidden mid-scroll to avoid lag).
 @MainActor
 final class AdsManager: NSObject, ObservableObject {
     static let shared = AdsManager()
 
     // Appodeal app key (iOS app 782028), provided by the owner.
     private let appKey = "c9a03363e7ae756c1a672b2ffbff689c8ea7cf589a12a7d7"
-    private let placement = "default"
 
-    /// Drives the visibility of the bottom banner strip. The strip is fully
-    /// collapsed (height 0) until a real ad has loaded, so the app looks normal
-    /// when there is no ad fill.
-    @Published private(set) var isBannerReady = false
     @Published private(set) var isInitialized = false
-
-    /// Standard 320×50 banner. Created as soon as a root view controller exists
-    /// (driven by `ensureBanner()` from the SwiftUI container, which keeps it
-    /// mounted in the hierarchy), and only asked to load once the SDK is ready.
-    private var bannerView: APDBannerView?
-    private var bannerLoadStarted = false
-
-    let bannerHeight: CGFloat = kAPDAdSize320x50.height // 50pt
 
     private var started = false
     private var attRequested = false
-    private var hasBecomeActiveOnce = false
-    private let launchDate = Date()
-    private var lastInterstitialDate: Date?
 
-    // Pacing rules (kept deliberately gentle).
-    private let interstitialWarmup: TimeInterval = 120  // no ads in first 2 min
-    private let interstitialMinGap: TimeInterval = 180  // at most one per 3 min
+    // Inline feed ads
+    private weak var overlay: UIView?
+    private weak var webView: WKWebView?
+    private var pool: [AdPoolItem] = []
+    private let poolSize = 3
+    private var lastSlots: [AdSlot] = []
+    private var lastScrolling = false
 
     private override init() { super.init() }
 
     // MARK: - Lifecycle entry points
 
-    /// Called from the SwiftUI scene when it becomes active. First activation
-    /// only attempts initialisation; later activations (returning from the
-    /// background) may also show a paced interstitial.
+    /// Called from the SwiftUI scene when it becomes active.
     func appDidBecomeActive() {
-        let returningToForeground = hasBecomeActiveOnce
-        hasBecomeActiveOnce = true
-
         start()
-
-        if returningToForeground {
-            maybeShowInterstitial()
-        }
     }
 
-    /// Begins SDK setup. No-op until the user's consent choice is known, and
-    /// only ever runs once. Safe to call repeatedly.
+    /// Begins SDK setup. No-op until the user's consent choice is known, and only
+    /// ever runs once. Safe to call repeatedly.
     func start() {
         guard !started else { return }
-        // If the user has not yet made an ads-consent choice, do nothing — we
-        // will be called again from `applyConsent(_:)` once the web app posts it.
         guard let consent = UserDefaults.standard.string(forKey: "vf_consent") else { return }
         started = true
 
@@ -86,16 +90,10 @@ final class AdsManager: NSObject, ObservableObject {
     }
 
     /// Called by NotifManager when the web app reports a consent choice/change.
-    /// `value` has already been persisted to "vf_consent" by the caller.
     func applyConsent(_ value: String) {
         if !started {
-            // First time we learn the choice — kick off initialisation.
             start()
         } else if value == "personal" {
-            // User upgraded to personalised after we had already initialised.
-            // We can still ask for ATT if it was never requested; a downgrade to
-            // "limited" simply takes effect on the next launch (the SDK cannot be
-            // re-initialised in place).
             requestATT(nil)
         }
     }
@@ -105,9 +103,6 @@ final class AdsManager: NSObject, ObservableObject {
     private func requestATT(_ completion: (() -> Void)?) {
         guard !attRequested else { completion?(); return }
         attRequested = true
-
-        // ATT can only be presented once the app is active; the scene is active
-        // by the time we get here. The completion always runs on the main actor.
         ATTrackingManager.requestTrackingAuthorization { _ in
             Task { @MainActor in completion?() }
         }
@@ -124,54 +119,129 @@ final class AdsManager: NSObject, ObservableObject {
         #endif
 
         Appodeal.setInitializationDelegate(self)
-        Appodeal.setInterstitialDelegate(self)
-
-        // We drive the banner's first load manually.
-        Appodeal.setAutocache(false, types: .banner)
-
-        let types: AppodealAdType = [.banner, .interstitial]
-        Appodeal.initialize(withApiKey: appKey, types: types)
-
-        _ = ensureBanner()
+        Appodeal.initialize(withApiKey: appKey, types: [.MREC])
     }
 
-    /// Returns the shared banner view, creating it once a root view controller
-    /// exists and kicking off its first load once the SDK has initialised. Both
-    /// steps are idempotent, so it is safe to call from the SwiftUI container on
-    /// every layout pass and from the init delegate.
-    func ensureBanner() -> APDBannerView? {
-        if bannerView == nil, let root = Self.topViewController() {
-            let banner = APDBannerView(size: kAPDAdSize320x50, rootViewController: root)
-            banner.delegate = self
-            bannerView = banner
+    // MARK: - Overlay + web view wiring (called from SwiftUI on the main actor)
+
+    func attachOverlay(_ view: UIView) {
+        overlay = view
+        buildPoolIfPossible()
+        applyLayout()
+    }
+
+    func setWebView(_ wv: WKWebView?) {
+        if let wv = wv { webView = wv }
+    }
+
+    // MARK: - MREC pool
+
+    private func buildPoolIfPossible() {
+        guard isInitialized, let overlay = overlay, pool.isEmpty else { return }
+        let root = Self.topViewController()
+        for index in 0..<poolSize {
+            // ObjC `-init` is imported as optional (no nullability annotation);
+            // it never actually returns nil.
+            guard let mrec = APDMRECView() else { continue }
+            let proxy = MRECDelegateProxy(index: index)
+            mrec.rootViewController = root
+            mrec.delegate = proxy
+            mrec.alpha = 0
+            overlay.addSubview(mrec)
+            pool.append(AdPoolItem(mrec: mrec, proxy: proxy))
         }
-        if isInitialized, !bannerLoadStarted, let banner = bannerView {
-            bannerLoadStarted = true
-            banner.loadAd()
+    }
+
+    // MARK: - Layout updates from the web feed
+
+    func updateLayout(slots: [AdSlot], scrolling: Bool) {
+        lastSlots = slots
+        lastScrolling = scrolling
+        buildPoolIfPossible()
+        applyLayout()
+    }
+
+    private func applyLayout() {
+        guard isInitialized, let overlay = overlay, !pool.isEmpty else { return }
+        let root = Self.topViewController()
+
+        // Hide everything while the feed is actively scrolling — a native overlay
+        // cannot ride an inner CSS scroll container, so following it mid-scroll
+        // would lag. The web skeleton shows through until scrolling settles.
+        if lastScrolling {
+            for item in pool { item.mrec.alpha = 0 }
+            return
         }
-        return bannerView
+
+        let midY = overlay.bounds.midY
+        let chosen = lastSlots
+            .sorted { abs(($0.y + $0.h / 2) - midY) < abs(($1.y + $1.h / 2) - midY) }
+            .prefix(pool.count)
+        let chosenIds = Set(chosen.map { $0.id })
+
+        // Release pool items whose slot is no longer visible.
+        for item in pool where item.slotId != nil && !chosenIds.contains(item.slotId!) {
+            item.slotId = nil
+            item.mrec.alpha = 0
+        }
+
+        let size = kAPDAdSize300x250
+        for slot in chosen {
+            let item = pool.first { $0.slotId == slot.id } ?? pool.first { $0.slotId == nil }
+            guard let it = item else { continue }
+            it.slotId = slot.id
+            it.mrec.rootViewController = root
+            let fx = slot.x + (slot.w - size.width) / 2
+            let fy = slot.y + (slot.h - size.height) / 2
+            it.mrec.frame = CGRect(x: fx, y: fy, width: size.width, height: size.height)
+            if !it.loadStarted {
+                it.loadStarted = true
+                it.mrec.loadAd()
+            }
+            it.mrec.alpha = it.loaded ? 1 : 0
+            if it.loaded { fillWeb(slot.id, true) }
+        }
     }
 
-    // MARK: - Interstitial
+    // MARK: - Delegate callbacks (hopped to the main actor by the proxy)
 
-    private func maybeShowInterstitial() {
-        guard isInitialized else { return }
-        let now = Date()
-        guard now.timeIntervalSince(launchDate) >= interstitialWarmup else { return }
-        if let last = lastInterstitialDate, now.timeIntervalSince(last) < interstitialMinGap { return }
-        guard Appodeal.canShow(.interstitial, forPlacement: placement),
-              let root = Self.topViewController() else { return }
+    func poolItem(_ index: Int, didLoad ok: Bool) {
+        guard index >= 0, index < pool.count else { return }
+        let it = pool[index]
+        it.loaded = ok
 
-        lastInterstitialDate = now
-        Appodeal.showAd(.interstitial, forPlacement: placement, rootViewController: root)
+        if ok {
+            if let sid = it.slotId {
+                it.mrec.alpha = 1
+                fillWeb(sid, true)
+            }
+            return
+        }
+
+        // No fill / failure: collapse the sponsored card so no empty box remains,
+        // and schedule a gentle retry in case inventory returns later.
+        it.loadStarted = false
+        if let sid = it.slotId {
+            it.mrec.alpha = 0
+            fillWeb(sid, false)
+        }
+        let index = index
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+            guard let self = self, index < self.pool.count else { return }
+            let item = self.pool[index]
+            if !item.loadStarted {
+                item.loadStarted = true
+                item.mrec.loadAd()
+            }
+        }
     }
 
-    // MARK: - Banner view for SwiftUI
+    // MARK: - Native → web
 
-    /// Localised "Ad" label shown above the banner (da: "Reklame").
-    var adLabelText: String {
-        let danish = (UserDefaults.standard.string(forKey: "vf_lang") ?? "da") != "en"
-        return danish ? "Reklame" : "Ad"
+    private func fillWeb(_ id: String, _ filled: Bool) {
+        // ids are the numeric slot indices the web assigned — safe to interpolate.
+        let js = "window.VibeFeedAds && window.VibeFeedAds.fill(\"\(id)\", \(filled ? "true" : "false"))"
+        webView?.evaluateJavaScript(js, completionHandler: nil)
     }
 
     // MARK: - Helpers
@@ -188,44 +258,45 @@ final class AdsManager: NSObject, ObservableObject {
     }
 }
 
-// MARK: - Appodeal delegates
+// MARK: - Per-MREC delegate proxy
 //
-// Appodeal delivers these on the main thread in practice, but the callbacks are
-// declared `nonisolated` and hop onto the main actor explicitly so the
-// @Published mutations are always race-free (and Swift 6 clean). None capture
-// the non-Sendable ad objects.
+// Appodeal delivers banner/MREC callbacks on the main thread, but the protocol
+// methods are not main-actor annotated. Each pool MREC gets its own lightweight
+// proxy that captures only its integer index (Sendable) and hops to the main
+// actor — so no non-Sendable ad object ever crosses an isolation boundary.
+final class MRECDelegateProxy: NSObject, APDBannerViewDelegate {
+    let index: Int
+    init(index: Int) { self.index = index }
+
+    nonisolated func bannerViewDidLoadAd(_ bannerView: APDBannerView, isPrecache precache: Bool) {
+        let i = index
+        Task { @MainActor in AdsManager.shared.poolItem(i, didLoad: true) }
+    }
+
+    nonisolated func bannerView(_ bannerView: APDBannerView, didFailToLoadAdWithError error: Error) {
+        let i = index
+        Task { @MainActor in AdsManager.shared.poolItem(i, didLoad: false) }
+    }
+
+    nonisolated func bannerView(_ bannerView: APDBannerView, didFailToPresentWithError error: Error) {
+        let i = index
+        Task { @MainActor in AdsManager.shared.poolItem(i, didLoad: false) }
+    }
+
+    nonisolated func bannerViewExpired(_ bannerView: APDBannerView) {
+        let i = index
+        Task { @MainActor in AdsManager.shared.poolItem(i, didLoad: false) }
+    }
+}
+
+// MARK: - Appodeal initialisation delegate
 
 extension AdsManager: AppodealInitializationDelegate {
     nonisolated func appodealSDKDidInitialize() {
         Task { @MainActor in
             self.isInitialized = true
-            // Kick off the first banner load now that the SDK is ready (the
-            // banner was already mounted in the hierarchy by the SwiftUI strip).
-            _ = self.ensureBanner()
+            self.buildPoolIfPossible()
+            self.applyLayout()
         }
     }
-}
-
-extension AdsManager: APDBannerViewDelegate {
-    nonisolated func bannerViewDidLoadAd(_ bannerView: APDBannerView, isPrecache precache: Bool) {
-        Task { @MainActor in self.isBannerReady = true }
-    }
-
-    nonisolated func bannerView(_ bannerView: APDBannerView, didFailToLoadAdWithError error: Error) {
-        Task { @MainActor in self.isBannerReady = false }
-    }
-
-    nonisolated func bannerView(_ bannerView: APDBannerView, didFailToPresentWithError error: Error) {
-        Task { @MainActor in self.isBannerReady = false }
-    }
-
-    nonisolated func bannerViewExpired(_ bannerView: APDBannerView) {
-        Task { @MainActor in self.isBannerReady = false }
-    }
-}
-
-extension AdsManager: AppodealInterstitialDelegate {
-    // Required for observability; nothing here is load-bearing for the UI.
-    nonisolated func interstitialDidFailToLoadAd() {}
-    nonisolated func interstitialDidFailToPresent() {}
 }
