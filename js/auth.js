@@ -4,7 +4,7 @@ import { me, setMe, state, FRIEND_SINCE, pv, expandedCmts, clearComposers, setCf
 import { el, registerProfile, toast, getConsent } from "./helpers.js";
 import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu, closeReportMenu, resetFeedbarSearch, resetTapState, resetBarHide, clearUnseenFeeds } from "./feed.js";
 import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPost, resetPoll } from "./compose.js";
-import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet } from "./profile.js";
+import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet, closeUnfriendMenu } from "./profile.js";
 import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
 import { closeLightbox } from "./lightbox.js";
 import { subscribeRealtime, unsubscribeRealtime } from "./realtime.js";
@@ -165,6 +165,7 @@ export function resetApp(){
   closePostEdit();
   closePostMenu();
   closeReportMenu();
+  closeUnfriendMenu();
   closeCompose();
   closeProfile();
   closeLightbox();

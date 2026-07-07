@@ -217,6 +217,7 @@
         <div class="since" id="pv-since"></div>
         <button class="pv-add" id="pv-add" style="display:none">Tilføj til din kreds</button>
         <button class="pv-actbtn" id="pv-act" style="display:none" data-i18n="pv.act">Se aktivitet</button>
+        <button class="pv-unfriend" id="pv-unfriend" style="display:none" data-i18n="pv.remove">Fjern ven</button>
       </div>
       <div class="ptl" data-i18n="stats.posts">Opslag</div>
       <div id="pv-posts"></div>
@@ -342,6 +343,15 @@
         <button class="mrow danger" id="rm-report2" data-i18n="rm.do">Anmeld</button>
         <button class="mrow" id="rm-cancel2" data-i18n="common.cancel">Annuller</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Fjern ven (popup, åbnes fra ven-profilen) -->
+  <div class="modal" id="ufmenu" role="dialog" aria-label="Fjern ven" data-i18n-aria="pv.remove">
+    <div class="modal-card">
+      <div class="mtitle" id="uf-title"></div>
+      <button class="mrow danger" id="uf-confirm" data-i18n="pv.remove">Fjern ven</button>
+      <button class="mrow" id="uf-cancel" data-i18n="common.cancel">Annuller</button>
     </div>
   </div>
 

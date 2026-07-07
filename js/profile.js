@@ -114,21 +114,61 @@ export function resetDeleteUI(){
 function pvIsFriend(h){
   return !!(me && (h === me.handle || h === OFFICIAL_HANDLE || state.friends.indexOf(h) >= 0));
 }
-/* Relations-linjen: venner (og botten) ser "I din kreds siden …";
+/* Relations-linjen: venner (og botten) ser "I din kreds siden …" + en lille grå
+   "Fjern ven"-knap (aldrig på egen profil eller den officielle bot);
    ikke-venner ser en rød "Tilføj til din kreds"-chip i stedet */
 function renderPvRelation(h){
-  const since = el("pv-since"), add = el("pv-add");
+  const since = el("pv-since"), add = el("pv-add"), unf = el("pv-unfriend");
   if(pvIsFriend(h)){
     since.style.display = "";
     since.textContent = t("pv.since", { year: FRIEND_SINCE[h] || user(h).since || t("pv.today") });
     add.style.display = "none";
+    unf.style.display = (me && h !== me.handle && h !== OFFICIAL_HANDLE) ? "" : "none";
   } else {
     since.style.display = "none";
     add.style.display = "";
     add.disabled = false;
     add.classList.remove("done");
     add.textContent = t("pv.add");
+    unf.style.display = "none";
   }
+}
+
+/* ---- Fjern ven (bekræftelses-popup — pmenu/modal-mønsteret) ---- */
+let ufHandle = null;
+function openUnfriendMenu(h){
+  ufHandle = h;
+  el("uf-title").innerHTML = t("pv.remove_confirm", { name: esc(user(h).name) });
+  el("uf-confirm").disabled = false;
+  el("ufmenu").classList.add("on");
+}
+export function closeUnfriendMenu(){
+  el("ufmenu").classList.remove("on");
+  ufHandle = null;
+}
+async function doRemoveFriend(){
+  const h = ufHandle;
+  if(!me || !h) return;
+  const btn = el("uf-confirm");
+  if(btn.disabled) return;
+  btn.disabled = true;
+  const { error } = await sb.rpc("remove_friend", { friend_handle: h });
+  btn.disabled = false;
+  if(error){
+    console.error(error);
+    closeUnfriendMenu();
+    toast(t("err.generic"));
+    return;
+  }
+  closeUnfriendMenu();
+  delete FRIEND_SINCE[h]; // væk begge veje — næste tilføjelse starter forfra
+  await loadFriends();
+  await loadPosts(); // vennens whole-kreds-opslag forsvinder (RLS) + bobler/feed gen-renderes
+  renderStories();
+  if(el("view-search").classList.contains("active")) renderSearch(); // søgelisten bag panelet uden den fjernede ven
+  // Panelet gen-renderes til ikke-ven-tilstanden (profilen er stadig synlig — nu med Tilføj-chip)
+  if(pv.u === h && el("profileview").classList.contains("on")) await openProfile(h);
+  toast(t("friend.removed", { name: user(h).name }));
 }
 function pvEmptyNote(h){
   return '<div class="emptynote">'+(pvIsFriend(h) ? t("pv.empty_friend") : t("pv.empty_stranger"))+'</div>';
@@ -366,6 +406,17 @@ el("pv-act").addEventListener("click", async function(){
   if(pv.u !== h) return;
   openActivitySheet(h);
 });
+/* ---- Ven: "Fjern ven" (lille grå tekst-knap -> bekræftelses-popup) ---- */
+el("pv-unfriend").addEventListener("click", function(){
+  const h = pv.u;
+  if(!me || !h || h === me.handle || h === OFFICIAL_HANDLE) return;
+  openUnfriendMenu(h);
+});
+el("ufmenu").addEventListener("click", function(e){
+  if(e.target === el("ufmenu")) closeUnfriendMenu();
+});
+el("uf-cancel").addEventListener("click", closeUnfriendMenu);
+el("uf-confirm").addEventListener("click", doRemoveFriend);
 /* ---- Ikke-ven: "Tilføj til din kreds" (optimistisk ✓, derefter refetch) ---- */
 el("pv-add").addEventListener("click", async function(){
   const h = pv.u;
