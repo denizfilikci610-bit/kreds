@@ -42,7 +42,7 @@ async function onReward(earned){
   }catch(err){ console.error(err); toast(t("reward.error")); }
 }
 
-const HEART = '<svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><path class="fillic" d="M12 21s-7.4-4.55-9.9-9.1C.7 8.9 1.9 5.4 5.1 5.05c2-.22 3.5.95 4.5 2.35C10.6 6 12.1 4.83 14.1 5.05c3.2.35 4.4 3.85 3 6.85C19.4 16.45 12 21 12 21Z"/></svg>';
+const HEART = '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path class="fillic" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
 
 function buildPopup(){
   if(el("rwd-pop")) return;
@@ -54,6 +54,7 @@ function buildPopup(){
       '<div class="rwdheart">'+HEART+'</div>'+
       '<div class="rwdtitle" id="rwd-title">'+t("reward.title")+'</div>'+
       '<div class="rwdsub">'+t("reward.sub")+'</div>'+
+      '<div class="rwdhow">'+t("reward.how")+'</div>'+
       '<button class="rwdgo" id="rwd-go">'+t("reward.watch")+'</button>'+
       '<button class="rwdno" id="rwd-no">'+t("reward.no")+'</button>'+
     '</div>';

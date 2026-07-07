@@ -281,7 +281,8 @@
     display:flex;align-items:center;justify-content:center;background:var(--red);color:#fff;
   }
   .rwdtitle{font-size:18px;font-weight:800;color:var(--ink);margin-bottom:6px}
-  .rwdsub{font-size:14px;color:var(--gray);line-height:1.4;margin-bottom:18px}
+  .rwdsub{font-size:14px;color:var(--gray);line-height:1.4;margin-bottom:6px}
+  .rwdhow{font-size:12px;color:var(--gray);opacity:.8;line-height:1.4;margin-bottom:18px}
   .rwdgo{width:100%;padding:13px;border-radius:12px;background:var(--red);color:#fff;font-size:15px;font-weight:700}
   .rwdgo:active{opacity:.85}
   .rwdno{width:100%;padding:11px;margin-top:8px;color:var(--gray);font-size:14px;font-weight:600}
