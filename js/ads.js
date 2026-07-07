@@ -23,20 +23,24 @@ export function adsEnabled(){
   return !!bridge() && !!getConsent();
 }
 
-/* Slot-markup: et opslags-lignende kort med tydelig "Reklame · Sponsoreret"-header
-   og et reserveret 300×250-hul (med skeleton-shimmer indtil annoncen ligger ovenpå).
-   data-ad-hole er det element vi måler og rapporterer til native. */
+/* Slot-markup: et OPSLAGS-lignende kort — profil-header (avatar + "Promovering" +
+   tydeligt "Annonce"-mærke + @promovering) oven på det reserverede 300×250-hul, hvor
+   den native MREC lægges. Kun skelettet er web; selve annoncen er den samme MREC som
+   før. Headeren er ikke klikbar (ingen rigtig profil). data-ad-hole måles + rapporteres. */
 export function adSlotHTML(i){
   return (
-    '<article class="post adslot" data-ad="'+i+'">'+
-      '<div class="adcol">'+
-        '<div class="adhead">'+
-          '<span class="adtag">'+t("ad.label")+'</span>'+
-          '<span class="adspon">'+t("ad.sponsored")+'</span>'+
+    '<article class="adslot" data-ad="'+i+'">'+
+      '<div class="adhead2">'+
+        '<span class="av adav" aria-hidden="true">'+
+          '<svg viewBox="0 0 24 24" width="22" height="22"><path class="fillic" d="M4 9a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h1l4 3.2a.6.6 0 0 0 1-.47V6.27a.6.6 0 0 0-1-.47L5 9H4Zm13.5 3a3.5 3.5 0 0 0-2-3.16v6.32A3.5 3.5 0 0 0 17.5 12Z"/></svg>'+
+        '</span>'+
+        '<div class="adname">'+
+          '<div class="adnrow"><b>Promovering</b><span class="adannonce">Annonce</span></div>'+
+          '<div class="adhandle">@promovering</div>'+
         '</div>'+
-        '<div class="adhole" data-ad-hole="'+i+'">'+
-          '<div class="adskel" aria-hidden="true"></div>'+
-        '</div>'+
+      '</div>'+
+      '<div class="adhole" data-ad-hole="'+i+'">'+
+        '<div class="adskel" aria-hidden="true"></div>'+
       '</div>'+
     '</article>'
   );
@@ -162,3 +166,4 @@ export function initAds(){
      anden reflow som ikke udløser scroll. send() sender kun ved reelle ændringer. */
   if(!heartbeat) heartbeat = setInterval(reportAdLayout, 400);
 }
+/* cache-bust 7e9ed93 */
