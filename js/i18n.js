@@ -75,6 +75,7 @@ const DA = {
   "post.updated": "Opslaget er opdateret",
   "post.deleted": "Opslaget er slettet",
   "post.delete_failed": "Kunne ikke slette opslaget. Prøv igen.",
+  "post.new": "NY",
   "report.done": "Tak. Opslaget er anmeldt og skjult for dig.",
 
   /* Tabbar */
@@ -108,6 +109,8 @@ const DA = {
   "pv.not_found": "Kunne ikke finde profilen",
   "pv.count": "{n} opslag",
   "pv.act": "Se aktivitet",
+  "pv.remove": "Fjern ven",
+  "pv.remove_confirm": "Fjern {name} som ven?",
 
   /* Aktivitet */
   "act.title": "{name}s aktivitet",
@@ -122,6 +125,7 @@ const DA = {
   "friend.not_found": "Ingen bruger med det navn",
   "friend.self": "Det er dig selv 😄",
   "friend.added": "{name} er nu i din kreds",
+  "friend.removed": "{name} er fjernet som ven",
 
   /* Søg */
   "search.ph": "Søg i din kreds",
@@ -401,6 +405,7 @@ const EN = {
   "post.updated": "The post has been updated",
   "post.deleted": "The post has been deleted",
   "post.delete_failed": "Couldn't delete the post. Try again.",
+  "post.new": "NEW",
   "report.done": "Thanks. The post has been reported and hidden for you.",
 
   /* Tabbar */
@@ -434,6 +439,8 @@ const EN = {
   "pv.not_found": "Couldn't find the profile",
   "pv.count": "{n} posts",
   "pv.act": "See activity",
+  "pv.remove": "Remove friend",
+  "pv.remove_confirm": "Remove {name} as a friend?",
 
   /* Activity */
   "act.title": "{name}'s activity",
@@ -448,6 +455,7 @@ const EN = {
   "friend.not_found": "No user with that name",
   "friend.self": "That's you 😄",
   "friend.added": "{name} is now in your circle",
+  "friend.removed": "{name} has been removed as a friend",
 
   /* Search */
   "search.ph": "Search your circle",

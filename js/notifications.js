@@ -41,16 +41,30 @@ export function realtimeNotify(table, payload){
 }
 
 /* ================= Notifikationer ================= */
+/* Ulæste rækker: vf_notif_seen = ISO for seneste åbning af akt-fanen (per enhed).
+   Sættes EFTER render, så fremhævningen er synlig under DETTE besøg og ryddet næste gang. */
+const NOTIF_SEEN_KEY = "vf_notif_seen";
+function readNotifSeen(){
+  try{ return localStorage.getItem(NOTIF_SEEN_KEY) || ""; }catch(_e){ return ""; }
+}
+function writeNotifSeen(iso){
+  try{ localStorage.setItem(NOTIF_SEEN_KEY, iso); }catch(_e){}
+}
 let notifTimer = null, notifSeq = 0;
 export async function loadNotifs(){
   if(!me) return;
   const seq = ++notifSeq; // sekvens-token: kun det nyeste kald må skrive resultatet
   el("notifs").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
+  const seenIso = readNotifSeen();
+  // Intet gemt tidsstempel (fanen aldrig åbnet på enheden) = alt er ulæst
+  const seenMs = seenIso ? new Date(seenIso).getTime() : 0;
+  function isUnread(at){ return new Date(at).getTime() > seenMs; }
   const H = '<svg viewBox="0 0 24 24"><path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
   const B = '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>';
   const P = '<svg viewBox="0 0 24 24"><g class="stroke"><circle cx="10" cy="8" r="3.4"/><path d="M3.8 19.5c.7-3.3 3.2-5 6.2-5s5.5 1.7 6.2 5"/><path d="M18.5 6.5v6M15.5 9.5h6"/></g></svg>';
-  function row(icon, cls, u, text, snip, tm, attrs){
-    return '<div class="notif"'+(attrs || "")+'>'+
+  function row(icon, cls, u, text, snip, tm, attrs, unread){
+    return '<div class="notif'+(unread ? " unread" : "")+'"'+(attrs || "")+'>'+
+      (unread ? '<span class="udot"></span>' : '')+
       avaHTML(u, 32)+
       '<div class="grow">'+
         '<div class="ntext"><b>'+esc(user(u).name)+'</b> '+text+'. <span class="nt">'+esc(tm)+'</span></div>'+
@@ -59,9 +73,11 @@ export async function loadNotifs(){
       '<div class="nicon '+cls+'">'+icon+'</div>'+
     '</div>';
   }
-  /* Invitation til en kreds (Accepter/Afvis) */
+  /* Invitation til en kreds (Accepter/Afvis) — handlingskrævende, men deltager også i ulæst-visningen */
   function invRow(n){
-    return '<div class="notif kinv" data-invf="'+esc(n.f)+'" data-k="'+esc(n.k)+'">'+
+    const un = isUnread(n.at);
+    return '<div class="notif kinv'+(un ? " unread" : "")+'" data-invf="'+esc(n.f)+'" data-k="'+esc(n.k)+'">'+
+      (un ? '<span class="udot"></span>' : '')+
       avaHTML(n.u, 32)+
       '<div class="grow">'+
         '<div class="ntext"><b>'+esc(user(n.u).name)+'</b> '+t("notif.invited", { k: esc(n.k) })+'. <span class="nt">'+esc(fmtTime(n.at))+'</span></div>'+
@@ -74,7 +90,9 @@ export async function loadNotifs(){
   }
   /* Anmodning om at være med i en af mine kredse (kun kreds-ejeren ser disse rækker) */
   function kreqRow(n){
-    return '<div class="notif kreq" data-f="'+esc(n.f)+'" data-uid="'+esc(n.uid)+'" data-n="'+esc(user(n.u).name)+'" data-k="'+esc(n.k)+'">'+
+    const un = isUnread(n.at);
+    return '<div class="notif kreq'+(un ? " unread" : "")+'" data-f="'+esc(n.f)+'" data-uid="'+esc(n.uid)+'" data-n="'+esc(user(n.u).name)+'" data-k="'+esc(n.k)+'">'+
+      (un ? '<span class="udot"></span>' : '')+
       avaHTML(n.u, 32)+
       '<div class="grow">'+
         '<div class="ntext"><b>'+esc(user(n.u).name)+'</b> '+t("notif.request", { k: esc(n.k) })+'. <span class="nt">'+esc(fmtTime(n.at))+'</span></div>'+
@@ -137,13 +155,16 @@ export async function loadNotifs(){
     if(seq !== notifSeq) return; // et nyere kald er i gang — lad det vinde
     el("notifs").innerHTML = top.length
       ? top.map(function(n){
-          if(n.type === "like")   return row(H, "heart",  n.u, t("notif.liked"), n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="like"');
-          if(n.type === "cmt")    return row(B, "bubble", n.u, t("notif.commented"),  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"');
+          if(n.type === "like")   return row(H, "heart",  n.u, t("notif.liked"), n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="like"', isUnread(n.at));
+          if(n.type === "cmt")    return row(B, "bubble", n.u, t("notif.commented"),  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "kreq")   return kreqRow(n);
           if(n.type === "inv")    return invRow(n);
-          return row(P, "friend", n.u, t("notif.friend"), "", fmtTime(n.at), ' data-friend="'+esc(n.u)+'"');
+          return row(P, "friend", n.u, t("notif.friend"), "", fmtTime(n.at), ' data-friend="'+esc(n.u)+'"', isUnread(n.at));
         }).join("")
       : '<div class="emptynote">'+t("notif.empty")+'</div>';
+    // EFTER render, og kun når akt-fanen faktisk er den aktive visning:
+    // gem nu() — fremhævningen står under DETTE besøg og er ryddet ved næste
+    if(curTab === "akt") writeNotifSeen(new Date().toISOString());
   }catch(err){
     console.error(err);
     if(seq !== notifSeq) return; // et forældet fejlsvar må ikke overskrive en frisk liste

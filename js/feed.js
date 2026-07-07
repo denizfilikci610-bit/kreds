@@ -1,5 +1,5 @@
 import { sb, OFFICIAL_HANDLE } from "./config.js";
-import { me, state, expandedCmts, pv, cstate, setCurTab, setCfilePid, ID2H, FRIEND_SINCE } from "./store.js";
+import { me, state, expandedCmts, pv, cstate, curTab, setCurTab, setCfilePid, ID2H, FRIEND_SINCE } from "./store.js";
 import { el, esc, avaHTML, user, grad, toast, fmtTime, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
 import { t, likesLabel } from "./i18n.js";
 import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, cInput, cKey, clearReply, clearCImg } from "./comments.js";
@@ -133,6 +133,7 @@ export function postHTML(p){
           '<span class="nm">'+esc(user(p.u).name)+'</span>'+
           '<span class="badge">'+BADGE()+'</span>'+
           '<span class="ph">@'+esc(p.u)+' · '+esc(p.t)+'</span>'+
+          (p.isNew ? '<span class="newchip">'+t("post.new")+'</span>' : '')+
           '<button class="dots" data-id="'+p.id+'" aria-label="'+t("aria.more")+'">'+
             '<svg viewBox="0 0 24 24"><g class="fillic"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></g></svg>'+
           '</button>'+
@@ -269,6 +270,45 @@ export function renderFeed(){
   }
 }
 
+/* ================= Nye opslag i feedet (NY-mærke) =================
+   Per enhed: vf_post_seen er ISO-tidspunktet for det nyeste opslag, brugeren
+   allerede har haft på skærmen. Flag sættes ved hver loadPosts-render mod det
+   GEMTE tidsstempel; tidsstemplet rykkes først frem EFTER render — og kun når
+   brugeren faktisk kigger på feedet (fanen aktiv + vinduet i fokus), så
+   mærkerne overlever indtil feedet reelt bliver set. */
+const POST_SEEN_KEY = "vf_post_seen";
+function readPostSeen(){
+  try{ return localStorage.getItem(POST_SEEN_KEY) || ""; }catch(_e){ return ""; }
+}
+function writePostSeen(iso){
+  try{ localStorage.setItem(POST_SEEN_KEY, iso); }catch(_e){}
+}
+function flagNewPosts(){
+  const seen = readPostSeen();
+  // Første kørsel (intet gemt tidsstempel): alt tælles som set — flag ingenting
+  const seenMs = seen ? new Date(seen).getTime() : 0;
+  state.posts.forEach(function(p){
+    // Kun rigtige opslag fra andre — egne og @vibefeed (inkl. det fastgjorte
+    // velkomstopslag) er undtaget; teasers renderes separat og flagges aldrig
+    p.isNew = !!(seenMs && me && p.u !== me.handle && p.u !== OFFICIAL_HANDLE &&
+                 new Date(p.created).getTime() > seenMs);
+  });
+}
+function advancePostSeen(){
+  // Kun når brugeren faktisk SER feedet — ellers skal NY-mærkerne overleve
+  // til næste render (fx realtime-opslag der ankommer, mens fanen er væk)
+  if(!document.hasFocus() || curTab !== "feed") return;
+  let newest = 0;
+  state.posts.forEach(function(p){
+    const ts = new Date(p.created).getTime();
+    if(ts > newest) newest = ts;
+  });
+  if(!newest) return;
+  const seen = readPostSeen();
+  // Date-aritmetik (ikke streng-max) — ISO-varianter sammenlignes ellers forkert
+  if(!seen || newest > new Date(seen).getTime()) writePostSeen(new Date(newest).toISOString());
+}
+
 /* ================= Data-hentning ================= */
 export function postQuery(){
   return sb.from("posts").select(POST_SELECT)
@@ -303,9 +343,11 @@ export async function loadPosts(){
       state.teasers = [];
       state.posts = (res[1].data || []).map(mapPost);
     }
+    flagNewPosts();
     renderFeed();
     renderStories();
     if(el("view-profil").classList.contains("active")) renderMyPosts();
+    advancePostSeen(); // EFTER render: dette renders NY-mærker står — næste hentning ser dem som set
   }catch(err){
     console.error(err);
     toast(t("feed.load_failed"));

@@ -236,6 +236,15 @@
   .phead .ph{color:var(--gray);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:28px}
   .phead .dots{margin-left:auto;color:var(--gray);padding:2px 0 2px 10px;flex:0 0 auto}
   .phead .dots svg{width:19px;height:19px}
+  /* NY-mærke på nye/usete opslag (højrestillet i header-linjen før ⋯-knappen) */
+  .phead .newchip{
+    margin-left:auto;flex:0 0 auto;
+    font-size:10px;font-weight:800;letter-spacing:.05em;line-height:1;
+    color:var(--red);background:var(--chip);
+    border-radius:999px;
+    padding:3px 7px;
+  }
+  .phead .newchip+.dots{margin-left:0}
 
   .ptext{padding:1px 0 0;font-size:15px;color:var(--ink);white-space:pre-wrap;overflow-wrap:break-word}
 
@@ -442,6 +451,10 @@
   .notif .nicon.heart svg path{fill:var(--red);stroke:var(--red)}
   .notif .nicon.bubble{color:var(--gray)}
   .notif .nicon.friend{color:var(--red)}
+  /* Ulæste notifikationer (siden sidste åbning af fanen): rød prik + tonet række */
+  .notif.unread{background:var(--chip)}
+  .notif.unread .ntext{font-weight:600}
+  .notif .udot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--red)}
   .notif.kreq,.notif.kinv{align-items:flex-start}
   .notif .kbtns{display:flex;gap:8px;margin-top:7px}
   .kbtn{
@@ -487,6 +500,14 @@
   }
   .pv-actbtn:active{opacity:.7}
   .pv-actbtn:disabled{opacity:.5;cursor:default}
+  /* "Fjern ven" — lille grå tekst-knap under relations-linjen på ven-profilen */
+  .pv-unfriend{
+    display:block;
+    margin-top:10px;padding:2px 0;
+    font-size:13px;font-weight:600;color:var(--gray);
+    text-align:left;
+  }
+  .pv-unfriend:active{opacity:.6}
   .niksaldo{margin-top:8px}
   .niksaldo .nik1{font-size:14px;color:var(--ink)}
   .niksaldo .nik1 b{font-weight:700}
