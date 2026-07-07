@@ -211,9 +211,10 @@ final class AdsManager: NSObject, ObservableObject {
         it.loaded = ok
 
         if ok {
+            it.loadStarted = true
             if let sid = it.slotId {
-                it.mrec.alpha = 1
-                fillWeb(sid, true)
+                it.mrec.alpha = lastScrolling ? 0 : 1
+                fillWeb(sid, true) // reveal — also un-collapses the card if it was collapsed
             }
             return
         }
@@ -234,6 +235,18 @@ final class AdsManager: NSObject, ObservableObject {
                 item.mrec.loadAd()
             }
         }
+    }
+
+    /// An ad expired (normal — banners refresh on a timer) or failed to present.
+    /// This is NOT a no-fill: keep the sponsored card and load a fresh creative, so
+    /// the ad refreshes in place instead of disappearing. The card re-reveals when
+    /// the new ad loads (`poolItem(_:didLoad:)`).
+    func poolItemExpired(_ index: Int) {
+        guard index >= 0, index < pool.count else { return }
+        let it = pool[index]
+        it.loaded = false
+        it.loadStarted = true
+        it.mrec.loadAd()
     }
 
     // MARK: - Native → web
@@ -280,12 +293,12 @@ final class MRECDelegateProxy: NSObject, APDBannerViewDelegate {
 
     nonisolated func bannerView(_ bannerView: APDBannerView, didFailToPresentWithError error: Error) {
         let i = index
-        Task { @MainActor in AdsManager.shared.poolItem(i, didLoad: false) }
+        Task { @MainActor in AdsManager.shared.poolItemExpired(i) }
     }
 
     nonisolated func bannerViewExpired(_ bannerView: APDBannerView) {
         let i = index
-        Task { @MainActor in AdsManager.shared.poolItem(i, didLoad: false) }
+        Task { @MainActor in AdsManager.shared.poolItemExpired(i) }
     }
 }
 
