@@ -22,7 +22,11 @@ final class AdPoolItem {
     let mrec: APDMRECView
     let proxy: MRECDelegateProxy
     var slotId: String?
-    var loaded = false
+    // True once this MREC has loaded at least one creative. Appodeal then keeps a
+    // creative in the view and refreshes it on its own timer, so visibility keys off
+    // THIS (a stable fact) rather than the momentary "is a load in flight" state —
+    // otherwise a routine refresh would blank an ad that is already on screen.
+    var hasCreative = false
     var loadStarted = false
 
     init(mrec: APDMRECView, proxy: MRECDelegateProxy) {
@@ -193,8 +197,11 @@ final class AdsManager: NSObject, ObservableObject {
                 it.loadStarted = true
                 it.mrec.loadAd()
             }
-            it.mrec.alpha = it.loaded ? 1 : 0
-            if it.loaded { fillWeb(slot.id, true) }
+            // Show the ad whenever this MREC has ever loaded a creative — NOT the
+            // transient reload state — so a refresh in flight (poolItemExpired)
+            // never blanks an ad that is already visible.
+            it.mrec.alpha = it.hasCreative ? 1 : 0
+            if it.hasCreative { fillWeb(slot.id, true) }
         }
     }
 
@@ -203,9 +210,9 @@ final class AdsManager: NSObject, ObservableObject {
     func poolItem(_ index: Int, didLoad ok: Bool) {
         guard index >= 0, index < pool.count else { return }
         let it = pool[index]
-        it.loaded = ok
 
         if ok {
+            it.hasCreative = true
             it.loadStarted = true
             if let sid = it.slotId {
                 it.mrec.alpha = 1
@@ -214,10 +221,13 @@ final class AdsManager: NSObject, ObservableObject {
             return
         }
 
-        // No fill / failure: collapse the sponsored card so no empty box remains,
-        // and schedule a gentle retry in case inventory returns later.
+        // A load came up empty. If this MREC has shown an ad before, this is just a
+        // failed refresh — keep the card and the existing creative on screen
+        // (collapsing here is exactly the "ad appeared then vanished" the owner saw)
+        // and retry quietly. Only collapse when we have never had an ad to show, so
+        // no empty box is left behind.
         it.loadStarted = false
-        if let sid = it.slotId {
+        if !it.hasCreative, let sid = it.slotId {
             it.mrec.alpha = 0
             fillWeb(sid, false)
         }
@@ -239,7 +249,10 @@ final class AdsManager: NSObject, ObservableObject {
     func poolItemExpired(_ index: Int) {
         guard index >= 0, index < pool.count else { return }
         let it = pool[index]
-        it.loaded = false
+        // Transient: load a fresh creative but leave `hasCreative` and alpha as-is,
+        // so the current ad stays visible until the new one arrives. Dropping
+        // visibility here (directly, or via applyLayout reading a reset flag) is
+        // what made ads flicker away on the refresh timer.
         it.loadStarted = true
         it.mrec.loadAd()
     }
