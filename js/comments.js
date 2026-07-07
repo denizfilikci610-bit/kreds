@@ -33,9 +33,9 @@ function buildThread(p){
 function cmtRowHTML(item){
   const c = item.c;
   const lvl = Math.min(item.lvl, 3);
-  const deep = item.lvl > 3 && item.parentU;
   const ind = lvl * 26;
-  const prefix = deep ? '<span class="cat">@'+esc(item.parentU)+'</span> ' : '';
+  // Vis ALTID hvem svaret er rettet til (ikke kun ved dyb nesting)
+  const prefix = item.parentU ? '<span class="cat">@'+esc(item.parentU)+'</span> ' : '';
   return '<div class="crow'+(lvl > 0 ? " cnest" : "")+'"'+(ind ? ' style="margin-left:'+ind+'px"' : '')+' data-cid="'+c.id+'">'+
     avaHTML(c.u, 28)+
     '<div class="cbody">'+

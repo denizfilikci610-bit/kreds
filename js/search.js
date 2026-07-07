@@ -24,10 +24,13 @@ export function renderSearch(){
   }).join("");
   if(q && q === globalQ && globalResults.length){
     globalResults.forEach(function(p){
+      const pending = state.sentRequests.indexOf(p.handle) >= 0;
       html += '<div class="listrow tap" data-open="'+esc(p.handle)+'">'+
                 avaHTML(p.handle, 44)+
                 '<div class="grow"><div class="l1">'+esc(p.name || p.handle)+'</div>'+
-                '<button class="addaction" data-add="'+esc(p.handle)+'">'+t("search.add", { h: esc(p.handle) })+'</button></div>'+
+                '<button class="addaction'+(pending ? " pending" : "")+'" data-add="'+esc(p.handle)+'">'+
+                  (pending ? t("search.requested") : t("search.add", { h: esc(p.handle) }))+
+                '</button></div>'+
               '</div>';
     });
   }
@@ -77,6 +80,16 @@ el("search-list").addEventListener("click", async function(e){
     if(!me) return;
     const h = a.dataset.add;
     a.disabled = true;
+    // Udestående anmodning → tryk fortryder den
+    if(state.sentRequests.indexOf(h) >= 0){
+      const { error } = await sb.rpc("cancel_friend_request", { to_handle:h });
+      if(error){ a.disabled = false; toast(t("err.generic")); return; }
+      const i = state.sentRequests.indexOf(h);
+      if(i >= 0) state.sentRequests.splice(i, 1);
+      renderSearch();
+      toast(t("friend.request_cancelled", { name: user(h).name }));
+      return;
+    }
     const { data, error } = await sb.rpc("add_friend", { friend_handle:h });
     if(error){
       a.disabled = false;
@@ -86,14 +99,21 @@ el("search-list").addEventListener("click", async function(e){
       else toast(t("err.generic"));
       return;
     }
-    if(data) registerProfile(data);
-    el("search-input").value = "";
-    globalResults = []; globalQ = "";
-    await loadFriends();
-    renderSearch();
-    renderStories();
-    loadPosts();
-    toast(t("friend.added", { name: user(h).name }));
+    const prof = data && data.profile;
+    if(prof) registerProfile(prof);
+    if(data && data.status === "friends"){
+      el("search-input").value = "";
+      globalResults = []; globalQ = "";
+      await loadFriends();
+      renderSearch();
+      renderStories();
+      loadPosts();
+      toast(t("friend.added", { name: user(h).name }));
+      return;
+    }
+    if(state.sentRequests.indexOf(h) < 0) state.sentRequests.push(h);
+    renderSearch(); // vis "Anmodning sendt" på rækken
+    toast(t("friend.request_sent", { name: user(h).name }));
     return;
   }
   /* Tap på selve rækken: åbn profilpanelet (venner OG globale resultater) */

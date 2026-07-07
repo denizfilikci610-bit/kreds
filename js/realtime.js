@@ -62,6 +62,13 @@ export function subscribeRealtime(){
     .on("postgres_changes", { event:"INSERT", schema:"public", table:"kreds_requests" }, function(payload){
       realtimeNotify("kreds_requests", payload);
     })
+    .on("postgres_changes", { event:"INSERT", schema:"public", table:"friend_requests" }, function(payload){
+      realtimeNotify("friend_requests", payload); // en anmodning TIL mig tænder prikken
+    })
+    .on("postgres_changes", { event:"INSERT", schema:"public", table:"friendships" }, function(payload){
+      scheduleRefetch();                          // nyt venskab (fx nogen accepterede mig) → frisk vennerne live
+      realtimeNotify("friendships", payload);
+    })
     .subscribe();
 }
 export function unsubscribeRealtime(){

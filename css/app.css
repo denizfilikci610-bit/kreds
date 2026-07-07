@@ -430,6 +430,7 @@
   .listrow .l2{font-size:13.5px;color:var(--gray)}
   .sectionlabel{font-size:16px;font-weight:700;padding:14px 16px 6px;color:var(--ink)}
   .addaction{color:var(--red);font-weight:700;font-size:14px;text-align:left}
+  .addaction.pending{color:var(--gray)}
   .emptynote{padding:18px 16px;color:var(--gray);font-size:14px}
 
   /* ================= Notifikationer ================= */
@@ -489,6 +490,8 @@
   }
   .pv-add:active{opacity:.8}
   .pv-add.done,.pv-add:disabled{background:var(--chip);color:var(--gray);cursor:default;opacity:1}
+  /* Sendt ven-anmodning: dæmpet, men stadig klikbar (tryk = fortryd) */
+  .pv-add.pending{background:var(--chip);color:var(--gray);cursor:pointer;opacity:1}
   /* "Se aktivitet"-chip på ven-profilen */
   .pv-actbtn{
     display:inline-flex;align-items:center;

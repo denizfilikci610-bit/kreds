@@ -12,6 +12,7 @@ export function setMe(v){ me = v; }
 export const state = {
   friends: [],            // handles (inkl. den officielle profil)
   humanFriends: [],       // handles uden den officielle profil (tælles/vises som "venner")
+  sentRequests: [],       // handles jeg har sendt en (endnu ikke accepteret) ven-anmodning til
   posts: [],              // posts in current view (view-model shape)
   wholePosts: [],         // whole-kreds posts (feed_id null)
   teasers: [],            // blurred teasers fra private kredse (kreds_teasers-RPC)

@@ -102,6 +102,7 @@ const DA = {
   /* Ven-profil */
   "pv.add": "Tilføj til din kreds",
   "pv.added": "I din kreds ✓",
+  "pv.requested": "Anmodning sendt",
   "pv.since": "I din kreds siden {year} · Gensidig ven",
   "pv.today": "i dag",
   "pv.empty_friend": "Ingen opslag endnu.",
@@ -125,19 +126,25 @@ const DA = {
   "friend.not_found": "Ingen bruger med det navn",
   "friend.self": "Det er dig selv 😄",
   "friend.added": "{name} er nu i din kreds",
+  "friend.request_sent": "Anmodning sendt til {name}",
+  "friend.request_cancelled": "Anmodning trukket tilbage",
+  "friend.req_declined": "Anmodning afvist",
   "friend.removed": "{name} er fjernet som ven",
 
   /* Søg */
   "search.ph": "Søg i din kreds",
   "search.section": "Din kreds",
   "search.add": "Tilføj @{h} til din kreds",
+  "search.requested": "Anmodning sendt",
   "search.no_match": "Ingen i din kreds matcher.",
   "search.empty": "Din kreds er tom endnu. Søg efter dine venner her 🔍",
 
   /* Notifikationer */
   "notif.liked": "likede dit opslag",
   "notif.commented": "svarede på dit opslag",
+  "notif.replied": "svarede på din kommentar",
   "notif.friend": "er nu i din kreds",
+  "notif.friend_request": "vil være venner",
   "notif.invited": "har inviteret dig til “{k}”",
   "notif.request": "vil være med i “{k}”",
   "notif.accept": "Accepter",
@@ -432,6 +439,7 @@ const EN = {
   /* Friend profile */
   "pv.add": "Add to your circle",
   "pv.added": "In your circle ✓",
+  "pv.requested": "Request sent",
   "pv.since": "In your circle since {year} · Mutual friend",
   "pv.today": "today",
   "pv.empty_friend": "No posts yet.",
@@ -455,19 +463,25 @@ const EN = {
   "friend.not_found": "No user with that name",
   "friend.self": "That's you 😄",
   "friend.added": "{name} is now in your circle",
+  "friend.request_sent": "Friend request sent to {name}",
+  "friend.request_cancelled": "Request withdrawn",
+  "friend.req_declined": "Request declined",
   "friend.removed": "{name} has been removed as a friend",
 
   /* Search */
   "search.ph": "Search your circle",
   "search.section": "Your circle",
   "search.add": "Add @{h} to your circle",
+  "search.requested": "Request sent",
   "search.no_match": "No one in your circle matches.",
   "search.empty": "Your circle is empty so far. Search for your friends here 🔍",
 
   /* Notifications */
   "notif.liked": "liked your post",
   "notif.commented": "replied to your post",
+  "notif.replied": "replied to your comment",
   "notif.friend": "is now in your circle",
+  "notif.friend_request": "wants to be friends",
   "notif.invited": "invited you to “{k}”",
   "notif.request": "wants to join “{k}”",
   "notif.accept": "Accept",
