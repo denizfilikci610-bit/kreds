@@ -48,9 +48,11 @@ struct WebView: UIViewRepresentable {
         }
         #endif
 
-        let refresh = UIRefreshControl()
-        refresh.addTarget(context.coordinator, action: #selector(Coordinator.pullToRefresh(_:)), for: .valueChanged)
-        webView.scrollView.refreshControl = refresh
+        // No native pull-to-refresh / outer bounce: the feed scrolls in the web's own
+        // inner container (#app), so the outer WKWebView must NOT rubber-band (that was
+        // what revealed a black gap + spinner and pushed the whole UI down). Pull-to-
+        // refresh is now a clean in-app gesture handled in the web (js/pullrefresh.js).
+        webView.scrollView.bounces = false
 
         model.webView = webView
         // Let the ad manager call back into the page (fill/collapse slots).
@@ -70,13 +72,6 @@ struct WebView: UIViewRepresentable {
 
         init(model: WebViewModel) {
             self.model = model
-        }
-
-        @objc func pullToRefresh(_ sender: UIRefreshControl) {
-            model.webView?.reload()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                sender.endRefreshing()
-            }
         }
 
         // keep VibeFeed (and its Supabase backend) inside the app;
