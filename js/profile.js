@@ -1,10 +1,10 @@
 import { sb, GENERIC_ERR, BLOCKED_MSG, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab } from "./store.js";
-import { el, esc, avaHTML, user, toast, uuid, registerProfile } from "./helpers.js";
+import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime } from "./helpers.js";
 import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts } from "./feed.js";
 import { openCompose } from "./compose.js";
 import { renderSearch, refreshSearchAfterFriendAdd } from "./search.js";
-import { resetApp, showAuth } from "./auth.js";
+import { resetApp, showAuth, nativeLogout } from "./auth.js";
 
 /* ================= Bobler-række ================= */
 export function renderStories(){
@@ -54,10 +54,47 @@ export function setOwnUI(){
 
 export function closeEditSheet(){
   el("esheet").classList.remove("on");
-  if(!el("fsheet").classList.contains("on") && !el("edsheet").classList.contains("on") && !el("msheet").classList.contains("on"))
+  if(!el("fsheet").classList.contains("on") && !el("edsheet").classList.contains("on") && !el("msheet").classList.contains("on") && !el("asheet").classList.contains("on"))
     el("scrim").classList.remove("on");
 }
 function epCan(){ el("ep-save").disabled = !el("ep-name").value.trim(); }
+
+/* ================= Aktivitet (samtykke-styret visning af likes/kommentarer) ================= */
+const ACT_H = '<svg viewBox="0 0 24 24"><path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+const ACT_B = '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>';
+
+export function closeActivitySheet(){
+  el("asheet").classList.remove("on");
+  if(!el("fsheet").classList.contains("on") && !el("esheet").classList.contains("on") &&
+     !el("edsheet").classList.contains("on") && !el("msheet").classList.contains("on"))
+    el("scrim").classList.remove("on");
+}
+async function openActivitySheet(h){
+  el("as-title").textContent = user(h).name + "s aktivitet";
+  el("as-list").innerHTML = '<div class="emptynote">Henter …</div>';
+  el("scrim").classList.add("on");
+  el("asheet").classList.add("on");
+  const { data, error } = await sb.rpc("activity_of", { u: user(h).id });
+  if(!el("asheet").classList.contains("on")) return; // lukket imens
+  if(error){
+    console.error(error);
+    el("as-list").innerHTML = '<div class="emptynote">Kunne ikke hente aktiviteten. Prøv igen.</div>';
+    return;
+  }
+  const rows = data || [];
+  el("as-list").innerHTML = rows.length
+    ? rows.map(function(r){
+        const like = r.kind === "like";
+        const txt = like
+          ? 'Likede '+esc(r.target_name)+'s opslag'+(r.snippet ? ': “'+esc(r.snippet)+'”' : '')
+          : 'Kommenterede hos '+esc(r.target_name)+(r.snippet ? ': “'+esc(r.snippet)+'”' : '');
+        return '<div class="notif">'+
+          '<div class="nicon '+(like ? "heart" : "bubble")+'">'+(like ? ACT_H : ACT_B)+'</div>'+
+          '<div class="grow"><div class="ntext">'+txt+' <span class="nt">'+esc(fmtTime(r.created_at))+'</span></div></div>'+
+        '</div>';
+      }).join("")
+    : '<div class="emptynote">Ingen aktivitet endnu.</div>';
+}
 
 /* ---- Slet konto (popup) ---- */
 export function resetDeleteUI(){
@@ -112,6 +149,10 @@ export async function openProfile(h){
   el("pv-stat-kredse").textContent = "–";
   el("pv-ava").innerHTML = avaHTML(h, 86);
   renderPvRelation(h);
+  /* "Se aktivitet" — skjules på egen profil og for den officielle bot */
+  const act = el("pv-act");
+  act.style.display = (me && h !== me.handle && h !== OFFICIAL_HANDLE) ? "" : "none";
+  act.disabled = false;
   el("pv-posts").innerHTML = '<div class="emptynote">Henter …</div>';
   el("pv-body").scrollTop = 0;
   el("profileview").classList.add("on");
@@ -167,6 +208,7 @@ el("editprof").addEventListener("click", function(){
   if(!me) return;
   el("ep-name").value = me.name || "";
   el("ep-bio").value = me.bio || "";
+  el("ep-share").checked = me.show_activity !== false;
   el("ep-ava").innerHTML = avaHTML(me.handle, 72);
   el("ep-file").value = "";
   resetDeleteUI();
@@ -179,9 +221,10 @@ el("ep-name").addEventListener("input", epCan);
 el("ep-save").addEventListener("click", async function(){
   const name = el("ep-name").value.trim();
   const bio = el("ep-bio").value.trim().slice(0, 160);
+  const share = el("ep-share").checked;
   if(!name || !me) return;
   this.disabled = true;
-  const { error } = await sb.from("profiles").update({ name:name, bio: bio || null }).eq("id", me.id);
+  const { error } = await sb.from("profiles").update({ name:name, bio: bio || null, show_activity: share }).eq("id", me.id);
   this.disabled = false;
   if(error){
     console.error(error);
@@ -190,6 +233,7 @@ el("ep-save").addEventListener("click", async function(){
   }
   me.name = name;
   me.bio = bio || null;
+  me.show_activity = share;
   registerProfile(me);
   setOwnUI();
   closeEditSheet();
@@ -272,6 +316,7 @@ el("del-btn").addEventListener("click", async function(){
   try{
     const { data, error } = await sb.functions.invoke("delete-account", { body:{} });
     if(error || !data || !data.ok) throw (error || new Error("delete_failed"));
+    nativeLogout(); // tilbagekald device-token + besked til appen FØR sessionen ryddes
     try{ await sb.auth.signOut(); }catch(_e){}
     closeEditSheet();
     resetApp();
@@ -285,10 +330,28 @@ el("del-btn").addEventListener("click", async function(){
 });
 
 el("logoutbtn").addEventListener("click", async function(){
+  nativeLogout(); // tilbagekald device-token + besked til appen FØR sessionen ryddes
   const { error } = await sb.auth.signOut();
   if(error){ console.error(error); toast(GENERIC_ERR); }
 });
 el("pv-back").addEventListener("click", closeProfile);
+/* ---- "Se aktivitet": samtykke-tjek via RPC, derefter fladt bottom sheet ---- */
+el("pv-act").addEventListener("click", async function(){
+  const h = pv.u;
+  if(!me || !h || this.disabled) return;
+  const u = user(h);
+  if(!u.id) return;
+  const btn = this;
+  btn.disabled = true;
+  const { data, error } = await sb.rpc("activity_allowed", { u: u.id });
+  btn.disabled = false;
+  if(error){ console.error(error); toast(GENERIC_ERR); return; }
+  if(data === "self_off"){ toast("Slå “Del min aktivitet” til for at se andres."); return; }
+  if(data === "target_off"){ toast(u.name + " deler ikke sin aktivitet."); return; }
+  if(data !== "ok"){ toast(GENERIC_ERR); return; }
+  if(pv.u !== h) return;
+  openActivitySheet(h);
+});
 /* ---- Ikke-ven: "Tilføj til din kreds" (optimistisk ✓, derefter refetch) ---- */
 el("pv-add").addEventListener("click", async function(){
   const h = pv.u;

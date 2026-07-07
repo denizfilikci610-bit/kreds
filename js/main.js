@@ -5,7 +5,7 @@ import { initComments } from "./comments.js";
 import { initKredse, closeFeedSheet, closeMemberSheet } from "./kredse.js";
 import { initCompose } from "./compose.js";
 import { initSearch } from "./search.js";
-import { initProfile, closeEditSheet } from "./profile.js";
+import { initProfile, closeEditSheet, closeActivitySheet } from "./profile.js";
 import { initNotifs } from "./notifications.js";
 import { initLightbox } from "./lightbox.js";
 import { initRealtime } from "./realtime.js";
@@ -23,7 +23,7 @@ initLightbox();
 initRealtime();
 initAuth();
 
-el("scrim").addEventListener("click", function(){ closeFeedSheet(); closeMemberSheet(); closeEditSheet(); closePostEdit(); });
+el("scrim").addEventListener("click", function(){ closeFeedSheet(); closeMemberSheet(); closeEditSheet(); closeActivitySheet(); closePostEdit(); });
 
 document.querySelectorAll(".tabbar [data-view]").forEach(function(t){
   t.addEventListener("click", function(){ switchTab(t.dataset.view); });

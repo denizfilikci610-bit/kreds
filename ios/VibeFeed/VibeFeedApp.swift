@@ -2,9 +2,20 @@ import SwiftUI
 
 @main
 struct VibeFeedApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+
+    init() {
+        NotifManager.shared.register()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background {
+                NotifManager.shared.scheduleRefresh()
+            }
         }
     }
 }

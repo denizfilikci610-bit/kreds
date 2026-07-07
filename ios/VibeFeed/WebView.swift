@@ -30,6 +30,8 @@ struct WebView: UIViewRepresentable {
         config.mediaTypesRequiringUserActionForPlayback = []
         // persistent store: login/session survives app restarts
         config.websiteDataStore = .default()
+        // bridge: the web app hands over a device secret for background notifications
+        config.userContentController.add(NotifManager.shared, name: "vibefeed")
 
         let webView = InsetFreeWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator

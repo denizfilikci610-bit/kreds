@@ -18,7 +18,7 @@ export function openFeedSheet(){
 }
 export function closeFeedSheet(){
   el("fsheet").classList.remove("on");
-  if(!el("esheet").classList.contains("on") && !el("edsheet").classList.contains("on") && !el("msheet").classList.contains("on"))
+  if(!el("esheet").classList.contains("on") && !el("edsheet").classList.contains("on") && !el("msheet").classList.contains("on") && !el("asheet").classList.contains("on"))
     el("scrim").classList.remove("on");
 }
 function renderFsList(){
@@ -64,7 +64,7 @@ export function openMemberSheet(){
 export function closeMemberSheet(){
   el("msheet").classList.remove("on");
   msFeedId = null;
-  if(!el("fsheet").classList.contains("on") && !el("esheet").classList.contains("on") && !el("edsheet").classList.contains("on"))
+  if(!el("fsheet").classList.contains("on") && !el("esheet").classList.contains("on") && !el("edsheet").classList.contains("on") && !el("asheet").classList.contains("on"))
     el("scrim").classList.remove("on");
 }
 function renderMemberSheet(){
@@ -92,7 +92,7 @@ function renderMemberSheet(){
         return '<div class="listrow">'+
           avaHTML(h, 44)+
           '<div class="grow"><div class="l1">'+esc(user(h).name)+'</div><div class="l2">@'+esc(h)+'</div></div>'+
-          '<button class="ms-btn add" data-add="'+esc(user(h).id)+'">Tilføj</button>'+
+          '<button class="ms-btn add" data-add="'+esc(user(h).id)+'">Invitér</button>'+
         '</div>';
       }).join("")
     : '<div class="emptynote">Alle dine venner er allerede med.</div>';
@@ -114,7 +114,7 @@ function govErrToast(m){
   if(m.indexOf("proposal_exists") >= 0) toast("Der er allerede en afstemning i gang om det");
   else if(m.indexOf("not_owner") >= 0) toast("Kun ejeren kan fjerne direkte i små kredse");
   else if(m.indexOf("already_member") >= 0) toast("Personen er allerede med i kredsen");
-  else if(m.indexOf("not_friend") >= 0) toast("Du kan kun tilføje dine egne venner");
+  else if(m.indexOf("not_friend") >= 0) toast("Du kan kun invitere dine egne venner");
   else toast(GENERIC_ERR);
 }
 async function msRemove(btn){
@@ -143,6 +143,7 @@ async function msAdd(btn){
   const f = feedById(fid);
   if(!f || !me || btn.disabled) return;
   btn.disabled = true;
+  /* Serveren sender nu ALTID en invitation (ingen direkte tilføjelse/afstemning her) */
   const { error } = await sb.rpc("add_kreds_member", { f: fid, u: btn.dataset.add });
   if(error){
     console.error(error);
@@ -150,12 +151,8 @@ async function msAdd(btn){
     govErrToast(String(error.message || ""));
     return;
   }
-  await refreshAfterGov();
-  const f2 = feedById(fid);
-  if(!f2) return;
-  toast(f2.memberIds.indexOf(btn.dataset.add) >= 0
-    ? user(ID2H[btn.dataset.add] || "?").name + " er nu med i kredsen"
-    : "Afstemning oprettet — de andre skal være enige");
+  btn.textContent = "Inviteret ✓"; // medlemslisten ændrer sig først, når invitationen accepteres
+  toast("Invitation sendt til " + user(ID2H[btn.dataset.add] || "?").name);
 }
 
 export function initKredse(){
@@ -198,7 +195,7 @@ el("fs-create").addEventListener("click", async function(){
   await loadFeeds();
   renderComposeDest();
   setFeed(data);
-  toast("Kredsen ”"+name+"” er oprettet");
+  toast("Kredsen “"+name+"” er oprettet — invitationer sendt 💌");
 });
 /* ---- Medlemmer-sheet ---- */
 el("msheet").addEventListener("click", function(e){

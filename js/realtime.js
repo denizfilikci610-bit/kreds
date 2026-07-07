@@ -6,6 +6,7 @@ import { renderComposeDest } from "./compose.js";
 import { refreshMemberSheet } from "./kredse.js";
 import { renderStories, loadPvPosts } from "./profile.js";
 import { renderSearch } from "./search.js";
+import { realtimeNotify } from "./notifications.js";
 
 /* ================= Realtime + fokus ================= */
 let channel = null, refetchTimer = null;
@@ -42,11 +43,23 @@ export function subscribeRealtime(){
       // ingen egen realtime-hændelse — hent igen lidt senere, så de kommer med
       if(payload && payload.eventType === "INSERT") setTimeout(scheduleRefetch, 3000);
     })
-    .on("postgres_changes", { event:"*", schema:"public", table:"comments" }, scheduleRefetch)
-    .on("postgres_changes", { event:"*", schema:"public", table:"likes" }, scheduleRefetch)
+    .on("postgres_changes", { event:"*", schema:"public", table:"comments" }, function(payload){
+      scheduleRefetch();
+      realtimeNotify("comments", payload);
+    })
+    .on("postgres_changes", { event:"*", schema:"public", table:"likes" }, function(payload){
+      scheduleRefetch();
+      realtimeNotify("likes", payload);
+    })
     .on("postgres_changes", { event:"*", schema:"public", table:"poll_votes" }, scheduleRefetch)
     .on("postgres_changes", { event:"*", schema:"public", table:"feed_members" }, scheduleRefetch)
     .on("postgres_changes", { event:"*", schema:"public", table:"feeds" }, scheduleRefetch)
+    .on("postgres_changes", { event:"INSERT", schema:"public", table:"kreds_invites" }, function(payload){
+      realtimeNotify("kreds_invites", payload);
+    })
+    .on("postgres_changes", { event:"INSERT", schema:"public", table:"kreds_requests" }, function(payload){
+      realtimeNotify("kreds_requests", payload);
+    })
     .subscribe();
 }
 export function unsubscribeRealtime(){

@@ -1,9 +1,9 @@
 import { sb, GENERIC_ERR, BLOCKED_MSG, recoveryMode, setRecoveryMode } from "./config.js";
 import { me, setMe, state, FRIEND_SINCE, pv, expandedCmts, clearComposers, setCfilePid } from "./store.js";
 import { el, registerProfile, toast } from "./helpers.js";
-import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu, closeReportMenu, resetFeedbarSearch, resetTapState } from "./feed.js";
+import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu, closeReportMenu, resetFeedbarSearch, resetTapState, resetBarHide } from "./feed.js";
 import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPost, resetPoll } from "./compose.js";
-import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile } from "./profile.js";
+import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet } from "./profile.js";
 import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
 import { closeLightbox } from "./lightbox.js";
 import { subscribeRealtime, unsubscribeRealtime } from "./realtime.js";
@@ -59,6 +59,39 @@ export function hideAuth(){
   el("rc-err").textContent = "";
 }
 
+/* ================= Native notifikations-bro (kun i iOS-appen — no-op i browsere) ================= */
+async function pushNativeCreds(){
+  try{
+    if(!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed)) return;
+    if(!me) return;
+    const uid = me.id;
+    let secret = localStorage.getItem("vf_device_secret");
+    if(!secret){
+      const { data, error } = await sb.rpc("issue_device_token");
+      if(error || !data){ if(error) console.error(error); return; }
+      // Log ud imens RPC'en var i luften? Gem/post ALDRIG et token for en død session
+      // — ellers kan næste login genbruge den forrige brugers device-token.
+      if(!me || me.id !== uid) return;
+      secret = data;
+      localStorage.setItem("vf_device_secret", secret);
+    }
+    if(me && me.id === uid) window.webkit.messageHandlers.vibefeed.postMessage({ type:"creds", secret:secret, userId: me.id });
+  }catch(_e){ /* aldrig lade broen vælte web-appen */ }
+}
+/* Best effort: tilbagekald token + giv appen besked. Kaldes FØR signOut (session i live)
+   og igen fra resetApp (idempotent — nøglen er fjernet efter første kald). */
+export function nativeLogout(){
+  try{
+    const secret = localStorage.getItem("vf_device_secret");
+    if(secret){
+      localStorage.removeItem("vf_device_secret");
+      sb.rpc("revoke_device_token", { s: secret }).then(function(){}, function(){});
+    }
+    if(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed)
+      window.webkit.messageHandlers.vibefeed.postMessage({ type:"logout" });
+  }catch(_e){}
+}
+
 /* ================= Boot ================= */
 export async function boot(session){
   if(recoveryMode){ showRecovery(); return; }
@@ -89,11 +122,15 @@ export async function boot(session){
   subscribeRealtime();
   loadQuota();
   hideAuth();
+  pushNativeCreds(); // fire-and-forget — kun i WKWebView'en
 }
 export function resetApp(){
+  nativeLogout(); // no-op hvis allerede kaldt før signOut (nøglen er fjernet)
   unsubscribeRealtime();
   setMe(null);
   switchTab("feed");
+  resetBarHide();
+  el("tabdot").classList.remove("on");
   Object.keys(FRIEND_SINCE).forEach(function(k){ delete FRIEND_SINCE[k]; });
   state.friends = [];
   state.humanFriends = [];
@@ -114,6 +151,7 @@ export function resetApp(){
   closeFeedSheet();
   closeMemberSheet();
   closeEditSheet();
+  closeActivitySheet();
   closePostEdit();
   closePostMenu();
   closeReportMenu();

@@ -1,14 +1,42 @@
 import { sb, GENERIC_ERR } from "./config.js";
-import { me, expandedCmts } from "./store.js";
+import { me, expandedCmts, curTab } from "./store.js";
 import { el, esc, avaHTML, user, fmtTime, toast, registerProfile } from "./helpers.js";
 import { scheduleRefetch } from "./realtime.js";
-import { switchTab, setFeed } from "./feed.js";
+import { switchTab, setFeed, resetBarHide } from "./feed.js";
 import { rerenderPostCmts } from "./comments.js";
 import { openProfile } from "./profile.js";
 
+/* ================= Notifikations-prik (session-only, ingen persistens) ================= */
+export function setNotifDot(on){
+  el("tabdot").classList.toggle("on", !!on);
+}
+/* Kaldes fra realtime.js ved INSERTs på likes/comments/kreds_invites/kreds_requests.
+   RLS har allerede filtreret synligheden — vi frasorterer kun egne handlinger. */
+export function realtimeNotify(table, payload){
+  if(!me || !payload || payload.eventType !== "INSERT") return;
+  const row = payload.new;
+  if(!row) return;
+  if(table === "kreds_invites"){
+    if(row.user_id !== me.id) return; // kun invitationer TIL mig
+  } else {
+    const actor = row.user_id !== undefined ? row.user_id : row.author;
+    if(actor === me.id) return; // egne likes/kommentarer/anmodninger tæller ikke
+  }
+  if(curTab === "akt"){
+    // Fanen er åben: frisk liste i stedet for prik (gælder også invitationer).
+    // Debounce som scheduleRefetch, så en byge af events ikke giver overlappende loads.
+    clearTimeout(notifTimer);
+    notifTimer = setTimeout(loadNotifs, 400);
+    return;
+  }
+  setNotifDot(true);
+}
+
 /* ================= Notifikationer ================= */
+let notifTimer = null, notifSeq = 0;
 export async function loadNotifs(){
   if(!me) return;
+  const t = ++notifSeq; // sekvens-token: kun det nyeste kald må skrive resultatet
   el("notifs").innerHTML = '<div class="emptynote">Henter …</div>';
   const H = '<svg viewBox="0 0 24 24"><path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
   const B = '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>';
@@ -21,6 +49,19 @@ export async function loadNotifs(){
         (snip ? '<div class="nsnip">'+esc(snip)+'</div>' : '')+
       '</div>'+
       '<div class="nicon '+cls+'">'+icon+'</div>'+
+    '</div>';
+  }
+  /* Invitation til en kreds (Accepter/Afvis) */
+  function invRow(n){
+    return '<div class="notif kinv" data-invf="'+esc(n.f)+'" data-k="'+esc(n.k)+'">'+
+      avaHTML(n.u, 32)+
+      '<div class="grow">'+
+        '<div class="ntext"><b>'+esc(user(n.u).name)+'</b> har inviteret dig til “'+esc(n.k)+'”. <span class="nt">'+esc(fmtTime(n.at))+'</span></div>'+
+        '<div class="kbtns">'+
+          '<button class="kbtn kacc">Accepter</button>'+
+          '<button class="kbtn kdec">Afvis</button>'+
+        '</div>'+
+      '</div>'+
     '</div>';
   }
   /* Anmodning om at være med i en af mine kredse (kun kreds-ejeren ser disse rækker) */
@@ -45,7 +86,8 @@ export async function loadNotifs(){
 
     const reqs = [
       sb.from("friendships").select("created_at, from_profile:profiles!user_id(*)").eq("friend_id", me.id),
-      sb.from("kreds_requests").select("created_at, feed_id, user_id, requester:profiles!user_id(*), feed:feeds!feed_id(name)").neq("user_id", me.id)
+      sb.from("kreds_requests").select("created_at, feed_id, user_id, requester:profiles!user_id(*), feed:feeds!feed_id(name)").neq("user_id", me.id),
+      sb.from("kreds_invites").select("created_at, feed_id, feed:feeds!feed_id(name), inviter:profiles!invited_by(*)").eq("user_id", me.id)
     ];
     if(ids.length){
       reqs.push(sb.from("likes").select("created_at, post_id, liker:profiles!user_id(*)").in("post_id", ids).neq("user_id", me.id));
@@ -64,26 +106,39 @@ export async function loadNotifs(){
         items.push({ type:"kreq", u:r.requester.handle, at:r.created_at, f:r.feed_id, uid:r.user_id, k:(r.feed && r.feed.name) || "" });
       }
     });
+    (res[2].data || []).forEach(function(r){
+      if(r.inviter){
+        registerProfile(r.inviter);
+        items.push({ type:"inv", u:r.inviter.handle, at:r.created_at, f:r.feed_id, k:(r.feed && r.feed.name) || "" });
+      }
+    });
     if(ids.length){
-      (res[2].data || []).forEach(function(r){
+      (res[3].data || []).forEach(function(r){
         if(r.liker){ registerProfile(r.liker); items.push({ type:"like", u:r.liker.handle, at:r.created_at, pid:r.post_id, snip:textById[r.post_id] || "" }); }
       });
-      (res[3].data || []).forEach(function(r){
+      (res[4].data || []).forEach(function(r){
         if(r.author_profile){ registerProfile(r.author_profile); items.push({ type:"cmt", u:r.author_profile.handle, at:r.created_at, pid:r.post_id, snip:r.text || (r.image_path ? "📷 Billede" : "") }); }
       });
     }
     items.sort(function(a,b){ return new Date(b.at) - new Date(a.at); });
-    const top = items.slice(0, 30);
+    /* Invitationer/anmodninger er handlingskrævende — de må aldrig ryge ud af 30-loftet */
+    const acts = items.filter(function(n){ return n.type === "inv" || n.type === "kreq"; });
+    const rest = items.filter(function(n){ return n.type !== "inv" && n.type !== "kreq"; })
+      .slice(0, Math.max(0, 30 - acts.length));
+    const top = acts.concat(rest);
+    if(t !== notifSeq) return; // et nyere kald er i gang — lad det vinde
     el("notifs").innerHTML = top.length
       ? top.map(function(n){
           if(n.type === "like")   return row(H, "heart",  n.u, "likede dit opslag", n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="like"');
           if(n.type === "cmt")    return row(B, "bubble", n.u, "svarede på dit opslag",  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"');
           if(n.type === "kreq")   return kreqRow(n);
+          if(n.type === "inv")    return invRow(n);
           return row(P, "friend", n.u, "er nu i din kreds", "", fmtTime(n.at), ' data-friend="'+esc(n.u)+'"');
         }).join("")
       : '<div class="emptynote">Ingen notifikationer endnu.</div>';
   }catch(err){
     console.error(err);
+    if(t !== notifSeq) return; // et forældet fejlsvar må ikke overskrive en frisk liste
     el("notifs").innerHTML = '<div class="emptynote">Kunne ikke hente notifikationer. Prøv igen.</div>';
   }
 }
@@ -103,12 +158,64 @@ async function openNotifPost(pid, isCmt){
   const node = document.querySelector('#feed .post[data-id="'+data.id+'"]');
   if(!node){ toast("Opslaget kunne ikke vises i feedet"); return; }
   node.scrollIntoView({ block:"center" });
+  resetBarHide(); // programmatisk hop må ikke skjule topbaren — genstart fra landingspositionen
   node.classList.add("flash");
   setTimeout(function(){ node.classList.remove("flash"); }, 1600);
 }
 
+/* ---- Fjern en række og vis evt. tom-tilstand ---- */
+function removeNotifRow(row){
+  row.remove();
+  if(!el("notifs").querySelector(".notif, .emptynote"))
+    el("notifs").innerHTML = '<div class="emptynote">Ingen notifikationer endnu.</div>';
+}
+
+/* ---- Accepter/afvis kreds-invitation ---- */
+async function handleInvite(row, accept){
+  const k = row.dataset.k;
+  row.querySelectorAll(".kbtn").forEach(function(x){ x.disabled = true; });
+  const { data, error } = await sb.rpc(accept ? "accept_kreds_invite" : "decline_kreds_invite", { f: row.dataset.invf });
+  if(error){
+    console.error(error);
+    const m = String(error.message || "");
+    if(m.indexOf("no_invite") >= 0){
+      removeNotifRow(row);
+      toast("Invitationen findes ikke længere");
+      return;
+    }
+    if(m.indexOf("already_member") >= 0){
+      removeNotifRow(row);
+      toast("Du er allerede med i “"+k+"” 🎉");
+      scheduleRefetch();
+      return;
+    }
+    row.querySelectorAll(".kbtn").forEach(function(x){ x.disabled = false; });
+    toast(GENERIC_ERR);
+    return;
+  }
+  removeNotifRow(row);
+  if(!accept){
+    toast("Invitation afvist");
+    return;
+  }
+  if(data === "member"){
+    toast("Du er nu med i “"+k+"” 🎉");
+    scheduleRefetch(); // feeds + opslag skal med det samme afspejle medlemskabet
+  } else {
+    toast("Accepteret — kredsen stemmer nu om dig 🗳️");
+  }
+}
+
 /* ---- Godkend/afvis kreds-anmodning (kun ejeren ser knapperne) ---- */
 async function notifClick(e){
+  const iv = e.target.closest(".kacc, .kdec");
+  if(iv){
+    if(iv.disabled || !me) return;
+    const irow = iv.closest(".notif");
+    if(!irow || !irow.dataset.invf) return;
+    handleInvite(irow, iv.classList.contains("kacc"));
+    return;
+  }
   const b = e.target.closest(".kap, .krej");
   if(!b){
     // Tap på selve rækken (ikke Godkend/Afvis): åbn opslag eller profil
@@ -127,9 +234,7 @@ async function notifClick(e){
   if(error){
     console.error(error);
     if(String(error.message || "").indexOf("no_request") >= 0){
-      row.remove();
-      if(!el("notifs").querySelector(".notif, .emptynote"))
-        el("notifs").innerHTML = '<div class="emptynote">Ingen notifikationer endnu.</div>';
+      removeNotifRow(row);
       toast("Anmodningen findes ikke længere");
       return;
     }
@@ -137,9 +242,7 @@ async function notifClick(e){
     toast(GENERIC_ERR);
     return;
   }
-  row.remove();
-  if(!el("notifs").querySelector(".notif, .emptynote"))
-    el("notifs").innerHTML = '<div class="emptynote">Ingen notifikationer endnu.</div>';
+  removeNotifRow(row);
   toast(approve ? row.dataset.n + " er nu med i " + row.dataset.k : "Anmodning afvist");
   if(approve) scheduleRefetch(); // medlemslisten i kredshead/compose skal med
 }

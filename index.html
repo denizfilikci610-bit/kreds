@@ -106,6 +106,7 @@
       </button>
       <button data-view="akt" aria-label="Notifikationer">
         <svg viewBox="0 0 24 24" id="ic-bell"></svg>
+        <span class="tabdot" id="tabdot"></span>
       </button>
       <button data-view="profil" aria-label="Profil">
         <span class="tabava" id="tab-ava" style="display:none"></span>
@@ -215,6 +216,7 @@
         <div class="bio" id="pv-bio" style="display:none"></div>
         <div class="since" id="pv-since"></div>
         <button class="pv-add" id="pv-add" style="display:none">Tilføj til din kreds</button>
+        <button class="pv-actbtn" id="pv-act" style="display:none">Se aktivitet</button>
       </div>
       <div class="ptl">Opslag</div>
       <div id="pv-posts"></div>
@@ -238,6 +240,15 @@
       <div class="fs-label">Din bio</div>
       <div class="fs-name">
         <textarea id="ep-bio" placeholder="Skriv lidt om dig selv ..." maxlength="160" rows="3"></textarea>
+      </div>
+      <div class="fs-label">Aktivitet</div>
+      <div class="ep-actrow">
+        <label class="eptoggle">
+          <span>Del min aktivitet</span>
+          <input type="checkbox" id="ep-share">
+          <span class="epswitch" aria-hidden="true"></span>
+        </label>
+        <div class="ep-actnote">Slår du den fra, kan du heller ikke se andres aktivitet.</div>
       </div>
       <div class="fs-foot" style="padding-bottom:4px">
         <button class="fs-create" id="ep-save" disabled>Gem</button>
@@ -269,7 +280,7 @@
     <div class="ep-scroll" style="flex:1;overflow-y:auto;min-height:0">
       <div class="fs-label">Medlemmer</div>
       <div id="ms-members"></div>
-      <div class="fs-label">Tilføj ven</div>
+      <div class="fs-label">Invitér ven</div>
       <div id="ms-friends"></div>
       <div class="ms-leavezone">
         <button class="ms-leave" id="ms-leave">Forlad kreds</button>
@@ -280,6 +291,13 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Aktivitet (sheet, åbnes fra ven-profilen) -->
+  <div class="fsheet" id="asheet" role="dialog" aria-label="Aktivitet">
+    <div class="cmt-grab"></div>
+    <div class="cmt-title" id="as-title"></div>
+    <div class="ep-scroll" id="as-list" style="flex:1;overflow-y:auto;min-height:120px"></div>
   </div>
 
   <!-- Opslag-menu (egne opslag) -->

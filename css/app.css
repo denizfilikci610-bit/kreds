@@ -82,7 +82,11 @@
     padding:env(safe-area-inset-top) 16px 0;
     background:var(--bg);
     border-bottom:1px solid var(--line);
+    transition:transform .25s ease;
   }
+  /* Skjul topbaren ved scroll ned — feedbar/søgehoved glider op til toppen */
+  body.hidebar .topbar{transform:translateY(-100%)}
+  body.hidebar .feedbar,body.hidebar .searchhead{top:env(safe-area-inset-top)}
   .wordmark{
     font-family:Georgia,"Times New Roman",serif;
     font-weight:700;font-size:26px;letter-spacing:-.5px;
@@ -142,6 +146,7 @@
     overflow-x:auto;scrollbar-width:none;
     background:var(--bg);
     border-bottom:1px solid var(--line);
+    transition:top .25s ease;
   }
   .feedbar::-webkit-scrollbar{display:none}
   .fpill{
@@ -387,6 +392,7 @@
     padding:10px 16px 10px;position:sticky;top:calc(52px + env(safe-area-inset-top));z-index:40;
     background:var(--bg);
     border-bottom:1px solid var(--line);
+    transition:top .25s ease;
   }
   .searchbox{
     display:flex;align-items:center;gap:9px;
@@ -428,7 +434,7 @@
   .notif .nicon.heart svg path{fill:var(--red);stroke:var(--red)}
   .notif .nicon.bubble{color:var(--gray)}
   .notif .nicon.friend{color:var(--red)}
-  .notif.kreq{align-items:flex-start}
+  .notif.kreq,.notif.kinv{align-items:flex-start}
   .notif .kbtns{display:flex;gap:8px;margin-top:7px}
   .kbtn{
     border-radius:999px;
@@ -436,7 +442,7 @@
     font-size:13px;font-weight:700;
     background:var(--chip);color:var(--ink);
   }
-  .kbtn.kap{background:var(--red);color:#fff}
+  .kbtn.kap,.kbtn.kacc{background:var(--red);color:#fff}
   .kbtn:active{opacity:.75}
   .kbtn:disabled{opacity:.5;cursor:default}
 
@@ -462,6 +468,17 @@
   }
   .pv-add:active{opacity:.8}
   .pv-add.done,.pv-add:disabled{background:var(--chip);color:var(--gray);cursor:default;opacity:1}
+  /* "Se aktivitet"-chip på ven-profilen */
+  .pv-actbtn{
+    display:inline-flex;align-items:center;
+    margin-top:10px;margin-left:8px;
+    background:var(--chip);color:var(--ink);
+    border-radius:999px;
+    padding:7px 16px;
+    font-size:13px;font-weight:700;
+  }
+  .pv-actbtn:active{opacity:.7}
+  .pv-actbtn:disabled{opacity:.5;cursor:default}
   .niksaldo{margin-top:8px}
   .niksaldo .nik1{font-size:14px;color:var(--ink)}
   .niksaldo .nik1 b{font-weight:700}
@@ -490,11 +507,20 @@
     border-top:1px solid var(--line);
   }
   .tabbar button{
+    position:relative;
     flex:1;
     display:flex;align-items:center;justify-content:center;
     height:50px;
     color:var(--ink);
   }
+  /* Notifikations-prik (session-only) øverst til højre på hjerte-fanen */
+  .tabdot{
+    position:absolute;top:8px;left:calc(50% + 7px);
+    width:8px;height:8px;border-radius:50%;
+    background:var(--red);
+    display:none;pointer-events:none;
+  }
+  .tabdot.on{display:block}
   .tabbar button:active{opacity:.55}
   .tabbar svg{width:26px;height:26px}
   .tabava{
@@ -740,6 +766,31 @@
   .ed-body textarea:focus{outline:none}
   .ed-hint{padding:8px 18px 0;font-size:13px;font-weight:600;color:var(--red)}
 
+  /* ---- Rediger profil: "Del min aktivitet"-toggle (flad switch) ---- */
+  .ep-actrow{padding:10px 16px 0}
+  .eptoggle{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    font-size:15px;font-weight:600;color:var(--ink);
+    cursor:pointer;
+  }
+  .eptoggle input{position:absolute;opacity:0;pointer-events:none}
+  .epswitch{
+    width:44px;height:26px;border-radius:999px;
+    background:var(--line2);
+    position:relative;flex:0 0 auto;
+    transition:background .2s ease;
+  }
+  .epswitch::after{
+    content:"";position:absolute;top:3px;left:3px;
+    width:20px;height:20px;border-radius:50%;
+    background:#fff;
+    transition:transform .2s ease;
+  }
+  .eptoggle input:checked+.epswitch{background:var(--red)}
+  .eptoggle input:checked+.epswitch::after{transform:translateX(18px)}
+  .eptoggle input:focus-visible+.epswitch{outline:2px solid var(--red);outline-offset:2px}
+  .ep-actnote{font-size:12.5px;color:var(--gray);margin-top:6px;line-height:1.4}
+
   /* ---- Rediger profil: avatar + slet konto ---- */
   .ep-avarow{display:flex;align-items:center;gap:14px;padding:12px 16px 0}
   .ep-avarow .pic{font-size:14px;font-weight:700;color:var(--red);text-align:left;padding:4px 0}
@@ -857,7 +908,7 @@
   .compose-body::-webkit-scrollbar,.ep-scroll::-webkit-scrollbar,.authview::-webkit-scrollbar,textarea::-webkit-scrollbar{display:none;width:0;height:0}
 
   @media(prefers-reduced-motion:reduce){
-    .fsheet,.compose,.profileview,.scrim,.toast{transition:none}
+    .fsheet,.compose,.profileview,.scrim,.toast,.topbar,.feedbar,.searchhead,.epswitch,.epswitch::after{transition:none}
     .bigheart.go svg,.like-btn.on svg,.post.flash{animation:none}
     .bigheart.go svg{opacity:0}
     .post.flash{background:var(--chip)}

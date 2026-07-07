@@ -5,7 +5,7 @@ import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggle
 import { openFeedSheet, openMemberSheet } from "./kredse.js";
 import { openProfile, closeProfile, renderMyPosts, renderStories, refreshPv } from "./profile.js";
 import { renderSearch } from "./search.js";
-import { loadNotifs } from "./notifications.js";
+import { loadNotifs, setNotifDot } from "./notifications.js";
 import { scheduleRefetch } from "./realtime.js";
 import { mapPoll, pollHTML, votePoll } from "./polls.js";
 import { openLightbox } from "./lightbox.js";
@@ -432,6 +432,7 @@ export function setFeed(id){
   el("feed").innerHTML = '<div class="emptynote" style="text-align:center">Henter …</div>';
   const done = loadPosts();
   el("app").scrollTop = 0;
+  resetBarHide();
   return done; // kan awaites (fx notifikations-hop)
 }
 
@@ -464,6 +465,41 @@ export async function loadQuota(){
   }
 }
 
+/* ================= Skjul topbar ved scroll ned (vis igen ved scroll op / nær toppen) ================= */
+let barHidden = false, barLastY = 0, barDownAcc = 0, barUpAcc = 0;
+export function resetBarHide(){
+  barHidden = false;
+  barDownAcc = 0;
+  barUpAcc = 0;
+  barLastY = el("app").scrollTop || 0;
+  document.body.classList.remove("hidebar");
+}
+function appScrolled(){
+  // Klem scrollTop fast i [0, max] — iOS-bounce rapporterer værdier udenfor og
+  // ville ellers vise baren igen efter et fling til bunden.
+  const a = el("app");
+  const max = Math.max(0, a.scrollHeight - a.clientHeight);
+  const y = Math.min(Math.max(a.scrollTop, 0), max);
+  const dy = y - barLastY;
+  barLastY = y;
+  if(y < 40){
+    // Topzonen (pull-to-refresh) viser altid baren
+    barDownAcc = 0;
+    barUpAcc = 0;
+    if(barHidden){ barHidden = false; document.body.classList.remove("hidebar"); }
+    return;
+  }
+  if(dy > 0){
+    barUpAcc = 0;
+    barDownAcc += dy;
+    if(!barHidden && barDownAcc > 24){ barHidden = true; document.body.classList.add("hidebar"); }
+  } else if(dy < 0){
+    barDownAcc = 0;
+    barUpAcc -= dy; // lille tærskel, så jitter ikke flipper baren
+    if(barHidden && barUpAcc > 6){ barHidden = false; document.body.classList.remove("hidebar"); }
+  }
+}
+
 /* ================= Tabs ================= */
 export function switchTab(name){
   setCurTab(name);
@@ -474,9 +510,10 @@ export function switchTab(name){
   });
   setTabIcons(name);
   if(name === "search") renderSearch();
-  if(name === "akt") loadNotifs();
+  if(name === "akt"){ loadNotifs(); setNotifDot(false); }
   if(name === "profil") renderMyPosts();
   el("app").scrollTop = 0;
+  resetBarHide();
 }
 
 /* ================= Likes ================= */
@@ -613,7 +650,7 @@ export function openPostEdit(id){
 export function closePostEdit(){
   el("edsheet").classList.remove("on");
   editPid = null;
-  if(!el("fsheet").classList.contains("on") && !el("esheet").classList.contains("on") && !el("msheet").classList.contains("on"))
+  if(!el("fsheet").classList.contains("on") && !el("esheet").classList.contains("on") && !el("msheet").classList.contains("on") && !el("asheet").classList.contains("on"))
     el("scrim").classList.remove("on");
 }
 
@@ -791,6 +828,7 @@ function timelineClick(e){
 }
 
 export function initFeed(){
+el("app").addEventListener("scroll", appScrolled, { passive:true });
 el("feedbar").addEventListener("click", function(e){
   if(e.target.closest(".fbseek")){
     kseek.on = true;
