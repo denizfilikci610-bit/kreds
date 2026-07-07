@@ -154,7 +154,7 @@ final class AdsManager: NSObject, ObservableObject {
         MobileAds.shared.start(completionHandler: nil)
         RewardedAd.load(with: "ca-app-pub-3940256099942544/1712485313", // Google's public rewarded test unit
                         request: Request()) { [weak self] ad, _ in
-            self?.googleRewarded = ad
+            MainActor.assumeIsolated { self?.googleRewarded = ad } // GAD calls back on the main thread
         }
     }
     #endif
@@ -469,7 +469,7 @@ extension AdsManager: AppodealRewardedVideoDelegate {
     nonisolated func rewardedVideoDidFinish(_ rewardAmount: Float, name: String?) {
         Task { @MainActor in AdsManager.shared.rewardWeb(true) }
     }
-    nonisolated func rewardedVideoDidFailToPresent(withError error: Error) {
+    nonisolated func rewardedVideoDidFailToPresentWithError(_ error: Error) {
         // Only fires for an actual show attempt → report "not earned".
         Task { @MainActor in AdsManager.shared.rewardWeb(false) }
     }
