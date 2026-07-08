@@ -102,9 +102,15 @@ struct NativeKredsBar: View {
                 .focused($focused)
                 .foregroundStyle(Color.primary)
             Button {
-                searching = false; query = ""; focused = false
+                query = ""
+                focused = false
+                searching = false
             } label: {
-                Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(.secondary)
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36, height: 36)      // stort, robust tryk-område
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
