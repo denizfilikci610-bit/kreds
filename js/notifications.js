@@ -1,4 +1,4 @@
-import { sb } from "./config.js";
+import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, expandedCmts, curTab } from "./store.js";
 import { el, esc, avaHTML, user, fmtTime, toast, registerProfile } from "./helpers.js";
 import { t } from "./i18n.js";
@@ -45,6 +45,9 @@ function startAdmTicker(){
 function renderAdmissionVotes(rows){
   const box = el("admvotes");
   if(!box) return;
+  // Afgjorte OPTAGELSES-afstemninger (add) vises nu som notifikation ("Tillykke …"/"… gik ikke igennem"),
+  // så dem skjuler vi fra kortet. Fjernelses-afstemninger (remove) beholder deres resultat på kortet.
+  rows = rows.filter(function(v){ return !(v.resolved && v.kind === "add"); });
   if(!rows.length){ box.innerHTML = ""; stopAdmTicker(); return; }
   box.innerHTML = rows.map(function(v){
     const total = (v.ja || 0) + (v.nej || 0);
@@ -70,15 +73,23 @@ function renderAdmissionVotes(rows){
   }).join("");
   if(rows.some(function(v){ return !v.resolved; })) startAdmTicker(); else stopAdmTicker();
 }
+let admPending = new Set(); // post_id'er for afstemninger der stadig kører — så vi kan opdage en netop-afgjort
 async function loadAdmissionVotes(){
   const box = el("admvotes");
-  if(!me || !box){ if(box) box.innerHTML = ""; stopAdmTicker(); return; }
+  if(!me || !box){ if(box) box.innerHTML = ""; stopAdmTicker(); admPending = new Set(); return; }
   let rows = [];
   try{
     const { data, error } = await sb.rpc("my_membership_votes");
     if(!error && data) rows = data;
   }catch(_e){}
+  // Opdag om en afstemning netop er afgjort (var i gang sidst, er væk/afgjort nu) → frisk notifikationslisten,
+  // så resultat-beskeden ("Tillykke …"/"… gik ikke igennem") dukker op med det samme.
+  const nowPending = new Set(rows.filter(function(v){ return !v.resolved; }).map(function(v){ return v.post_id; }));
+  let justResolved = false;
+  admPending.forEach(function(pid){ if(!nowPending.has(pid)) justResolved = true; });
+  admPending = nowPending;
   renderAdmissionVotes(rows);
+  if(justResolved) loadNotifs();
 }
 /* Kaldes fra realtime.js ved INSERTs på likes/comments/kreds_invites/kreds_requests.
    RLS har allerede filtreret synligheden — vi frasorterer kun egne handlinger. */
@@ -168,7 +179,12 @@ async function hasUnseenNotifs(){
     probes.push(sb.from("comments").select("*", head).in("parent_id", cids).neq("author", me.id).gt("created_at", reactIso));
     probes.push(sb.from("comment_likes").select("*", head).in("comment_id", cids).neq("user_id", me.id).gt("created_at", reactIso));
   }
-  const res = await Promise.all(probes);
+  const [res, admR] = await Promise.all([
+    Promise.all(probes),
+    // Afgjort optagelses-afstemning (Tillykke/gik ikke igennem) tænder også prikken
+    sb.rpc("my_admission_results", { since: reactIso })
+  ]);
+  if(!admR.error && (admR.data || []).length > 0) return true;
   return res.some(function(r){ return !r.error && (r.count || 0) > 0; });
 }
 
@@ -273,6 +289,20 @@ export async function loadNotifs(){
       '</div>'+
     '</div>';
   }
+  /* Resultat af en optagelses-afstemning (til personen selv): tillykke / gik desværre ikke igennem.
+     Neutral system-afsender (VibeFeed-avatar); ikke klikbar — bare en besked. */
+  function mresRow(n){
+    const un = isUnread(n.at);
+    const msg = n.admitted
+      ? t("notif.admission_yes", { k: esc(n.k) })
+      : (n.request ? t("notif.admission_no_request", { k: esc(n.k) }) : t("notif.admission_no_invite", { k: esc(n.k) }));
+    return '<div class="notif mres'+(n.admitted ? " ok" : " no")+(un ? " unread" : "")+'">'+
+      (un ? '<span class="udot"></span>' : '')+
+      avaHTML(n.u, 32)+
+      '<div class="grow"><div class="ntext">'+msg+' <span class="nt">'+esc(fmtTime(n.at))+'</span></div></div>'+
+      '<div class="nicon kvote">'+K+'</div>'+
+    '</div>';
+  }
   try{
     // Mine opslag + mine kommentar-id'er (så svar PÅ mine kommentarer kan findes)
     const [mine, myCmts] = await Promise.all([
@@ -305,7 +335,10 @@ export async function loadNotifs(){
       // Likes PÅ mine kommentarer (comment_likes → comment.post_id for at kunne åbne opslaget)
       iClikes = reqs.push(sb.from("comment_likes").select("created_at, comment:comments!comment_id(post_id), liker:profiles!user_id(*)").in("comment_id", myCmtIds).neq("user_id", me.id).gte("created_at", dayStartIso)) - 1;
     }
-    const res = await Promise.all(reqs);
+    const [res, admResR] = await Promise.all([
+      Promise.all(reqs),
+      sb.rpc("my_admission_results", { since: dayStartIso })
+    ]);
     for(const r of res){ if(r.error) throw r.error; }
 
     const items = [];
@@ -338,8 +371,12 @@ export async function loadNotifs(){
         const rq = typeof r.text === "string" ? /^Afstemning: Skal ([\s\S]+?) lukkes ind i kredsen\?/.exec(r.text) : null;
         const isOwner = typeof r.text === "string" && r.text.indexOf("Afstemning: Hvem skal være ny ejer") === 0;
         if(rq){
-          items.push({ type:"kvote", u:r.author_profile.handle, at:r.created_at, pid:r.id,
-                       k:(r.feed && r.feed.name) || "", sub: rq[1], request: true });
+          // Kun MENS afstemningen kører. Når den er afgjort (✅/❌ i teksten) vises resultatet i stedet
+          // som en mres-notifikation ("Tillykke …"/"… gik ikke igennem") — undgår en dobbelt/forældet række.
+          if(r.text.indexOf("✅") < 0 && r.text.indexOf("❌") < 0){
+            items.push({ type:"kvote", u:r.author_profile.handle, at:r.created_at, pid:r.id,
+                         k:(r.feed && r.feed.name) || "", sub: rq[1], request: true });
+          }
         } else if(gm){
           items.push({ type:"kvote", u:r.author_profile.handle, at:r.created_at, pid:r.id,
                        k:(r.feed && r.feed.name) || "", sub: gm[1], rm: gm[2] === "ud af" });
@@ -385,9 +422,15 @@ export async function loadNotifs(){
         }
       });
     }
+    // Resultat af egne optagelses-afstemninger (både anmodning og invitation) — vises som notifikation
+    (admResR && admResR.data ? admResR.data : []).forEach(function(r){
+      items.push({ type:"mres", u:OFFICIAL_HANDLE, at:r.created_at, f:r.feed_id, k:r.feed_name || "",
+                   admitted: !!r.admitted, request: !!r.is_request });
+    });
     items.sort(function(a,b){ return new Date(b.at) - new Date(a.at); });
-    /* Invitationer/anmodninger er handlingskrævende — de må aldrig ryge ud af 30-loftet */
-    const isAct = function(n){ return n.type === "inv" || n.type === "kreq" || n.type === "freq"; };
+    /* Invitationer/anmodninger er handlingskrævende — de må aldrig ryge ud af 30-loftet.
+       Optagelses-resultatet (mres) fritages også, så en "Tillykke …" ikke skubbes ud en travl dag. */
+    const isAct = function(n){ return n.type === "inv" || n.type === "kreq" || n.type === "freq" || n.type === "mres"; };
     const acts = items.filter(isAct);
     const rest = items.filter(function(n){ return !isAct(n); })
       .slice(0, Math.max(0, 30 - acts.length));
@@ -405,6 +448,7 @@ export async function loadNotifs(){
           if(n.type === "kreq")   return kreqRow(n);
           if(n.type === "inv")    return invRow(n);
           if(n.type === "freq")   return freqRow(n);
+          if(n.type === "mres")   return mresRow(n);
           return row(P, "friend", n.u, t("notif.friend"), "", fmtTime(n.at), ' data-friend="'+esc(n.u)+'"', isUnread(n.at));
         }).join("")
       : '<div class="emptynote">'+t("notif.empty")+'</div>';
