@@ -12,6 +12,8 @@
     --scrim:rgba(0,0,0,.4);
     --toastbg:#262626;
     --toastink:#FFFFFF;
+    --glass:rgba(255,255,255,.6);
+    --glass-brd:rgba(0,0,0,.08);
   }
   @media(prefers-color-scheme:dark){
     :root{
@@ -26,6 +28,8 @@
       --scrim:rgba(0,0,0,.6);
       --toastbg:#363636;
       --toastink:#FFFFFF;
+      --glass:rgba(28,28,30,.52);
+      --glass-brd:rgba(255,255,255,.12);
     }
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -99,6 +103,15 @@
   /* Skjul topbaren ved scroll ned — feedbar/søgehoved glider op til toppen */
   body.hidebar .topbar{transform:translateY(-100%)}
   body.hidebar .feedbar,body.hidebar .searchhead{top:env(safe-area-inset-top)}
+  /* Blød fade under systemets statusbar/Dynamic Island — ENS på alle skærme. Farven er
+     app-baggrunden → gennemsigtig: usynlig oven på en bjælke med samme baggrund (fx topbaren),
+     men lader indhold der scroller op fade blødt ud i stedet for at "bleede" råt bag statusbaren. */
+  .topfade{
+    position:absolute;top:0;left:0;right:0;
+    height:calc(env(safe-area-inset-top) + 8px);
+    background:linear-gradient(to bottom, var(--bg) 58%, transparent);
+    z-index:60;pointer-events:none;   /* over topbar/feedbar/indhold, men under profil/lightbox/ark (egen baggrund) */
+  }
   .wordmark{
     font-family:Georgia,"Times New Roman",serif;
     font-weight:700;font-size:26px;letter-spacing:-.5px;
@@ -156,22 +169,25 @@
     display:flex;gap:8px;align-items:center;
     padding:9px 12px;
     overflow-x:auto;scrollbar-width:none;
-    background:var(--bg);
-    border-bottom:1px solid var(--line);
+    background:transparent;
     transition:top .25s ease;
   }
   .feedbar::-webkit-scrollbar{display:none}
+  /* Liquid glass: matterede, gennemskinnelige piller der flyder over det fadede indhold */
   .fpill{
     flex:0 0 auto;
     border-radius:999px;
     padding:7px 15px;
     font-size:13.5px;font-weight:700;
-    background:var(--chip);
+    background:var(--glass);
+    -webkit-backdrop-filter:blur(18px) saturate(1.7);
+    backdrop-filter:blur(18px) saturate(1.7);
+    border:1px solid var(--glass-brd);
     color:var(--ink);
     white-space:nowrap;
   }
   .fpill:active{opacity:.65}
-  .fpill.on{background:var(--ink);color:var(--bg)}
+  .fpill.on{background:var(--ink);color:var(--bg);border-color:transparent}
   .fpill.new{color:var(--red)}
   /* Ulæste opslag i en kreds: lille rød prik øverst til højre på pillen */
   .fpill{position:relative}
@@ -187,7 +203,10 @@
     flex:0 0 auto;
     display:flex;align-items:center;justify-content:center;
     width:31px;height:31px;border-radius:50%;
-    background:var(--chip);color:var(--gray);
+    background:var(--glass);color:var(--gray);
+    -webkit-backdrop-filter:blur(18px) saturate(1.7);
+    backdrop-filter:blur(18px) saturate(1.7);
+    border:1px solid var(--glass-brd);
   }
   .fbseek svg{width:16px;height:16px}
   .fbseek:active{opacity:.65}
