@@ -76,12 +76,16 @@ if(window.__vfNative){
     const active = av ? av.id.replace("view-", "") : "feed";
     const dot = !!(el("tabdot") && el("tabdot").classList.contains("on"));
     const compact = document.body.classList.contains("hidebar");
-    const overlay = !!document.querySelector("#scrim.on, .compose.on, .profileview.on, #lightbox.on, #rwd-pop.on")
-      || document.body.classList.contains("lb-lock");
-    const key = active + "|" + dot + "|" + compact + "|" + (!overlay);
+    // Skjul baren når noget ligger ovenpå ELLER vi ikke er på hoved-appen (boot-splash, login, gates)
+    const blocked = !!document.querySelector(
+        "#scrim.on, .compose.on, .profileview.on, #lightbox.on, #rwd-pop.on, #authview.on, #langview.on, #consentview.on"
+      ) || document.body.classList.contains("lb-lock")
+      || !!(el("splash") && !el("splash").classList.contains("gone"));
+    const visible = !blocked;
+    const key = active + "|" + dot + "|" + compact + "|" + visible;
     if(key === lastNativeKey) return;
     lastNativeKey = key;
-    mh.postMessage({ type: "tab", active: active, dot: dot, compact: compact, visible: !overlay });
+    mh.postMessage({ type: "tab", active: active, dot: dot, compact: compact, visible: visible });
   };
   setInterval(syncNativeBar, 120);
   syncNativeBar();
