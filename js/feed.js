@@ -111,6 +111,12 @@ const BIGHEART = '<div class="bigheart"><svg viewBox="0 0 24 24"><path d="M20.84
 function cntHTML(n){
   return '<span class="cnt"'+(n > 0 ? '' : ' style="display:none"')+'>'+n+'</span>';
 }
+/* Governance-afstemning: gør navnet fedt i "Afstemning: Skal <navn> med i/ud af kredsen?" */
+function govPostText(text){
+  const m = /^(Afstemning: Skal )([\s\S]+?)( (?:med i|ud af) kredsen\?[\s\S]*)$/.exec(text);
+  if(!m) return esc(text);
+  return esc(m[1]) + "<b>" + esc(m[2]) + "</b>" + esc(m[3]);
+}
 export function postHTML(p){
   let media = '';
   if(p.video){
@@ -139,7 +145,7 @@ export function postHTML(p){
             '<svg viewBox="0 0 24 24"><g class="fillic"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></g></svg>'+
           '</button>'+
         '</div>'+
-        (p.text ? '<div class="ptext">'+esc(p.text)+'</div>' : '')+
+        (p.text ? '<div class="ptext">'+(p.poll && p.poll.gov ? govPostText(p.text) : esc(p.text))+'</div>' : '')+
         media+
         pollHTML(p)+
         '<div class="pactions">'+

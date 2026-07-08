@@ -412,9 +412,8 @@
   .poll-res .pcheck{width:14px;height:14px;flex:0 0 auto}
   .poll-res .ppct{position:relative;flex:0 0 auto;font-size:13px;font-weight:700;color:var(--gray)}
   .pollmeta{padding:7px 0 0;font-size:12.5px;color:var(--gray)}
-  /* Governance-afstemning: tydelig ramme + label så den ikke ligner et almindeligt opslag */
-  .pollwrap.gov{border:1px solid var(--red);border-radius:12px;padding:8px 12px 10px;margin-top:4px}
-  .gov-head{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12px;font-weight:800;color:var(--red);letter-spacing:.02em}
+  /* Governance-afstemning: kun en label (ingen ramme), i primær tekstfarve */
+  .gov-head{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12px;font-weight:800;color:var(--ink);letter-spacing:.02em}
   /* Live optagelses-afstemning (målpersonens boks i Notifikationer) */
   #admvotes:empty{display:none}
   .admvote{margin:12px 16px 0;padding:12px 14px;border:1px solid var(--red);border-radius:14px}
