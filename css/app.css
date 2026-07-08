@@ -371,7 +371,10 @@
     font-size:13px;font-weight:700;
   }
   .treq:active{background:var(--chip)}
-  .treq.sent,.treq:disabled{border-color:transparent;background:var(--chip);color:var(--gray);cursor:default}
+  .treq:disabled{border-color:transparent;background:var(--chip);color:var(--gray);cursor:default}
+  /* "Anmodning sendt": dæmpet, men KLIKBAR (tryk = fortryd) */
+  .treq.sent{border-color:transparent;background:var(--chip);color:var(--gray);cursor:pointer}
+  .treq.sent:active{opacity:.6}
 
   .pactions{
     display:flex;align-items:center;justify-content:space-between;

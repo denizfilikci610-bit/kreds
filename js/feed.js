@@ -53,6 +53,8 @@ export function mapPost(row){
 /* Teasers fra private kredse (kreds_teasers-RPC — serveren sender ALDRIG indhold) */
 /* Kredse med en optimistisk 'Anmodning sendt' der endnu ikke er bekræftet af serveren */
 const pendingReq = new Set();
+/* Kredse med en optimistisk 'annulleret' der endnu ikke er bekræftet (overlever refetch) */
+const cancelledReq = new Set();
 async function mapTeasers(rows){
   const unknown = [];
   rows.forEach(function(r){
@@ -63,8 +65,9 @@ async function mapTeasers(rows){
     if(!r.error) (r.data || []).forEach(registerProfile);
   }
   return rows.map(function(r){
-    const requested = !!r.requested || pendingReq.has(r.feed_id);
-    if(r.requested) pendingReq.delete(r.feed_id); // serveren har bekræftet — override unødig
+    const requested = (!!r.requested || pendingReq.has(r.feed_id)) && !cancelledReq.has(r.feed_id);
+    if(r.requested) pendingReq.delete(r.feed_id);    // serveren bekræftede anmodningen
+    if(!r.requested) cancelledReq.delete(r.feed_id); // serveren bekræftede annulleringen
     return {
       teaser: true,
       id: "t" + r.post_id,
@@ -171,7 +174,7 @@ export function postHTML(p){
 export function teaserHTML(p){
   const name = user(p.u).name;
   const btn = p.requested
-    ? '<button class="treq sent" data-f="'+esc(p.feedId)+'" disabled>'+t("teaser.sent")+'</button>'
+    ? '<button class="treq sent" data-f="'+esc(p.feedId)+'">'+t("teaser.sent")+'</button>'
     : '<button class="treq" data-f="'+esc(p.feedId)+'">'+t("teaser.request")+'</button>';
   return (
     '<article class="post teaser" data-tid="'+esc(p.id)+'">'+
@@ -199,10 +202,26 @@ export function teaserHTML(p){
 function setTeaserReqUI(f, on){
   state.teasers.forEach(function(x){ if(x.feedId === f) x.requested = on; });
   document.querySelectorAll('.treq[data-f="'+f+'"]').forEach(function(b){
-    b.disabled = on;
-    b.classList.toggle("sent", on);
+    b.classList.toggle("sent", on); // altid klikbar — "sendt" = tryk for at fortryde
     b.textContent = on ? t("teaser.sent") : t("teaser.request");
   });
+}
+async function cancelJoin(f){
+  if(!me || !f) return;
+  pendingReq.delete(f);
+  cancelledReq.add(f);      // negativ optimistisk — overlever en baggrunds-refetch mens RPC'en kører
+  setTeaserReqUI(f, false); // optimistisk tilbage til "Anmod om at være med"
+  const { error } = await sb.rpc("cancel_join_request", { f: f });
+  if(error){
+    console.error(error);
+    cancelledReq.delete(f);
+    pendingReq.add(f);
+    setTeaserReqUI(f, true); // fortryd fejlede → tilbage til "Anmodning sendt"
+    toast(t("err.generic"));
+    return;
+  }
+  scheduleRefetch(); // hold teaser-listen frisk (evt. afstemning fjernet)
+  toast(t("friend.request_cancelled"));
 }
 async function requestJoin(f){
   if(!me || !f) return;
@@ -966,7 +985,11 @@ export function resetTapState(){
 }
 function timelineClick(e){
   const tq = e.target.closest(".treq");
-  if(tq){ if(!tq.disabled) requestJoin(tq.dataset.f); return; }
+  if(tq){
+    if(tq.classList.contains("sent")) cancelJoin(tq.dataset.f);
+    else requestJoin(tq.dataset.f);
+    return;
+  }
   const like = e.target.closest(".like-btn");
   if(like){ setLike(like.dataset.id); return; }
   const vt = e.target.closest("[data-vote]");
