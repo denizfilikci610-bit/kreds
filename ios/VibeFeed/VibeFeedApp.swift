@@ -116,12 +116,18 @@ struct ContentView: View {
             }
             .ignoresSafeArea(.keyboard, edges: .bottom)
         }
+        // Real iOS 26 Liquid Glass action sheets (report / post menu / unfriend),
+        // presented on top of everything and driven by the web over the JS bridge.
+        .modifier(SheetHost())
         .onAppear {
             TabBarModel.shared.onTap = { name in
                 model.webView?.evaluateJavaScript("window.vfTab && window.vfTab('\(name)')", completionHandler: nil)
             }
             KredsBarModel.shared.onTap = { id in
                 model.webView?.evaluateJavaScript("window.vfKreds && window.vfKreds('\(id)')", completionHandler: nil)
+            }
+            SheetModel.shared.onAction = { action in
+                model.webView?.evaluateJavaScript("window.vfSheet && window.vfSheet('\(action)')", completionHandler: nil)
             }
         }
     }

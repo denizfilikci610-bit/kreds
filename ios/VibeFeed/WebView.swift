@@ -28,8 +28,13 @@ struct WebView: UIViewRepresentable {
         config.userContentController.add(NotifManager.shared, name: "vibefeed")
         // Tell the page it's inside the native app BEFORE its scripts run, so it hides its own
         // web tabbar and drives the native Liquid Glass bar instead (window.__vfNative + vfTab bridge).
+        // __vfNativeSheets is a capability flag: it tells the web this build can render
+        // native Liquid Glass action sheets (report / post menu / unfriend). Older installed
+        // builds inject only __vfNative, so the web keeps using its web .modal fallback there —
+        // which makes the web deploy safe to ship before/after this native rebuild, in any order.
         config.userContentController.addUserScript(
-            WKUserScript(source: "window.__vfNative = true;", injectionTime: .atDocumentStart, forMainFrameOnly: true)
+            WKUserScript(source: "window.__vfNative = true; window.__vfNativeSheets = true;",
+                         injectionTime: .atDocumentStart, forMainFrameOnly: true)
         )
 
         // Edge-to-edge: the web view extends under the notch/home indicator (SwiftUI

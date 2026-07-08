@@ -63,6 +63,12 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
             // The web mirrors its kreds selector (list + active + unread + compact + visible)
             // so the native Liquid Glass kreds bar stays in sync.
             Task { @MainActor in KredsBarModel.shared.apply(dict) }
+        case "sheet":
+            // The web asks native to show a real iOS 26 Liquid Glass action sheet
+            // (report / post menu / unfriend). We render whatever buttons the web sends
+            // and call back window.vfSheet(action) with the chosen button. The web owns
+            // all flow logic (incl. any follow-up confirmation sheet).
+            Task { @MainActor in SheetModel.shared.apply(dict) }
         case "logout":
             UserDefaults.standard.removeObject(forKey: secretKey)
             UserDefaults.standard.removeObject(forKey: lastCheckKey)
