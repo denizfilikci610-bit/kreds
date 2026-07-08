@@ -73,23 +73,6 @@ if(window.__vfNative){
     if(id === "__new"){ openFeedSheet(); return; }
     setFeed(id);
   };
-  /* --- Native action sheets (ægte iOS 26 Liquid Glass) ---
-     Web-modalerne #rmenu/#pmenu/#ufmenu erstattes i app'en af systemets .confirmationDialog.
-     openReportMenu/openPostMenu/openUnfriendMenu kalder __vfSheetPost(spec, onAction): specen
-     (titel/besked/knapper med lokaliseret tekst) postes til Swift, og onAction gemmes indtil
-     Swift kalder vfSheet(action) tilbage med den valgte knap. Én sheet ad gangen; en handler
-     må poste en opfølgende sheet (fx slet-bekræftelsen). */
-  let pendingSheet = null;
-  window.__vfSheetPost = function(spec, onAction){
-    pendingSheet = onAction || null;
-    const mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed;
-    if(mh) mh.postMessage(Object.assign({ type: "sheet" }, spec));
-  };
-  window.vfSheet = function(action){
-    const h = pendingSheet;
-    pendingSheet = null; // Annuller/afvisning rydder blot konteksten
-    if(h && action && action !== "__cancel") h(action);
-  };
   let lastTabKey = "", lastKredsKey = "";
   const syncNative = function(){
     const mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed;

@@ -324,43 +324,54 @@
   </div>
 
   <!-- Opslag-menu (egne opslag) -->
-  <div class="modal" id="pmenu" role="dialog" aria-label="Opslag" data-i18n-aria="pm.aria">
+  <div class="modal sheet" id="pmenu" role="dialog" aria-label="Opslag" data-i18n-aria="pm.aria">
     <div class="modal-card">
-      <div id="pmenu-main">
-        <button class="mrow" id="pm-edit" data-i18n="pm.edit">Rediger</button>
-        <button class="mrow danger" id="pm-delete" data-i18n="pm.delete">Slet opslag</button>
-        <button class="mrow" id="pm-cancel" data-i18n="common.cancel">Annuller</button>
+      <div id="pmenu-main" class="mstep">
+        <div class="mgroup">
+          <button class="mrow" id="pm-edit" data-i18n="pm.edit">Rediger</button>
+          <button class="mrow danger" id="pm-delete" data-i18n="pm.delete">Slet opslag</button>
+        </div>
+        <button class="mrow mcancel" id="pm-cancel" data-i18n="common.cancel">Annuller</button>
       </div>
-      <div id="pmenu-confirm" style="display:none">
-        <div class="mtitle" data-i18n="pm.confirm">Slet opslaget permanent?</div>
-        <button class="mrow danger" id="pm-del2" data-i18n="pm.del">Slet</button>
-        <button class="mrow" id="pm-del-cancel" data-i18n="common.cancel">Annuller</button>
+      <div id="pmenu-confirm" class="mstep" style="display:none">
+        <div class="mgroup">
+          <div class="mtitle" data-i18n="pm.confirm">Slet opslaget permanent?</div>
+          <button class="mrow danger" id="pm-del2" data-i18n="pm.del">Slet</button>
+        </div>
+        <button class="mrow mcancel" id="pm-del-cancel" data-i18n="common.cancel">Annuller</button>
       </div>
     </div>
   </div>
 
   <!-- Anmeld opslag (andres opslag, popup) -->
-  <div class="modal" id="rmenu" role="dialog" aria-label="Anmeld opslag" data-i18n-aria="rm.report">
+  <div class="modal sheet" id="rmenu" role="dialog" aria-label="Anmeld opslag" data-i18n-aria="rm.report">
     <div class="modal-card">
-      <div id="rmenu-main">
-        <button class="mrow danger" id="rm-report" data-i18n="rm.report">Anmeld opslag</button>
-        <button class="mrow" id="rm-cancel" data-i18n="common.cancel">Annuller</button>
+      <div id="rmenu-main" class="mstep">
+        <div class="mgroup">
+          <div class="mprev" id="rm-prev"></div>
+          <button class="mrow danger" id="rm-report" data-i18n="rm.report">Anmeld opslag</button>
+        </div>
+        <button class="mrow mcancel" id="rm-cancel" data-i18n="common.cancel">Annuller</button>
       </div>
-      <div id="rmenu-confirm" style="display:none">
-        <div class="mtitle" data-i18n="rm.confirm">Anmeld dette opslag?</div>
-        <p class="mtext" data-i18n="rm.note">Ved 2 anmeldelser skjules det for alle.</p>
-        <button class="mrow danger" id="rm-report2" data-i18n="rm.do">Anmeld</button>
-        <button class="mrow" id="rm-cancel2" data-i18n="common.cancel">Annuller</button>
+      <div id="rmenu-confirm" class="mstep" style="display:none">
+        <div class="mgroup">
+          <div class="mtitle" data-i18n="rm.confirm">Anmeld dette opslag?</div>
+          <p class="mtext" data-i18n="rm.note">Ved 10 anmeldelser skjules det for alle.</p>
+          <button class="mrow danger" id="rm-report2" data-i18n="rm.do">Anmeld</button>
+        </div>
+        <button class="mrow mcancel" id="rm-cancel2" data-i18n="common.cancel">Annuller</button>
       </div>
     </div>
   </div>
 
   <!-- Fjern ven (popup, åbnes fra ven-profilen) -->
-  <div class="modal" id="ufmenu" role="dialog" aria-label="Fjern ven" data-i18n-aria="pv.remove">
+  <div class="modal sheet" id="ufmenu" role="dialog" aria-label="Fjern ven" data-i18n-aria="pv.remove">
     <div class="modal-card">
-      <div class="mtitle" id="uf-title"></div>
-      <button class="mrow danger" id="uf-confirm" data-i18n="pv.remove">Fjern ven</button>
-      <button class="mrow" id="uf-cancel" data-i18n="common.cancel">Annuller</button>
+      <div class="mgroup">
+        <div class="mtitle" id="uf-title"></div>
+        <button class="mrow danger" id="uf-confirm" data-i18n="pv.remove">Fjern ven</button>
+      </div>
+      <button class="mrow mcancel" id="uf-cancel" data-i18n="common.cancel">Annuller</button>
     </div>
   </div>
 
