@@ -768,6 +768,7 @@ export function switchTab(name){
   document.querySelectorAll(".tabbar [data-view]").forEach(function(b){
     b.classList.toggle("active", b.dataset.view === name);
   });
+  moveTabIndicator(name);
   setTabIcons(name);
   if(name === "search") renderSearch();
   if(name === "akt"){ loadNotifs(); setNotifDot(false); }
@@ -775,6 +776,39 @@ export function switchTab(name){
   el("app").scrollTop = 0;
   resetBarHide();
 }
+
+/* ================= Tabbar-indikator (glidende "swish") ================= */
+let tabIndName = "feed", tabIndReady = false;
+function moveTabIndicator(name, tries){
+  const bar = document.querySelector(".tabbar");
+  if(!bar) return;
+  const ind = bar.querySelector(".tab-ind");
+  const btn = bar.querySelector('[data-view="' + name + '"]');
+  if(!ind || !btn) return;
+  tabIndName = name;
+  // Vent på layout (fx under boot bag splash) — men kun et begrænset antal frames
+  if(!btn.offsetWidth){
+    if((tries || 0) < 20) requestAnimationFrame(function(){ moveTabIndicator(name, (tries || 0) + 1); });
+    return;
+  }
+  const inset = 4;
+  const place = function(){
+    ind.style.width = (btn.offsetWidth - inset * 2) + "px";
+    ind.style.transform = "translateY(-50%) translateX(" + (btn.offsetLeft + inset) + "px)";
+    ind.style.opacity = "1";
+  };
+  if(!tabIndReady){
+    // Første placering uden animation, så den ikke "swisher" ind ved boot
+    ind.style.transition = "none";
+    place();
+    void ind.offsetWidth; // fremtving reflow
+    ind.style.transition = "";
+    tabIndReady = true;
+  } else {
+    place();
+  }
+}
+window.addEventListener("resize", function(){ moveTabIndicator(tabIndName); });
 
 /* ================= Likes ================= */
 export function allPostArrays(){ return [state.posts, state.wholePosts, pv.posts]; }

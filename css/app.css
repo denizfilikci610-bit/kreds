@@ -668,11 +668,15 @@
     height:100%;
     color:var(--ink);
   }
-  /* Aktiv fane: fremhævet "under-pille" bag ikonet */
-  .tabbar button.active::before{
-    content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-    width:54px;height:38px;border-radius:999px;
-    background:var(--tab-hi);
+  /* Aktiv fane: ÉN glidende indikator-pille bag ikonerne. Position + bredde sættes i JS
+     (moveTabIndicator); transform-transition giver den fjedrende "swish" mellem faner. */
+  .tab-ind{
+    position:absolute;top:50%;left:0;height:44px;
+    border-radius:999px;background:var(--tab-hi);
+    transform:translateY(-50%);
+    opacity:0;
+    transition:transform .4s cubic-bezier(.34,1.28,.5,1), width .4s cubic-bezier(.34,1.28,.5,1);
+    pointer-events:none;
   }
   .tabbar button svg{position:relative;z-index:1}
   /* Notifikations-prik (session-only) øverst til højre på hjerte-fanen */
@@ -690,7 +694,6 @@
     display:flex;align-items:center;justify-content:center;
     overflow:hidden;
   }
-  .tabava.on{box-shadow:0 0 0 2px var(--ink)}
 
   /* ================= Overlays ================= */
   .scrim{
