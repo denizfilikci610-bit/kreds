@@ -26,6 +26,11 @@ struct WebView: UIViewRepresentable {
         config.websiteDataStore = .default()
         // bridge: the web app hands over a device secret for background notifications
         config.userContentController.add(NotifManager.shared, name: "vibefeed")
+        // Tell the page it's inside the native app BEFORE its scripts run, so it hides its own
+        // web tabbar and drives the native Liquid Glass bar instead (window.__vfNative + vfTab bridge).
+        config.userContentController.addUserScript(
+            WKUserScript(source: "window.__vfNative = true;", injectionTime: .atDocumentStart, forMainFrameOnly: true)
+        )
 
         // Edge-to-edge: the web view extends under the notch/home indicator (SwiftUI
         // .ignoresSafeArea), and iOS reports the real safe-area insets to the page via

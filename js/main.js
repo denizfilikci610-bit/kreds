@@ -5,7 +5,7 @@ import { t, initI18n, setLang, hasStoredLang } from "./i18n.js";
 import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, loadQuota } from "./feed.js";
 import { initComments } from "./comments.js";
 import { initKredse, closeFeedSheet, closeMemberSheet } from "./kredse.js";
-import { initCompose, renderComposeDest } from "./compose.js";
+import { initCompose, renderComposeDest, openCompose } from "./compose.js";
 import { initSearch, renderSearch } from "./search.js";
 import { initProfile, closeEditSheet, closeActivitySheet, renderStories, renderMyPosts, refreshPv } from "./profile.js";
 import { initNotifs, loadNotifs } from "./notifications.js";
@@ -57,6 +57,35 @@ document.querySelectorAll(".tabbar [data-view]").forEach(function(tab){
 el("nosparkle").addEventListener("click", function(){
   toast(t("nosparkle.toast"));
 });
+
+/* ================= Native tabbar-bro (KUN i app'en; window.__vfNative injiceres af Swift) =================
+   Den native Liquid Glass-bar erstatter web-tabbaren i app'en. Native → web: window.vfTab(name).
+   Web → native: vi poster {active, dot, compact, visible} så baren spejler appens tilstand og
+   skjules når et ark/lightbox/profil ligger ovenpå. */
+if(window.__vfNative){
+  document.body.classList.add("native"); // CSS skjuler web-tabbaren
+  window.vfTab = function(name){
+    if(name === "compose"){ openCompose(); return; }
+    switchTab(name);
+  };
+  let lastNativeKey = "";
+  const syncNativeBar = function(){
+    const mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed;
+    if(!mh) return;
+    const av = document.querySelector(".view.active");
+    const active = av ? av.id.replace("view-", "") : "feed";
+    const dot = !!(el("tabdot") && el("tabdot").classList.contains("on"));
+    const compact = document.body.classList.contains("hidebar");
+    const overlay = !!document.querySelector("#scrim.on, .compose.on, .profileview.on, #lightbox.on, #rwd-pop.on")
+      || document.body.classList.contains("lb-lock");
+    const key = active + "|" + dot + "|" + compact + "|" + (!overlay);
+    if(key === lastNativeKey) return;
+    lastNativeKey = key;
+    mh.postMessage({ type: "tab", active: active, dot: dot, compact: compact, visible: !overlay });
+  };
+  setInterval(syncNativeBar, 120);
+  syncNativeBar();
+}
 
 /* ================= Fælles gate-hjælper (langview/consentview) =================
    Modal for alvor: appen bag porten gøres inert (fokus + a11y-træ), og fokus

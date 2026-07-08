@@ -780,6 +780,7 @@ export function switchTab(name){
 /* ================= Tabbar-indikator (glidende "swish") ================= */
 let tabIndName = "feed", tabIndReady = false;
 function moveTabIndicator(name, tries){
+  if(document.body.classList.contains("native")) return; // native bar er aktiv i app'en
   const bar = document.querySelector(".tabbar");
   if(!bar) return;
   const ind = bar.querySelector(".tab-ind");

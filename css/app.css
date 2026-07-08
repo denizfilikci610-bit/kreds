@@ -661,6 +661,8 @@
     transition:transform .28s cubic-bezier(.32,.72,.25,1);
   }
   body.hidebar .tabbar{transform:scale(.86)}
+  /* I app'en overtager den native Liquid Glass-bar — skjul web-tabbaren */
+  body.native .tabbar{display:none}
   .tabbar button{
     position:relative;
     flex:1;

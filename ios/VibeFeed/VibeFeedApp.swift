@@ -99,6 +99,20 @@ struct ContentView: View {
                 InlineAdsOverlay()
             }
             .ignoresSafeArea()
+
+            // Native Liquid Glass tab bar, floating over the web view. It mirrors the web's
+            // tab state (active/dot/compact/visible) and routes taps back via window.vfTab.
+            VStack {
+                Spacer()
+                NativeTabBar()
+                    .padding(.bottom, -6)
+            }
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+        }
+        .onAppear {
+            TabBarModel.shared.onTap = { name in
+                model.webView?.evaluateJavaScript("window.vfTab && window.vfTab('\(name)')", completionHandler: nil)
+            }
         }
     }
 }

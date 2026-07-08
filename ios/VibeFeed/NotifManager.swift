@@ -55,6 +55,10 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
                 UserDefaults.standard.set(normalized, forKey: "vf_consent")
                 Task { @MainActor in AdsManager.shared.applyConsent(normalized) }
             }
+        case "tab":
+            // The web mirrors its tab state so the native Liquid Glass bar stays in sync
+            // (active tab, notification dot, scroll-compact, and hidden while an overlay is up).
+            Task { @MainActor in TabBarModel.shared.apply(dict) }
         case "logout":
             UserDefaults.standard.removeObject(forKey: secretKey)
             UserDefaults.standard.removeObject(forKey: lastCheckKey)
