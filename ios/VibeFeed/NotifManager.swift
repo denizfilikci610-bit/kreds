@@ -59,6 +59,10 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
             // The web mirrors its tab state so the native Liquid Glass bar stays in sync
             // (active tab, notification dot, scroll-compact, and hidden while an overlay is up).
             Task { @MainActor in TabBarModel.shared.apply(dict) }
+        case "kreds":
+            // The web mirrors its kreds selector (list + active + unread + compact + visible)
+            // so the native Liquid Glass kreds bar stays in sync.
+            Task { @MainActor in KredsBarModel.shared.apply(dict) }
         case "logout":
             UserDefaults.standard.removeObject(forKey: secretKey)
             UserDefaults.standard.removeObject(forKey: lastCheckKey)

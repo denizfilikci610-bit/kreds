@@ -100,6 +100,13 @@ struct ContentView: View {
             }
             .ignoresSafeArea()
 
+            // Native Liquid Glass kreds selector, floating at the top (feed tab only).
+            VStack {
+                NativeKredsBar()
+                Spacer()
+            }
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+
             // Native Liquid Glass tab bar, floating over the web view. It mirrors the web's
             // tab state (active/dot/compact/visible) and routes taps back via window.vfTab.
             VStack {
@@ -112,6 +119,9 @@ struct ContentView: View {
         .onAppear {
             TabBarModel.shared.onTap = { name in
                 model.webView?.evaluateJavaScript("window.vfTab && window.vfTab('\(name)')", completionHandler: nil)
+            }
+            KredsBarModel.shared.onTap = { id in
+                model.webView?.evaluateJavaScript("window.vfKreds && window.vfKreds('\(id)')", completionHandler: nil)
             }
         }
     }

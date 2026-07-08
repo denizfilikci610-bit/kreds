@@ -2,9 +2,9 @@ import { sb, recoveryMode, recoveryLinkError } from "./config.js";
 import { me, curTab } from "./store.js";
 import { el, toast, getConsent, setConsent } from "./helpers.js";
 import { t, initI18n, setLang, hasStoredLang } from "./i18n.js";
-import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, loadQuota } from "./feed.js";
+import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, loadQuota, setFeed, openFeedbarSearch, nativeKredsState } from "./feed.js";
 import { initComments } from "./comments.js";
-import { initKredse, closeFeedSheet, closeMemberSheet } from "./kredse.js";
+import { initKredse, closeFeedSheet, closeMemberSheet, openFeedSheet } from "./kredse.js";
 import { initCompose, renderComposeDest, openCompose } from "./compose.js";
 import { initSearch, renderSearch } from "./search.js";
 import { initProfile, closeEditSheet, closeActivitySheet, renderStories, renderMyPosts, refreshPv } from "./profile.js";
@@ -63,32 +63,47 @@ el("nosparkle").addEventListener("click", function(){
    Web → native: vi poster {active, dot, compact, visible} så baren spejler appens tilstand og
    skjules når et ark/lightbox/profil ligger ovenpå. */
 if(window.__vfNative){
-  document.body.classList.add("native"); // CSS skjuler web-tabbaren
+  document.body.classList.add("native"); // CSS skjuler web-tabbaren + kreds-baren
   window.vfTab = function(name){
     if(name === "compose"){ openCompose(); return; }
     switchTab(name);
   };
-  let lastNativeKey = "";
-  const syncNativeBar = function(){
+  window.vfKreds = function(id){
+    if(id === "__search"){ openFeedbarSearch(); return; }
+    if(id === "__new"){ openFeedSheet(); return; }
+    setFeed(id);
+  };
+  let lastTabKey = "", lastKredsKey = "";
+  const syncNative = function(){
     const mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed;
     if(!mh) return;
-    const av = document.querySelector(".view.active");
-    const active = av ? av.id.replace("view-", "") : "feed";
-    const dot = !!(el("tabdot") && el("tabdot").classList.contains("on"));
     const compact = document.body.classList.contains("hidebar");
-    // Skjul baren når noget ligger ovenpå ELLER vi ikke er på hoved-appen (boot-splash, login, gates)
+    // Skjul barerne når noget ligger ovenpå ELLER vi ikke er på hoved-appen (boot-splash, login, gates)
     const blocked = !!document.querySelector(
         "#scrim.on, .compose.on, .profileview.on, #lightbox.on, #rwd-pop.on, #authview.on, #langview.on, #consentview.on"
       ) || document.body.classList.contains("lb-lock")
       || !!(el("splash") && !el("splash").classList.contains("gone"));
     const visible = !blocked;
-    const key = active + "|" + dot + "|" + compact + "|" + visible;
-    if(key === lastNativeKey) return;
-    lastNativeKey = key;
-    mh.postMessage({ type: "tab", active: active, dot: dot, compact: compact, visible: visible });
+    // --- Tabbar ---
+    const av = document.querySelector(".view.active");
+    const active = av ? av.id.replace("view-", "") : "feed";
+    const dot = !!(el("tabdot") && el("tabdot").classList.contains("on"));
+    const tabKey = active + "|" + dot + "|" + compact + "|" + visible;
+    if(tabKey !== lastTabKey){
+      lastTabKey = tabKey;
+      mh.postMessage({ type: "tab", active: active, dot: dot, compact: compact, visible: visible });
+    }
+    // --- Kreds-bar (kun på feed-fanen; skjules under kreds-søgning → web-baren vises da) ---
+    const ks = nativeKredsState();
+    const kvisible = visible && active === "feed" && !ks.searching;
+    const kredsKey = JSON.stringify(ks.items) + "|" + compact + "|" + kvisible;
+    if(kredsKey !== lastKredsKey){
+      lastKredsKey = kredsKey;
+      mh.postMessage({ type: "kreds", items: ks.items, compact: compact, visible: kvisible });
+    }
   };
-  setInterval(syncNativeBar, 120);
-  syncNativeBar();
+  setInterval(syncNative, 120);
+  syncNative();
 }
 
 /* ================= Fælles gate-hjælper (langview/consentview) =================
