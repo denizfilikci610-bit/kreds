@@ -67,10 +67,12 @@ struct ContentView: View {
             })
             .ignoresSafeArea()
 
-            // The web view fills the safe area (iOS supplies the insets natively
-            // per device). The native ad overlay sits directly ON TOP of it in the
-            // same coordinate space, so it can position MRECs over the feed's
-            // sponsored slots; every non-ad touch passes through to the web view.
+            // The web view fills the ENTIRE screen (edge-to-edge). iOS reports the real
+            // safe-area insets to the page via env(safe-area-inset-*), and the web owns
+            // the safe areas (backgrounds run to the edges, content is padded away from
+            // the notch/home indicator). The native ad overlay sits directly ON TOP of it
+            // in the same full-screen coordinate space, so it can position MRECs over the
+            // feed's sponsored slots; every non-ad touch passes through to the web view.
             ZStack {
                 WebView(model: model)
 
@@ -96,6 +98,7 @@ struct ContentView: View {
 
                 InlineAdsOverlay()
             }
+            .ignoresSafeArea()
         }
     }
 }

@@ -13,12 +13,6 @@ final class WebViewModel: ObservableObject {
     }
 }
 
-// Reports zero safe-area insets to the web content, so the page never
-// double-pads: the native layer (SwiftUI) owns the safe areas exclusively.
-final class InsetFreeWebView: WKWebView {
-    override var safeAreaInsets: UIEdgeInsets { .zero }
-}
-
 struct WebView: UIViewRepresentable {
     @ObservedObject var model: WebViewModel
 
@@ -33,7 +27,10 @@ struct WebView: UIViewRepresentable {
         // bridge: the web app hands over a device secret for background notifications
         config.userContentController.add(NotifManager.shared, name: "vibefeed")
 
-        let webView = InsetFreeWebView(frame: .zero, configuration: config)
+        // Edge-to-edge: the web view extends under the notch/home indicator (SwiftUI
+        // .ignoresSafeArea), and iOS reports the real safe-area insets to the page via
+        // env(safe-area-inset-*). The web owns all safe-area padding.
+        let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
