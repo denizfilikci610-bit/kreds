@@ -348,6 +348,8 @@ export async function loadPosts(advanceSeen){
   // baggrunds-refetch (realtime/polling) = false. Default true for eksisterende kald.
   if(advanceSeen === undefined) advanceSeen = true;
   if(!me) return;
+  // Luk evt. udløbne kreds-afstemninger (10-min-frist) når man åbner en specifik kreds
+  if(advanceSeen && state.currentFeed !== "all"){ sb.rpc("close_due_votes").then(function(){}, function(){}); }
   try{
     const reqs = [ postQuery().is("feed_id", null) ];
     const cur = state.currentFeed;

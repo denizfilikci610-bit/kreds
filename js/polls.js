@@ -22,7 +22,13 @@ export function mapPoll(row){
     });
   // Governance-afstemning? (server-tekst "Afstemning: Skal …" — bruges til tydelig styling)
   const gov = typeof row.text === "string" && row.text.indexOf("Afstemning: Skal ") === 0;
-  return { options: options, total: total, myVote: myVote, gov: gov };
+  // Sekunder tilbage til fristen (10 min efter oprettelse) — null hvis ikke gov eller allerede afgjort
+  let left = null;
+  if(gov && row.created_at && row.text.indexOf("✅") < 0 && row.text.indexOf("❌") < 0){
+    const deadline = new Date(row.created_at).getTime() + 10 * 60 * 1000;
+    left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+  }
+  return { options: options, total: total, myVote: myVote, gov: gov, left: left };
 }
 
 function CHECK(){
@@ -34,7 +40,13 @@ export function pollHTML(p){
   if(!poll) return "";
   const showRes = poll.myVote != null || (me && p.u === me.handle);
   let html = '<div class="pollwrap'+(poll.gov ? " gov" : "")+'" data-id="'+p.id+'">';
-  if(poll.gov) html += '<div class="gov-head"><span class="gov-ic">🗳️</span>'+t("gov.vote_label")+'</div>';
+  if(poll.gov){
+    let head = t("gov.vote_label");
+    if(poll.left != null) head += poll.left > 0
+      ? " · " + t("gov.closes_in_min", { m: Math.ceil(poll.left / 60) })
+      : " · " + t("gov.closing");
+    html += '<div class="gov-head">'+head+'</div>';
+  }
   if(showRes){
     poll.options.forEach(function(o){
       const pct = poll.total ? Math.round(o.votes / poll.total * 100) : 0;

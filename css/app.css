@@ -415,7 +415,18 @@
   /* Governance-afstemning: tydelig ramme + label så den ikke ligner et almindeligt opslag */
   .pollwrap.gov{border:1px solid var(--red);border-radius:12px;padding:8px 12px 10px;margin-top:4px}
   .gov-head{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12px;font-weight:800;color:var(--red);letter-spacing:.02em}
-  .gov-ic{font-size:14px}
+  /* Live optagelses-afstemning (målpersonens boks i Notifikationer) */
+  #admvotes:empty{display:none}
+  .admvote{margin:12px 16px 0;padding:12px 14px;border:1px solid var(--red);border-radius:14px}
+  .admvote.done{border-color:var(--line)}
+  .adm-top{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14.5px}
+  .adm-countdown{flex:0 0 auto;font-size:12.5px;font-weight:800;color:var(--red)}
+  .adm-done{flex:0 0 auto;font-size:12.5px;font-weight:800}
+  .adm-done.ok{color:var(--ink)}
+  .adm-done.no{color:var(--gray)}
+  .adm-tally{margin-top:6px;font-size:13px;color:var(--gray)}
+  .adm-bar{margin-top:8px;height:8px;border-radius:999px;background:var(--chip);overflow:hidden}
+  .adm-bar span{display:block;height:100%;background:var(--red);transition:width .3s ease}
 
   /* ---------- Kommentartråd (inline, sammenklappet som standard) ---------- */
   .cmt-toggle{display:block;font-size:13px;font-weight:600;color:var(--gray);padding:9px 0 0;text-align:left}

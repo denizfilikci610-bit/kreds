@@ -11,6 +11,66 @@ import { openProfile } from "./profile.js";
 export function setNotifDot(on){
   el("tabdot").classList.toggle("on", !!on);
 }
+
+/* ================= Live-status for MIN optagelses-afstemning =================
+   Målpersonen kan ikke se selve afstemnings-opslaget (RLS), så vi henter en
+   aggregeret live-status via RPC og viser den øverst i Notifikationer med en
+   nedtælling. Afstemningen lukker efter 10 min (eller når alle har stemt). */
+let admTimer = null, admTick = 0;
+function admLeftLabel(s){
+  s = Math.max(0, s | 0);
+  const m = Math.floor(s / 60), ss = s % 60;
+  return t("adm.closes_in", { t: m + ":" + (ss < 10 ? "0" : "") + ss });
+}
+function stopAdmTicker(){ if(admTimer){ clearInterval(admTimer); admTimer = null; } }
+function startAdmTicker(){
+  if(admTimer) return;
+  admTick = 0;
+  admTimer = setInterval(function(){
+    if(curTab !== "akt"){ stopAdmTicker(); return; }        // kun aktiv mens man er på fanen
+    admTick++;
+    const cards = document.querySelectorAll("#admvotes .admvote[data-open='1']");
+    if(!cards.length){ stopAdmTicker(); return; }
+    let dueRefresh = false;
+    cards.forEach(function(c){
+      let left = (parseInt(c.dataset.left, 10) || 0) - 1;
+      if(left <= 0){ left = 0; dueRefresh = true; }
+      c.dataset.left = String(left);
+      const cd = c.querySelector(".adm-countdown");
+      if(cd) cd.textContent = admLeftLabel(left);
+    });
+    if(dueRefresh || admTick % 5 === 0) loadAdmissionVotes(); // frisk optælling / afslut ved frist
+  }, 1000);
+}
+function renderAdmissionVotes(rows){
+  const box = el("admvotes");
+  if(!box) return;
+  if(!rows.length){ box.innerHTML = ""; stopAdmTicker(); return; }
+  box.innerHTML = rows.map(function(v){
+    const total = (v.ja || 0) + (v.nej || 0);
+    const pctJa = total ? Math.round((v.ja || 0) / total * 100) : 0;
+    const open = !v.resolved;
+    const status = v.resolved
+      ? '<span class="adm-done '+(v.admitted ? "ok" : "no")+'">'+t(v.admitted ? "adm.admitted" : "adm.rejected")+'</span>'
+      : '<span class="adm-countdown">'+admLeftLabel(v.seconds_left)+'</span>';
+    return '<div class="admvote'+(v.resolved ? " done" : "")+'" data-open="'+(open ? 1 : 0)+'" data-left="'+(open ? (v.seconds_left | 0) : 0)+'">'+
+      '<div class="adm-top"><b>'+t("adm.title", { k: esc(v.feed_name || "") })+'</b>'+status+'</div>'+
+      '<div class="adm-tally">'+t("adm.tally", { ja: v.ja || 0, nej: v.nej || 0 })+'</div>'+
+      '<div class="adm-bar"><span style="width:'+pctJa+'%"></span></div>'+
+    '</div>';
+  }).join("");
+  if(rows.some(function(v){ return !v.resolved; })) startAdmTicker(); else stopAdmTicker();
+}
+async function loadAdmissionVotes(){
+  const box = el("admvotes");
+  if(!me || !box){ if(box) box.innerHTML = ""; stopAdmTicker(); return; }
+  let rows = [];
+  try{
+    const { data, error } = await sb.rpc("my_admission_votes");
+    if(!error && data) rows = data;
+  }catch(_e){}
+  renderAdmissionVotes(rows);
+}
 /* Kaldes fra realtime.js ved INSERTs på likes/comments/kreds_invites/kreds_requests.
    RLS har allerede filtreret synligheden — vi frasorterer kun egne handlinger. */
 export function realtimeNotify(table, payload){
@@ -122,6 +182,7 @@ function seenSinceMs(){
 let notifTimer = null, notifSeq = 0;
 export async function loadNotifs(){
   if(!me) return;
+  loadAdmissionVotes(); // live-status for min egen optagelses-afstemning (øverst, egen boks)
   const seq = ++notifSeq; // sekvens-token: kun det nyeste kald må skrive resultatet
   el("notifs").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
   const seenMs = seenSinceMs();
