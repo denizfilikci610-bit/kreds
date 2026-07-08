@@ -318,10 +318,16 @@ export async function loadNotifs(){
     (res[4].data || []).forEach(function(r){
       if(r.author_profile){
         registerProfile(r.author_profile);
-        // Governance-afstemninger (server-tekst "Afstemning: Skal …") får deres egen tydelige type
-        const isVote = typeof r.text === "string" && r.text.indexOf("Afstemning: Skal ") === 0;
-        items.push({ type: isVote ? "kvote" : "kpost", u:r.author_profile.handle, at:r.created_at, pid:r.id,
-                     k:(r.feed && r.feed.name) || "", snip: isVote ? "" : (r.text || (r.image_path ? t("notif.photo") : "")) });
+        // Governance-afstemning? Udled HVEM (sub) og HVAD (rm=fjernelse) af server-teksten
+        // "Afstemning: Skal <navn> med i/ud af kredsen?" — så stemmerne kan se hvad den handler om.
+        const gm = typeof r.text === "string" ? /^Afstemning: Skal ([\s\S]+?) (med i|ud af) kredsen\?/.exec(r.text) : null;
+        if(gm){
+          items.push({ type:"kvote", u:r.author_profile.handle, at:r.created_at, pid:r.id,
+                       k:(r.feed && r.feed.name) || "", sub: gm[1], rm: gm[2] === "ud af" });
+        } else {
+          items.push({ type:"kpost", u:r.author_profile.handle, at:r.created_at, pid:r.id,
+                       k:(r.feed && r.feed.name) || "", snip: r.text || (r.image_path ? t("notif.photo") : "") });
+        }
       }
     });
     // Svar PÅ mine kommentarer først — så deres id'er kan udelukkes fra "kommentar på dit opslag"
@@ -371,7 +377,7 @@ export async function loadNotifs(){
           if(n.type === "clike")  return row(H, "heart",  n.u, t("notif.liked_comment"), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "reply")  return row(B, "bubble", n.u, t("notif.replied"),   n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "cmt")    return row(B, "bubble", n.u, t("notif.commented"),  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
-          if(n.type === "kvote")  return row(K, "kvote",  n.u, t("notif.vote_kreds", { k: esc(n.k) }), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
+          if(n.type === "kvote")  return row(K, "kvote",  n.u, t(n.rm ? "notif.vote_remove" : "notif.vote_add", { name: esc(n.sub || ""), k: esc(n.k) }), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
           if(n.type === "kpost")  return row(K, "kpost",  n.u, t("notif.posted_kreds", { k: esc(n.k) }), n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
           if(n.type === "kreq")   return kreqRow(n);
           if(n.type === "inv")    return invRow(n);
