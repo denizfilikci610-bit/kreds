@@ -20,7 +20,9 @@ export function mapPoll(row){
       total += vs.length;
       return { id:o.id, idx:o.idx, text:o.text || "", votes:vs.length };
     });
-  return { options: options, total: total, myVote: myVote };
+  // Governance-afstemning? (server-tekst "Afstemning: Skal …" — bruges til tydelig styling)
+  const gov = typeof row.text === "string" && row.text.indexOf("Afstemning: Skal ") === 0;
+  return { options: options, total: total, myVote: myVote, gov: gov };
 }
 
 function CHECK(){
@@ -31,7 +33,8 @@ export function pollHTML(p){
   const poll = p.poll;
   if(!poll) return "";
   const showRes = poll.myVote != null || (me && p.u === me.handle);
-  let html = '<div class="pollwrap" data-id="'+p.id+'">';
+  let html = '<div class="pollwrap'+(poll.gov ? " gov" : "")+'" data-id="'+p.id+'">';
+  if(poll.gov) html += '<div class="gov-head"><span class="gov-ic">🗳️</span>'+t("gov.vote_label")+'</div>';
   if(showRes){
     poll.options.forEach(function(o){
       const pct = poll.total ? Math.round(o.votes / poll.total * 100) : 0;
