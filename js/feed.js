@@ -185,10 +185,10 @@ export function teaserHTML(p){
           '<span class="ph">@'+esc(p.u)+' · '+esc(p.t)+'</span>'+
         '</div>'+
         '<div class="pmedia tmedia">'+
-          '<div class="tblur" style="background:'+esc(grad(p.u))+'"></div>'+
           '<div class="tlock">'+
-            '<span class="tic" aria-hidden="true">🔒</span>'+
-            '<span class="ttxt">'+t("teaser.shared", { name:esc(name), kreds:esc(p.feedName) })+'</span>'+
+            '<span class="tlocki" aria-hidden="true"><svg viewBox="0 0 24 24"><g class="stroke"><rect x="5" y="10.5" width="14" height="9.5" rx="2.4"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></g></svg></span>'+
+            '<span class="ttxt">'+t("teaser.shared", { name:esc(name) })+' <b class="tkreds">'+esc(p.feedName)+'</b></span>'+
+            '<span class="tsub">'+t("teaser.members_only")+'</span>'+
             btn+
           '</div>'+
         '</div>'+
