@@ -50,11 +50,20 @@ function renderAdmissionVotes(rows){
     const total = (v.ja || 0) + (v.nej || 0);
     const pctJa = total ? Math.round((v.ja || 0) / total * 100) : 0;
     const open = !v.resolved;
+    const remove = v.kind === "remove";
+    const by = esc(v.by_name || t("mv.someone"));
+    const k = esc(v.feed_name || "");
+    // Tydeligt: HVEM startede den + HVAD de ønsker
+    const title = t(remove ? "mv.remove" : "mv.add", { by: by, k: k });
+    // is_member = godt for dig (optaget / blev i kredsen)
+    const doneText = remove
+      ? t(v.is_member ? "mv.kept" : "mv.removed")
+      : t(v.is_member ? "mv.admitted" : "mv.rejected");
     const status = v.resolved
-      ? '<span class="adm-done '+(v.admitted ? "ok" : "no")+'">'+t(v.admitted ? "adm.admitted" : "adm.rejected")+'</span>'
+      ? '<span class="adm-done '+(v.is_member ? "ok" : "no")+'">'+doneText+'</span>'
       : '<span class="adm-countdown">'+admLeftLabel(v.seconds_left)+'</span>';
     return '<div class="admvote'+(v.resolved ? " done" : "")+'" data-open="'+(open ? 1 : 0)+'" data-left="'+(open ? (v.seconds_left | 0) : 0)+'">'+
-      '<div class="adm-top"><b>'+t("adm.title", { k: esc(v.feed_name || "") })+'</b>'+status+'</div>'+
+      '<div class="adm-top"><b>'+title+'</b>'+status+'</div>'+
       '<div class="adm-tally">'+t("adm.tally", { ja: v.ja || 0, nej: v.nej || 0 })+'</div>'+
       '<div class="adm-bar"><span style="width:'+pctJa+'%"></span></div>'+
     '</div>';
@@ -66,7 +75,7 @@ async function loadAdmissionVotes(){
   if(!me || !box){ if(box) box.innerHTML = ""; stopAdmTicker(); return; }
   let rows = [];
   try{
-    const { data, error } = await sb.rpc("my_admission_votes");
+    const { data, error } = await sb.rpc("my_membership_votes");
     if(!error && data) rows = data;
   }catch(_e){}
   renderAdmissionVotes(rows);
