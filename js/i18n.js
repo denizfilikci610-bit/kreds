@@ -84,7 +84,9 @@ const DA = {
   "post.deleted": "Opslaget er slettet",
   "post.delete_failed": "Kunne ikke slette opslaget. Prøv igen.",
   "post.new": "NY",
-  "report.done": "Tak. Opslaget er anmeldt og skjult for dig.",
+  "report.reported": "Anmeldt · skjult for dig",
+  "report.undo": "Fortryd",
+  "report.undone": "Anmeldelse trukket tilbage",
 
   /* Tabbar */
   "tab.home": "Hjem",
@@ -296,7 +298,7 @@ const DA = {
   "pm.del": "Slet",
   "rm.report": "Anmeld opslag",
   "rm.confirm": "Anmeld dette opslag?",
-  "rm.note": "Ved 2 anmeldelser skjules det for alle.",
+  "rm.note": "Ved 10 anmeldelser skjules det for alle.",
   "rm.do": "Anmeld",
 
   /* Slet konto */
@@ -459,7 +461,9 @@ const EN = {
   "post.deleted": "The post has been deleted",
   "post.delete_failed": "Couldn't delete the post. Try again.",
   "post.new": "NEW",
-  "report.done": "Thanks. The post has been reported and hidden for you.",
+  "report.reported": "Reported · hidden for you",
+  "report.undo": "Undo",
+  "report.undone": "Report withdrawn",
 
   /* Tabbar */
   "tab.home": "Home",
@@ -671,7 +675,7 @@ const EN = {
   "pm.del": "Delete",
   "rm.report": "Report post",
   "rm.confirm": "Report this post?",
-  "rm.note": "After 2 reports it's hidden for everyone.",
+  "rm.note": "After 10 reports it's hidden for everyone.",
   "rm.do": "Report",
 
   /* Delete account */

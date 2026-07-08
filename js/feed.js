@@ -813,6 +813,27 @@ export function closeReportMenu(){
   el("rmenu").classList.remove("on");
   reportPid = null;
 }
+let reportUndo = null; // { pid, timer } — 5-sek fortryd-vindue efter en anmeldelse
+function hideReportUndo(){
+  if(reportUndo){ clearTimeout(reportUndo.timer); reportUndo = null; }
+  el("undobar").classList.remove("on");
+}
+function showReportUndo(id){
+  hideReportUndo(); // kun ét fortryd-vindue ad gangen
+  el("undobar-msg").textContent = t("report.reported");
+  el("undobar-btn").textContent = t("report.undo");
+  el("undobar").classList.add("on");
+  reportUndo = { pid: id, timer: setTimeout(hideReportUndo, 5000) };
+}
+async function undoReport(){
+  if(!reportUndo) return;
+  const id = reportUndo.pid;
+  hideReportUndo();
+  const { error } = await sb.from("reports").delete().eq("post_id", id).eq("user_id", me.id);
+  if(error){ console.error(error); toast(t("err.generic")); return; }
+  scheduleRefetch();        // opslaget kommer tilbage i feedet (RLS viser det igen)
+  toast(t("report.undone"));
+}
 async function reportPost(){
   const id = reportPid;
   if(id == null || !me) return;
@@ -835,7 +856,7 @@ async function reportPost(){
   renderFeed();
   if(el("view-profil").classList.contains("active")) renderMyPosts();
   refreshPv();
-  toast(t("report.done"));
+  showReportUndo(id);       // 5 sek til at fortryde i stedet for en simpel kvittering
 }
 
 export function openPostEdit(id){
@@ -1103,6 +1124,7 @@ el("rm-report").addEventListener("click", function(){
   el("rmenu-confirm").style.display = "";
 });
 el("rm-report2").addEventListener("click", reportPost);
+el("undobar-btn").addEventListener("click", undoReport);
 /* ---- Kreds-medlemmer: sheet åbnes fra kredshead ---- */
 el("kredshead").addEventListener("click", function(){ openMemberSheet(); });
 el("kredshead").addEventListener("keydown", function(e){

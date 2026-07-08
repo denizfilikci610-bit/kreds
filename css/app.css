@@ -993,6 +993,20 @@
     max-width:86%;text-align:center;
   }
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  /* Fortryd-snackbar (anmeld): besked + Fortryd-knap, vises i 5 sek */
+  .undobar{
+    position:absolute;left:50%;bottom:calc(64px + env(safe-area-inset-bottom));z-index:311;
+    transform:translateX(-50%) translateY(6px);
+    display:flex;align-items:center;gap:12px;
+    background:var(--toastbg);color:var(--toastink);
+    font-size:14px;font-weight:600;
+    padding:8px 8px 8px 16px;border-radius:10px;
+    opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;
+    max-width:86%;
+  }
+  .undobar.on{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+  .undobar button{flex:0 0 auto;background:transparent;color:#ff8a7a;font-weight:800;font-size:14px;padding:5px 10px}
+  .undobar button:active{opacity:.6}
 
   /* ---- Boot-splash (dækker den tomme app-skal ved (gen)indlæsning) ---- */
   .splash{
