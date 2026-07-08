@@ -39,7 +39,9 @@ private struct ChipBackground: ViewModifier {
         if active {
             content.background(Color.primary, in: Capsule())
         } else if #available(iOS 26.0, *) {
-            content.glassEffect(.regular, in: Capsule())
+            // .clipShape klipper Liquid Glass' nedadgående skygge (den mørke streg i bunden) væk,
+            // mens selve glasset bevares.
+            content.glassEffect(.regular, in: Capsule()).clipShape(Capsule())
         } else {
             content
                 .background(.ultraThinMaterial, in: Capsule())
