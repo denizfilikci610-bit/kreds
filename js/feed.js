@@ -435,7 +435,7 @@ export async function loadFeeds(){
   const { data, error } = await sb.from("feeds").select("*, feed_members(user_id)");
   if(error){ console.error(error); toast(t("err.generic")); return; }
   const feeds = (data || []).map(function(f){
-    return { id:f.id, name:f.name, owner:f.owner, created:f.created_at, memberIds:(f.feed_members||[]).map(function(m){ return m.user_id; }) };
+    return { id:f.id, name:f.name, owner:f.owner, governance:f.governance || "vote", created:f.created_at, memberIds:(f.feed_members||[]).map(function(m){ return m.user_id; }) };
   });
   feeds.sort(function(a,b){ return new Date(a.created) - new Date(b.created); });
   const unknown = [];

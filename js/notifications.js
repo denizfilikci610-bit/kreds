@@ -321,9 +321,13 @@ export async function loadNotifs(){
         // Governance-afstemning? Udled HVEM (sub) og HVAD (rm=fjernelse) af server-teksten
         // "Afstemning: Skal <navn> med i/ud af kredsen?" — så stemmerne kan se hvad den handler om.
         const gm = typeof r.text === "string" ? /^Afstemning: Skal ([\s\S]+?) (med i|ud af) kredsen\?/.exec(r.text) : null;
+        const isOwner = typeof r.text === "string" && r.text.indexOf("Afstemning: Hvem skal være ny ejer") === 0;
         if(gm){
           items.push({ type:"kvote", u:r.author_profile.handle, at:r.created_at, pid:r.id,
                        k:(r.feed && r.feed.name) || "", sub: gm[1], rm: gm[2] === "ud af" });
+        } else if(isOwner){
+          items.push({ type:"kvote", u:r.author_profile.handle, at:r.created_at, pid:r.id,
+                       k:(r.feed && r.feed.name) || "", owner: true });
         } else {
           items.push({ type:"kpost", u:r.author_profile.handle, at:r.created_at, pid:r.id,
                        k:(r.feed && r.feed.name) || "", snip: r.text || (r.image_path ? t("notif.photo") : "") });
@@ -377,7 +381,7 @@ export async function loadNotifs(){
           if(n.type === "clike")  return row(H, "heart",  n.u, t("notif.liked_comment"), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "reply")  return row(B, "bubble", n.u, t("notif.replied"),   n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "cmt")    return row(B, "bubble", n.u, t("notif.commented"),  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
-          if(n.type === "kvote")  return row(K, "kvote",  n.u, t(n.rm ? "notif.vote_remove" : "notif.vote_add", { name: esc(n.sub || ""), k: esc(n.k) }), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
+          if(n.type === "kvote")  return row(K, "kvote",  n.u, n.owner ? t("notif.vote_owner", { k: esc(n.k) }) : t(n.rm ? "notif.vote_remove" : "notif.vote_add", { name: esc(n.sub || ""), k: esc(n.k) }), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
           if(n.type === "kpost")  return row(K, "kpost",  n.u, t("notif.posted_kreds", { k: esc(n.k) }), n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
           if(n.type === "kreq")   return kreqRow(n);
           if(n.type === "inv")    return invRow(n);

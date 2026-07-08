@@ -693,6 +693,13 @@
   .fs-name textarea:focus{outline:none}
   .fs-label{font-size:12.5px;font-weight:700;color:var(--gray);padding:14px 18px 2px;text-transform:uppercase;letter-spacing:.05em}
   .fs-labelrow{display:flex;align-items:flex-end;justify-content:space-between;padding-right:16px}
+  /* Styreform-vælger i "Ny kreds" */
+  .fs-gov{display:flex;gap:8px;padding:4px 18px}
+  .fs-govbtn{flex:1;padding:9px 10px;border:1px solid var(--line);border-radius:12px;background:transparent;color:var(--gray);font-size:13.5px;font-weight:700}
+  .fs-govbtn.on{border-color:var(--red);color:var(--red);background:var(--chip)}
+  .fs-govbtn:active{opacity:.7}
+  /* "Ejeren bestemmer"-note i medlemmer-arket */
+  .ms-govnote{margin:2px 16px 10px;padding:9px 12px;border-radius:12px;background:var(--chip);color:var(--ink);font-size:13px;font-weight:700}
   .fs-all{
     flex:0 0 auto;
     background:var(--chip);color:var(--ink);

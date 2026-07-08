@@ -21,7 +21,7 @@ export function mapPoll(row){
       return { id:o.id, idx:o.idx, text:o.text || "", votes:vs.length };
     });
   // Governance-afstemning? (server-tekst "Afstemning: Skal …" — bruges til tydelig styling)
-  const gov = typeof row.text === "string" && row.text.indexOf("Afstemning: Skal ") === 0;
+  const gov = typeof row.text === "string" && row.text.indexOf("Afstemning: ") === 0;
   // Sekunder tilbage til fristen (10 min efter oprettelse) — null hvis ikke gov eller allerede afgjort
   let left = null;
   if(gov && row.created_at && row.text.indexOf("✅") < 0 && row.text.indexOf("❌") < 0){

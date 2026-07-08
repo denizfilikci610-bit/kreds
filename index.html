@@ -125,6 +125,13 @@
     <div class="fs-name">
       <input id="fs-name" placeholder="Hvad skal kredsen hedde?" data-i18n-ph="fs.name_ph" maxlength="30">
     </div>
+    <div class="fs-govrow">
+      <div class="fs-label" data-i18n="fs.gov_label">Hvem bestemmer medlemmer?</div>
+      <div class="fs-gov" id="fs-gov">
+        <button type="button" class="fs-govbtn on" data-gov="vote" data-i18n="fs.gov_vote">Alle stemmer</button>
+        <button type="button" class="fs-govbtn" data-gov="owner" data-i18n="fs.gov_owner">Ejeren bestemmer</button>
+      </div>
+    </div>
     <div class="fs-labelrow">
       <div class="fs-label" data-i18n="fs.pick">Vælg venner</div>
       <button class="fs-all" id="fs-all" type="button" style="display:none">Vælg alle</button>
@@ -295,7 +302,7 @@
     <div class="ep-scroll" style="flex:1;overflow-y:auto;min-height:0">
       <div class="fs-label" data-i18n="ms.members">Medlemmer</div>
       <div id="ms-members"></div>
-      <div class="fs-label" data-i18n="ms.invite_label">Invitér ven</div>
+      <div class="fs-label" id="ms-invite-label" data-i18n="ms.invite_label">Invitér ven</div>
       <div id="ms-friends"></div>
       <div class="ms-leavezone">
         <button class="ms-leave" id="ms-leave" data-i18n="ms.leave">Forlad kreds</button>

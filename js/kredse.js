@@ -7,11 +7,19 @@ import { renderComposeDest } from "./compose.js";
 
 /* ================= Ny kreds (sheet) ================= */
 let fsSelected = {};
+let fsGov = "vote"; // styreform for den nye kreds: 'vote' | 'owner'
+function renderFsGov(){
+  document.querySelectorAll("#fs-gov .fs-govbtn").forEach(function(b){
+    b.classList.toggle("on", b.dataset.gov === fsGov);
+  });
+}
 export function openFeedSheet(){
   fsSelected = {};
+  fsGov = "vote";
   el("fs-name").value = "";
   renderFsList();
   renderFsAll();
+  renderFsGov();
   fsCan();
   el("scrim").classList.add("on");
   el("fsheet").classList.add("on");
@@ -89,10 +97,13 @@ function renderMemberSheet(){
   const f = feedById(msFeedId);
   if(!f){ closeMemberSheet(); return; }
   el("ms-title").textContent = f.name;
-  el("ms-members").innerHTML = f.memberIds.map(function(id){
+  const ownerMode = f.governance === "owner";
+  const canManage = !ownerMode || f.owner === me.id;   // owner-tilstand: kun ejeren administrerer
+  const govNote = ownerMode ? '<div class="ms-govnote">'+t("ms.owner_governed")+'</div>' : '';
+  el("ms-members").innerHTML = govNote + f.memberIds.map(function(id){
     const h = ID2H[id] || "?";
     const ownerTag = id === f.owner ? '<span class="ms-owner">'+t("ms.owner")+'</span>' : '';
-    const btn = id !== me.id
+    const btn = (id !== me.id && canManage)
       ? '<button class="ms-btn" data-rm="'+esc(id)+'">'+t("ms.remove")+'</button>'
       : '';
     return '<div class="listrow">'+
@@ -101,6 +112,10 @@ function renderMemberSheet(){
       btn+
     '</div>';
   }).join("");
+  // Invitér-sektionen kun for dem der må administrere medlemmer (owner-tilstand: kun ejeren)
+  const lbl = el("ms-invite-label");
+  if(lbl) lbl.style.display = canManage ? "" : "none";
+  if(!canManage){ el("ms-friends").innerHTML = ""; return; }
   const cand = state.humanFriends.filter(function(h){
     const u = user(h);
     return u.id && f.memberIds.indexOf(u.id) < 0;
@@ -224,6 +239,12 @@ el("fs-all").addEventListener("click", function(){
   fsCan();
 });
 el("fs-name").addEventListener("input", fsCan);
+el("fs-gov").addEventListener("click", function(e){
+  const b = e.target.closest(".fs-govbtn");
+  if(!b) return;
+  fsGov = b.dataset.gov;
+  renderFsGov();
+});
 el("fs-create").addEventListener("click", async function(){
   const name = el("fs-name").value.trim();
   const ids = state.humanFriends
@@ -232,7 +253,7 @@ el("fs-create").addEventListener("click", async function(){
     .filter(Boolean);
   if(!name || !ids.length) return;
   this.disabled = true;
-  const { data, error } = await sb.rpc("create_feed", { feed_name:name, member_ids:ids });
+  const { data, error } = await sb.rpc("create_feed", { feed_name:name, member_ids:ids, governance: fsGov });
   this.disabled = false;
   if(error){
     const m = String(error.message || "");
