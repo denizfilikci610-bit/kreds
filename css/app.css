@@ -14,6 +14,7 @@
     --toastink:#FFFFFF;
     --glass:rgba(255,255,255,.6);
     --glass-brd:rgba(0,0,0,.08);
+    --tab-hi:rgba(0,0,0,.07);
   }
   @media(prefers-color-scheme:dark){
     :root{
@@ -30,6 +31,7 @@
       --toastink:#FFFFFF;
       --glass:rgba(28,28,30,.52);
       --glass-brd:rgba(255,255,255,.12);
+      --tab-hi:rgba(255,255,255,.15);
     }
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -242,7 +244,8 @@
 
   /* ================= Views ================= */
   .view{display:none}
-  .view.active{display:block;flex:1 0 auto}
+  /* Plads i bunden så sidste opslag kan scrolles fri af den svævende tabbar */
+  .view.active{display:block;flex:1 0 auto;padding-bottom:calc(82px + env(safe-area-inset-bottom))}
 
   /* ================= Timeline-post (X-anatomi: to kolonner) ================= */
   .post{
@@ -638,26 +641,43 @@
   .chipbtn:active{opacity:.7}
   .ptl{font-size:14px;font-weight:700;padding:12px 16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--ink)}
 
-  /* ================= Tabbar ================= */
+  /* ================= Tabbar (flydende liquid glass) ================= */
+  /* Svævende, matteret pille; indhold glider bag den. Krymper ved scroll ned (body.hidebar),
+     vokser igen ved scroll op — samme scroll-retningstilstand som skjuler topbaren. */
   .tabbar{
-    position:sticky;bottom:0;z-index:50;
-    flex-shrink:0;
+    position:fixed;z-index:50;
+    left:16px;right:16px;
+    bottom:calc(env(safe-area-inset-bottom) + 8px);
     display:flex;align-items:center;
-    height:calc(50px + env(safe-area-inset-bottom));
-    padding:0 4px env(safe-area-inset-bottom);
-    background:var(--bg);
-    border-top:1px solid var(--line);
+    height:58px;
+    padding:0 6px;
+    background:var(--glass);
+    -webkit-backdrop-filter:blur(24px) saturate(1.8);
+    backdrop-filter:blur(24px) saturate(1.8);
+    border:1px solid var(--glass-brd);
+    border-radius:999px;
+    box-shadow:0 6px 24px rgba(0,0,0,.16);
+    transform-origin:bottom center;
+    transition:transform .28s cubic-bezier(.32,.72,.25,1);
   }
+  body.hidebar .tabbar{transform:scale(.86)}
   .tabbar button{
     position:relative;
     flex:1;
     display:flex;align-items:center;justify-content:center;
-    height:50px;
+    height:100%;
     color:var(--ink);
   }
+  /* Aktiv fane: fremhævet "under-pille" bag ikonet */
+  .tabbar button.active::before{
+    content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:54px;height:38px;border-radius:999px;
+    background:var(--tab-hi);
+  }
+  .tabbar button svg{position:relative;z-index:1}
   /* Notifikations-prik (session-only) øverst til højre på hjerte-fanen */
   .tabdot{
-    position:absolute;top:8px;left:calc(50% + 7px);
+    position:absolute;top:15px;left:calc(50% + 7px);
     width:8px;height:8px;border-radius:50%;
     background:var(--red);
     display:none;pointer-events:none;

@@ -93,28 +93,28 @@
       <div id="myposts"></div>
       <div style="height:40px"></div>
     </section>
-
-    <!-- Tabbar -->
-    <nav class="tabbar" aria-label="Navigation">
-      <button data-view="feed" class="active" aria-label="Hjem" data-i18n-aria="tab.home">
-        <svg viewBox="0 0 24 24" id="ic-home"></svg>
-      </button>
-      <button data-view="search" aria-label="Søg" data-i18n-aria="tab.search">
-        <svg viewBox="0 0 24 24" id="ic-search"></svg>
-      </button>
-      <button id="tab-compose" aria-label="Nyt opslag" data-i18n-aria="tab.compose">
-        <svg viewBox="0 0 24 24"><g class="stroke"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M12 8.4v7.2M8.4 12h7.2"/></g></svg>
-      </button>
-      <button data-view="akt" aria-label="Notifikationer" data-i18n-aria="tab.notifs">
-        <svg viewBox="0 0 24 24" id="ic-bell"></svg>
-        <span class="tabdot" id="tabdot"></span>
-      </button>
-      <button data-view="profil" aria-label="Profil" data-i18n-aria="aria.profile">
-        <span class="tabava" id="tab-ava" style="display:none"></span>
-        <svg viewBox="0 0 24 24" id="ic-user"></svg>
-      </button>
-    </nav>
   </div>
+
+  <!-- Tabbar (flydende glas — uden for #app, så position:fixed ikke klippes af scroll-containeren) -->
+  <nav class="tabbar" aria-label="Navigation">
+    <button data-view="feed" class="active" aria-label="Hjem" data-i18n-aria="tab.home">
+      <svg viewBox="0 0 24 24" id="ic-home"></svg>
+    </button>
+    <button data-view="search" aria-label="Søg" data-i18n-aria="tab.search">
+      <svg viewBox="0 0 24 24" id="ic-search"></svg>
+    </button>
+    <button id="tab-compose" aria-label="Nyt opslag" data-i18n-aria="tab.compose">
+      <svg viewBox="0 0 24 24"><g class="stroke"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M12 8.4v7.2M8.4 12h7.2"/></g></svg>
+    </button>
+    <button data-view="akt" aria-label="Notifikationer" data-i18n-aria="tab.notifs">
+      <svg viewBox="0 0 24 24" id="ic-bell"></svg>
+      <span class="tabdot" id="tabdot"></span>
+    </button>
+    <button data-view="profil" aria-label="Profil" data-i18n-aria="aria.profile">
+      <span class="tabava" id="tab-ava" style="display:none"></span>
+      <svg viewBox="0 0 24 24" id="ic-user"></svg>
+    </button>
+  </nav>
 
   <div class="scrim" id="scrim"></div>
 
