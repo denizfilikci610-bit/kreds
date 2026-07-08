@@ -173,9 +173,7 @@ export function postHTML(p){
 /* ---- Teaser-kort: sløret pladsholder + anmod-knap (ingen actions/kommentarer) ---- */
 export function teaserHTML(p){
   const name = user(p.u).name;
-  const btn = p.requested
-    ? '<button class="treq sent" data-f="'+esc(p.feedId)+'">'+t("teaser.sent")+'</button>'
-    : '<button class="treq" data-f="'+esc(p.feedId)+'">'+t("teaser.request")+'</button>';
+  const btn = treqHTML(p);
   return (
     '<article class="post teaser" data-tid="'+esc(p.id)+'">'+
       '<button class="pavab" data-u="'+esc(p.u)+'" aria-label="'+t("aria.profile")+'">'+
@@ -199,24 +197,61 @@ export function teaserHTML(p){
     '</article>'
   );
 }
+/* 5-sek fortryd-vindue efter en join-anmodning: knappen tæller ned og kan trykkes for at fortryde;
+   bagefter bliver den til et dæmpet, ikke-klikbart "Anmodning sendt ✓". */
+const joinCountdown = new Map(); // feedId -> sekunder tilbage i fortryd-vinduet
+let joinTimer = null;
+let joinSeq = 0;                  // supersession: kun den NYESTE handling pr. kreds må rydde op
+const joinSeqOf = new Map();
+function treqState(f, requested){
+  const cd = joinCountdown.get(f);
+  if(cd != null) return { cls:"treq undo", txt:t("teaser.undo", { n:cd }), dis:false };
+  if(requested)  return { cls:"treq sent", txt:t("teaser.sent"), dis:true };
+  return { cls:"treq", txt:t("teaser.request"), dis:false };
+}
+function treqHTML(p){
+  const s = treqState(p.feedId, p.requested);
+  return '<button class="'+s.cls+'" data-f="'+esc(p.feedId)+'"'+(s.dis ? " disabled" : "")+'>'+esc(s.txt)+'</button>';
+}
+function refreshTreqButtons(){
+  document.querySelectorAll(".treq[data-f]").forEach(function(b){
+    const f = b.dataset.f;
+    const tz = state.teasers.find(function(x){ return x.feedId === f; });
+    const s = treqState(f, (tz ? tz.requested : false) || pendingReq.has(f));
+    b.className = s.cls;
+    b.textContent = s.txt;
+    b.disabled = s.dis;
+  });
+}
+function startJoinTicker(){
+  if(joinTimer) return;
+  joinTimer = setInterval(function(){
+    joinCountdown.forEach(function(sec, f){
+      if(sec <= 1) joinCountdown.delete(f);   // vinduet slut → bliver til "Anmodning sendt"
+      else joinCountdown.set(f, sec - 1);
+    });
+    refreshTreqButtons();
+    if(joinCountdown.size === 0){ clearInterval(joinTimer); joinTimer = null; }
+  }, 1000);
+}
 function setTeaserReqUI(f, on){
   state.teasers.forEach(function(x){ if(x.feedId === f) x.requested = on; });
-  document.querySelectorAll('.treq[data-f="'+f+'"]').forEach(function(b){
-    b.classList.toggle("sent", on); // altid klikbar — "sendt" = tryk for at fortryde
-    b.textContent = on ? t("teaser.sent") : t("teaser.request");
-  });
+  refreshTreqButtons();
 }
 async function cancelJoin(f){
   if(!me || !f) return;
+  const seq = ++joinSeq; joinSeqOf.set(f, seq);
+  joinCountdown.delete(f);
   pendingReq.delete(f);
   cancelledReq.add(f);      // negativ optimistisk — overlever en baggrunds-refetch mens RPC'en kører
   setTeaserReqUI(f, false); // optimistisk tilbage til "Anmod om at være med"
   const { error } = await sb.rpc("cancel_join_request", { f: f });
   if(error){
+    if(joinSeqOf.get(f) !== seq) return; // afløst af en nyere handling
     console.error(error);
     cancelledReq.delete(f);
     pendingReq.add(f);
-    setTeaserReqUI(f, true); // fortryd fejlede → tilbage til "Anmodning sendt"
+    setTeaserReqUI(f, true); // fortryd fejlede → "Anmodning sendt"
     toast(t("err.generic"));
     return;
   }
@@ -225,19 +260,24 @@ async function cancelJoin(f){
 }
 async function requestJoin(f){
   if(!me || !f) return;
+  const seq = ++joinSeq; joinSeqOf.set(f, seq);
   pendingReq.add(f);
+  cancelledReq.delete(f);
+  joinCountdown.set(f, 5);  // start 5-sek fortryd-vindue med nedtælling
   setTeaserReqUI(f, true);
+  startJoinTicker();
   const { error } = await sb.rpc("request_join_kreds", { f: f });
   if(!error) return;
+  if(joinSeqOf.get(f) !== seq) return; // afløst af en nyere handling — rør ikke tilstanden
   console.error(error);
   const m = String(error.message || "");
+  joinCountdown.delete(f);
+  pendingReq.delete(f);
   if(m.indexOf("already_member") >= 0){
-    pendingReq.delete(f); // teaseren forsvinder alligevel
     toast(t("teaser.already"));
     scheduleRefetch();
     return;
   }
-  pendingReq.delete(f);
   setTeaserReqUI(f, false);
   toast(m.indexOf("not_allowed") >= 0 ? t("teaser.not_allowed") : t("err.generic"));
 }
@@ -986,7 +1026,8 @@ export function resetTapState(){
 function timelineClick(e){
   const tq = e.target.closest(".treq");
   if(tq){
-    if(tq.classList.contains("sent")) cancelJoin(tq.dataset.f);
+    if(tq.disabled) return;
+    if(tq.classList.contains("undo")) cancelJoin(tq.dataset.f);
     else requestJoin(tq.dataset.f);
     return;
   }

@@ -371,10 +371,10 @@
     font-size:13px;font-weight:700;
   }
   .treq:active{background:var(--chip)}
-  .treq:disabled{border-color:transparent;background:var(--chip);color:var(--gray);cursor:default}
-  /* "Anmodning sendt": dæmpet, men KLIKBAR (tryk = fortryd) */
-  .treq.sent{border-color:transparent;background:var(--chip);color:var(--gray);cursor:pointer}
-  .treq.sent:active{opacity:.6}
+  /* "Anmodning sendt" (efter fortryd-vinduet) + disabled: dæmpet, ikke-klikbart */
+  .treq:disabled,.treq.sent{border-color:transparent;background:var(--chip);color:var(--gray);cursor:default}
+  /* Fortryd-vindue med nedtælling: tydelig rød outline, klikbar */
+  .treq.undo{border-color:var(--red);color:var(--red)}
 
   .pactions{
     display:flex;align-items:center;justify-content:space-between;
