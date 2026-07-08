@@ -661,11 +661,10 @@
     transition:transform .28s cubic-bezier(.32,.72,.25,1);
   }
   body.hidebar .tabbar{transform:scale(.86)}
-  /* I app'en overtager de native Liquid Glass-barer — skjul web-tabbaren OG kreds-baren.
-     Kreds-baren vises dog under kreds-søgning (.searching), hvor native-baren træder til side. */
+  /* I app'en overtager de native Liquid Glass-barer — skjul web-tabbaren OG kreds-baren helt
+     (også søgningen er native nu). */
   body.native .tabbar{display:none}
   body.native .feedbar{display:none}
-  body.native .feedbar.searching{display:flex}
   /* Plads i toppen af feedet til den svævende native kreds-bar */
   body.native #view-feed{padding-top:56px}
   .tabbar button{

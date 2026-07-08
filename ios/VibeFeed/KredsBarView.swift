@@ -50,29 +50,79 @@ private struct ChipBackground: ViewModifier {
 
 struct NativeKredsBar: View {
     @ObservedObject private var model = KredsBarModel.shared
+    @State private var searching = false
+    @State private var query = ""
+    @FocusState private var focused: Bool
+
+    private var searchPlaceholder: String {
+        (UserDefaults.standard.string(forKey: "vf_lang") ?? "da") == "en" ? "Search your circles …" : "Søg i dine kredse …"
+    }
+
+    // During search: "Hele kredsen" + matching kredse only (no search circle / no "+ Ny").
+    private var shownItems: [KredsItem] {
+        guard searching else { return model.items }
+        let q = query.lowercased()
+        return model.items.filter { item in
+            if item.kind == "all" { return true }
+            if item.kind == "kreds" { return q.isEmpty || item.name.lowercased().contains(q) }
+            return false
+        }
+    }
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(model.items) { item in
-                    chip(item)
+        VStack(spacing: 8) {
+            if searching { searchField }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(shownItems) { item in chip(item) }
                 }
+                .padding(.horizontal, 12)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .frame(height: 44)
         }
-        .frame(height: 50)
+        .padding(.vertical, 7)
         .padding(.top, model.compact ? 0 : 52)   // below the web topbar unless scrolled
         .opacity(model.visible ? 1 : 0)
         .allowsHitTesting(model.visible)
+        .onChange(of: model.visible) { _, v in if !v { searching = false; query = ""; focused = false } }
         .animation(.spring(response: 0.32, dampingFraction: 0.82), value: model.compact)
         .animation(.easeInOut(duration: 0.18), value: model.visible)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: searching)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: model.items)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "magnifyingglass").font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
+            TextField(searchPlaceholder, text: $query)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .focused($focused)
+                .foregroundStyle(Color.primary)
+            Button {
+                searching = false; query = ""; focused = false
+            } label: {
+                Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 40)
+        .modifier(ChipBackground(active: false))
+        .padding(.horizontal, 12)
     }
 
     @ViewBuilder
     private func chip(_ item: KredsItem) -> some View {
-        Button { model.onTap?(item.id) } label: {
+        Button {
+            if item.kind == "search" {
+                searching = true
+                DispatchQueue.main.async { focused = true }
+            } else {
+                model.onTap?(item.id)
+                searching = false; query = ""; focused = false
+            }
+        } label: {
             content(item)
                 .foregroundStyle(item.active ? Color(.systemBackground)
                                  : (item.kind == "new" ? Color.red : Color.primary))

@@ -2,7 +2,7 @@ import { sb, recoveryMode, recoveryLinkError } from "./config.js";
 import { me, curTab } from "./store.js";
 import { el, toast, getConsent, setConsent } from "./helpers.js";
 import { t, initI18n, setLang, hasStoredLang } from "./i18n.js";
-import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, loadQuota, setFeed, openFeedbarSearch, nativeKredsState } from "./feed.js";
+import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, loadQuota, setFeed, nativeKredsState } from "./feed.js";
 import { initComments } from "./comments.js";
 import { initKredse, closeFeedSheet, closeMemberSheet, openFeedSheet } from "./kredse.js";
 import { initCompose, renderComposeDest, openCompose } from "./compose.js";
@@ -69,7 +69,7 @@ if(window.__vfNative){
     switchTab(name);
   };
   window.vfKreds = function(id){
-    if(id === "__search"){ openFeedbarSearch(); return; }
+    // Søgning håndteres nu 100% native (i den native kreds-bar) — kun feed-valg + opret her.
     if(id === "__new"){ openFeedSheet(); return; }
     setFeed(id);
   };
@@ -93,9 +93,9 @@ if(window.__vfNative){
       lastTabKey = tabKey;
       mh.postMessage({ type: "tab", active: active, dot: dot, compact: compact, visible: visible });
     }
-    // --- Kreds-bar (kun på feed-fanen; skjules under kreds-søgning → web-baren vises da) ---
+    // --- Kreds-bar (kun på feed-fanen; søgning er native, så baren bliver synlig hele tiden) ---
     const ks = nativeKredsState();
-    const kvisible = visible && active === "feed" && !ks.searching;
+    const kvisible = visible && active === "feed";
     const kredsKey = JSON.stringify(ks.items) + "|" + compact + "|" + kvisible;
     if(kredsKey !== lastKredsKey){
       lastKredsKey = kredsKey;

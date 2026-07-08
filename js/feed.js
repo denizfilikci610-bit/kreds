@@ -690,12 +690,8 @@ export function setFeed(id){
   return done; // kan awaites (fx notifikations-hop)
 }
 
-/* ---- Bro til den native kreds-bar (kun i app'en) ---- */
-export function openFeedbarSearch(){
-  kseek.on = true; kseek.q = "";
-  renderFeedbar();
-  const i = el("fb-input"); if(i) i.focus();
-}
+/* ---- Bro til den native kreds-bar (kun i app'en). Søgningen er nu 100% native
+   (filtreres lokalt i den native bar), så vi sender bare hele listen. ---- */
 export function nativeKredsState(){
   const items = [{ kind:"search", id:"__search", name:"", active:false, unread:false }];
   items.push({ kind:"all", id:"all", name:t("feedbar.all"), active: state.currentFeed === "all", unread:false });
@@ -703,7 +699,7 @@ export function nativeKredsState(){
     items.push({ kind:"kreds", id:f.id, name:f.name, active: state.currentFeed === f.id, unread: unseenFeeds.has(f.id) });
   });
   items.push({ kind:"new", id:"__new", name:t("feedbar.new"), active:false, unread:false });
-  return { items: items, searching: kseek.on };
+  return { items: items };
 }
 
 /* ================= Like-saldo (chip + profil, én datakilde) ================= */
