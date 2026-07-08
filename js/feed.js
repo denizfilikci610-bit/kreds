@@ -114,9 +114,9 @@ const BIGHEART = '<div class="bigheart"><svg viewBox="0 0 24 24"><path d="M20.84
 function cntHTML(n){
   return '<span class="cnt"'+(n > 0 ? '' : ' style="display:none"')+'>'+n+'</span>';
 }
-/* Governance-afstemning: gør navnet fedt i "Afstemning: Skal <navn> med i/ud af kredsen?" */
+/* Governance-afstemning: gør navnet fedt i "Afstemning: Skal <navn> med i/ud af/lukkes ind i kredsen?" */
 function govPostText(text){
-  const m = /^(Afstemning: Skal )([\s\S]+?)( (?:med i|ud af) kredsen\?[\s\S]*)$/.exec(text);
+  const m = /^(Afstemning: Skal )([\s\S]+?)( (?:med i|ud af|lukkes ind i) kredsen\?[\s\S]*)$/.exec(text);
   if(!m) return esc(text);
   return esc(m[1]) + "<b>" + esc(m[2]) + "</b>" + esc(m[3]);
 }

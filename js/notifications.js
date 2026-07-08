@@ -53,8 +53,8 @@ function renderAdmissionVotes(rows){
     const remove = v.kind === "remove";
     const by = esc(v.by_name || t("mv.someone"));
     const k = esc(v.feed_name || "");
-    // Tydeligt: HVEM startede den + HVAD de ønsker
-    const title = t(remove ? "mv.remove" : "mv.add", { by: by, k: k });
+    // Tydeligt: HVEM startede den + HVAD de ønsker (join-anmodning = din egen anmodning)
+    const title = v.is_request ? t("mv.request", { k: k }) : t(remove ? "mv.remove" : "mv.add", { by: by, k: k });
     // is_member = godt for dig (optaget / blev i kredsen)
     const doneText = remove
       ? t(v.is_member ? "mv.kept" : "mv.removed")
@@ -321,8 +321,13 @@ export async function loadNotifs(){
         // Governance-afstemning? Udled HVEM (sub) og HVAD (rm=fjernelse) af server-teksten
         // "Afstemning: Skal <navn> med i/ud af kredsen?" — så stemmerne kan se hvad den handler om.
         const gm = typeof r.text === "string" ? /^Afstemning: Skal ([\s\S]+?) (med i|ud af) kredsen\?/.exec(r.text) : null;
+        // Selv-anmodning: neutral system-post "Afstemning: Skal <navn> lukkes ind i kredsen?"
+        const rq = typeof r.text === "string" ? /^Afstemning: Skal ([\s\S]+?) lukkes ind i kredsen\?/.exec(r.text) : null;
         const isOwner = typeof r.text === "string" && r.text.indexOf("Afstemning: Hvem skal være ny ejer") === 0;
-        if(gm){
+        if(rq){
+          items.push({ type:"kvote", u:r.author_profile.handle, at:r.created_at, pid:r.id,
+                       k:(r.feed && r.feed.name) || "", sub: rq[1], request: true });
+        } else if(gm){
           items.push({ type:"kvote", u:r.author_profile.handle, at:r.created_at, pid:r.id,
                        k:(r.feed && r.feed.name) || "", sub: gm[1], rm: gm[2] === "ud af" });
         } else if(isOwner){
@@ -381,7 +386,7 @@ export async function loadNotifs(){
           if(n.type === "clike")  return row(H, "heart",  n.u, t("notif.liked_comment"), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "reply")  return row(B, "bubble", n.u, t("notif.replied"),   n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "cmt")    return row(B, "bubble", n.u, t("notif.commented"),  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
-          if(n.type === "kvote")  return row(K, "kvote",  n.u, n.owner ? t("notif.vote_owner", { k: esc(n.k) }) : t(n.rm ? "notif.vote_remove" : "notif.vote_add", { name: esc(n.sub || ""), k: esc(n.k) }), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
+          if(n.type === "kvote")  return row(K, "kvote",  n.u, n.owner ? t("notif.vote_owner", { k: esc(n.k) }) : n.request ? t("notif.vote_request", { name: esc(n.sub || ""), k: esc(n.k) }) : t(n.rm ? "notif.vote_remove" : "notif.vote_add", { name: esc(n.sub || ""), k: esc(n.k) }), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
           if(n.type === "kpost")  return row(K, "kpost",  n.u, t("notif.posted_kreds", { k: esc(n.k) }), n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
           if(n.type === "kreq")   return kreqRow(n);
           if(n.type === "inv")    return invRow(n);
