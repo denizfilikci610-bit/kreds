@@ -647,7 +647,7 @@
   .tabbar{
     position:fixed;z-index:50;
     left:16px;right:16px;
-    bottom:calc(env(safe-area-inset-bottom) + 8px);
+    bottom:max(8px, calc(env(safe-area-inset-bottom) - 8px));
     display:flex;align-items:center;
     height:58px;
     padding:0 6px;
