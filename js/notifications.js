@@ -440,6 +440,7 @@ async function handleInvite(row, accept){
     scheduleRefetch(); // feeds + opslag skal med det samme afspejle medlemskabet
   } else {
     toast(t("notif.vote_pending"));
+    loadAdmissionVotes(); // vis live-afstemnings-kortet med det samme (uden at forlade fanen)
   }
 }
 
