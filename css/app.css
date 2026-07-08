@@ -909,25 +909,31 @@
     padding:28px;
   }
   .modal.on{display:flex}
+  /* Liquid Glass-kort: frostet glas over det nedtonede feed (matcher de native
+     tab-/kreds-barer). I app'en vises #rmenu/#pmenu/#ufmenu native i stedet — dette
+     glas dækker #mediamenu/#delmodal (som forbliver web) + hele web-browseren. */
   .modal-card{
     width:100%;max-width:320px;
-    background:var(--surface);
-    border:1px solid var(--line);
+    background:var(--glass);
+    -webkit-backdrop-filter:blur(24px) saturate(1.6);
+    backdrop-filter:blur(24px) saturate(1.6);
+    border:1px solid var(--glass-brd);
     border-radius:14px;
     overflow:hidden;
+    box-shadow:0 12px 40px rgba(0,0,0,.18);
   }
   .mrow{
     display:block;width:100%;
     padding:14px 16px;
     font-size:15px;font-weight:600;color:var(--ink);
     text-align:center;
-    border-top:1px solid var(--line);
+    border-top:1px solid var(--glass-brd);
   }
   .mrow:first-child{border-top:none}
-  .mrow:active{background:var(--chip)}
+  .mrow:active{background:var(--tab-hi)}
   .mrow.danger{color:var(--red);font-weight:700}
   .mtitle{padding:18px 16px 4px;text-align:center;font-weight:700;font-size:16px;color:var(--ink)}
-  .mtitle+.mrow{margin-top:8px;border-top:1px solid var(--line)}
+  .mtitle+.mrow{margin-top:8px;border-top:1px solid var(--glass-brd)}
   .mtext{padding:6px 18px 14px;text-align:center;font-size:13.5px;color:var(--gray);line-height:1.45}
   .mfoot{padding:0 16px 16px}
 

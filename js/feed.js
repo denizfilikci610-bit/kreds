@@ -897,6 +897,29 @@ let menuPid = null, editPid = null;
 
 export function openPostMenu(id){
   menuPid = Number(id);
+  // I app'en: native Liquid Glass action sheet i stedet for web-modalen.
+  if(window.__vfNativeSheets && window.__vfSheetPost){
+    window.__vfSheetPost({
+      buttons: [
+        { label: t("pm.edit"), action: "edit" },
+        { label: t("pm.delete"), action: "delete", role: "destructive" },
+        { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+      ]
+    }, function(a){
+      if(a === "edit"){ openPostEdit(menuPid); return; }
+      if(a === "delete"){
+        // trin 2: bekræft permanent sletning (som web-flowets pmenu-confirm)
+        window.__vfSheetPost({
+          title: t("pm.confirm"),
+          buttons: [
+            { label: t("pm.del"), action: "delete", role: "destructive" },
+            { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+          ]
+        }, function(b){ if(b === "delete") deleteOwnPost(); });
+      }
+    });
+    return;
+  }
   el("pmenu-main").style.display = "";
   el("pmenu-confirm").style.display = "none";
   el("pmenu").classList.add("on");
@@ -911,6 +934,18 @@ let reportPid = null;
 
 export function openReportMenu(id){
   reportPid = Number(id);
+  // I app'en: native Liquid Glass action sheet i stedet for web-modalen.
+  if(window.__vfNativeSheets && window.__vfSheetPost){
+    window.__vfSheetPost({
+      title: t("rm.confirm"),
+      message: t("rm.note"),
+      buttons: [
+        { label: t("rm.report"), action: "report", role: "destructive" },
+        { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+      ]
+    }, function(a){ if(a === "report") reportPost(); });
+    return;
+  }
   el("rmenu-main").style.display = "";
   el("rmenu-confirm").style.display = "none";
   el("rmenu").classList.add("on");
