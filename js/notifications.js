@@ -245,6 +245,19 @@ export async function loadNotifs(){
       '</div>'+
     '</div>';
   }
+  /* Governance-anmodning: en bruger vil lukkes ind i en kreds jeg er med i (klik = åbn afstemningen).
+     Neutral system-afsender (VibeFeed-avatar), men ANMODEREN er den fede hovedperson i sætningen. */
+  function kvoteReqRow(n){
+    const un = isUnread(n.at);
+    return '<div class="notif kvote'+(un ? " unread" : "")+'" data-pid="'+esc(n.pid)+'" data-type="post">'+
+      (un ? '<span class="udot"></span>' : '')+
+      avaHTML(n.u, 32)+
+      '<div class="grow">'+
+        '<div class="ntext"><b>'+esc(n.sub || "")+'</b> '+t("notif.vote_request", { k: esc(n.k) })+'. <span class="nt">'+esc(fmtTime(n.at))+'</span></div>'+
+      '</div>'+
+      '<div class="nicon kvote">'+K+'</div>'+
+    '</div>';
+  }
   /* Ven-anmodning TIL mig (Accepter/Afvis) — handlingskrævende */
   function freqRow(n){
     const un = isUnread(n.at);
@@ -386,7 +399,8 @@ export async function loadNotifs(){
           if(n.type === "clike")  return row(H, "heart",  n.u, t("notif.liked_comment"), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "reply")  return row(B, "bubble", n.u, t("notif.replied"),   n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "cmt")    return row(B, "bubble", n.u, t("notif.commented"),  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
-          if(n.type === "kvote")  return row(K, "kvote",  n.u, n.owner ? t("notif.vote_owner", { k: esc(n.k) }) : n.request ? t("notif.vote_request", { name: esc(n.sub || ""), k: esc(n.k) }) : t(n.rm ? "notif.vote_remove" : "notif.vote_add", { name: esc(n.sub || ""), k: esc(n.k) }), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
+          if(n.type === "kvote" && n.request) return kvoteReqRow(n);
+          if(n.type === "kvote")  return row(K, "kvote",  n.u, n.owner ? t("notif.vote_owner", { k: esc(n.k) }) : t(n.rm ? "notif.vote_remove" : "notif.vote_add", { name: esc(n.sub || ""), k: esc(n.k) }), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
           if(n.type === "kpost")  return row(K, "kpost",  n.u, t("notif.posted_kreds", { k: esc(n.k) }), n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
           if(n.type === "kreq")   return kreqRow(n);
           if(n.type === "inv")    return invRow(n);
