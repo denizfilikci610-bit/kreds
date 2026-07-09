@@ -119,9 +119,10 @@ struct ContentView: View {
         // Real iOS 26 Liquid Glass action sheets (report / post menu / unfriend),
         // presented on top of everything and driven by the web over the JS bridge.
         .modifier(SheetHost())
-        // Real iOS 26 Liquid Glass bottom sheets (new circle / members), web-driven.
+        // Real iOS 26 Liquid Glass bottom sheets (new circle / members / edit profile), web-driven.
         .modifier(FsheetHost())
         .modifier(MemberSheetHost())
+        .modifier(EsheetHost())
         .onAppear {
             TabBarModel.shared.onTap = { name in
                 model.webView?.evaluateJavaScript("window.vfTab && window.vfTab('\(name)')", completionHandler: nil)
@@ -138,6 +139,13 @@ struct ContentView: View {
             }
             MemberSheetModel.shared.onAction = { json in
                 model.webView?.evaluateJavaScript("window.vfMember && window.vfMember(\(json))", completionHandler: nil)
+            }
+            EsheetModel.shared.onAction = { json in
+                model.webView?.evaluateJavaScript("window.vfEsheet && window.vfEsheet(\(json))", completionHandler: nil)
+            }
+            // Picked photo (base64 data URL — no quotes/backslashes) is staged in the web for Save.
+            EsheetModel.shared.onAvatar = { dataURL in
+                model.webView?.evaluateJavaScript("window.vfAvatar && window.vfAvatar('\(dataURL)')", completionHandler: nil)
             }
         }
     }

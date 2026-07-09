@@ -34,7 +34,7 @@ struct WebView: UIViewRepresentable {
         // so the web deploy is safe to ship in any order relative to this native rebuild.
         config.userContentController.addUserScript(
             WKUserScript(source: "window.__vfNative = true; window.__vfGlassCard = true;"
-                         + " window.__vfFsheet = true; window.__vfMemberSheet = true;",
+                         + " window.__vfFsheet = true; window.__vfMemberSheet = true; window.__vfEsheet = true;",
                          injectionTime: .atDocumentStart, forMainFrameOnly: true)
         )
 

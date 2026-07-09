@@ -75,6 +75,9 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
         case "msheet":
             // The "Kredsens medlemmer" (members) bottom sheet — real Liquid Glass, web-driven.
             Task { @MainActor in MemberSheetModel.shared.apply(dict) }
+        case "esheet":
+            // The "Rediger profil" (edit profile) bottom sheet — real Liquid Glass, web-driven.
+            Task { @MainActor in EsheetModel.shared.apply(dict) }
         case "logout":
             UserDefaults.standard.removeObject(forKey: secretKey)
             UserDefaults.standard.removeObject(forKey: lastCheckKey)
