@@ -33,7 +33,8 @@ struct WebView: UIViewRepresentable {
         // route to native; the browser and older installed builds keep the CSS-glass .modal fallback,
         // so the web deploy is safe to ship in any order relative to this native rebuild.
         config.userContentController.addUserScript(
-            WKUserScript(source: "window.__vfNative = true; window.__vfGlassCard = true;",
+            WKUserScript(source: "window.__vfNative = true; window.__vfGlassCard = true;"
+                         + " window.__vfFsheet = true; window.__vfMemberSheet = true;",
                          injectionTime: .atDocumentStart, forMainFrameOnly: true)
         )
 

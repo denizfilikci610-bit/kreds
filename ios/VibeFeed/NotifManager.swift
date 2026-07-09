@@ -69,6 +69,12 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
             // and call back window.vfSheet(action) with the chosen button. The web owns
             // all flow logic (incl. any follow-up confirmation sheet).
             Task { @MainActor in SheetModel.shared.apply(dict) }
+        case "fsheet":
+            // The "Ny kreds" (new circle) bottom sheet — real Liquid Glass, web-driven.
+            Task { @MainActor in FsheetModel.shared.apply(dict) }
+        case "msheet":
+            // The "Kredsens medlemmer" (members) bottom sheet — real Liquid Glass, web-driven.
+            Task { @MainActor in MemberSheetModel.shared.apply(dict) }
         case "logout":
             UserDefaults.standard.removeObject(forKey: secretKey)
             UserDefaults.standard.removeObject(forKey: lastCheckKey)

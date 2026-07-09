@@ -119,6 +119,9 @@ struct ContentView: View {
         // Real iOS 26 Liquid Glass action sheets (report / post menu / unfriend),
         // presented on top of everything and driven by the web over the JS bridge.
         .modifier(SheetHost())
+        // Real iOS 26 Liquid Glass bottom sheets (new circle / members), web-driven.
+        .modifier(FsheetHost())
+        .modifier(MemberSheetHost())
         .onAppear {
             TabBarModel.shared.onTap = { name in
                 model.webView?.evaluateJavaScript("window.vfTab && window.vfTab('\(name)')", completionHandler: nil)
@@ -128,6 +131,13 @@ struct ContentView: View {
             }
             SheetModel.shared.onAction = { action in
                 model.webView?.evaluateJavaScript("window.vfSheet && window.vfSheet('\(action)')", completionHandler: nil)
+            }
+            // The bottom sheets send a JSON object literal (actions carry payload).
+            FsheetModel.shared.onAction = { json in
+                model.webView?.evaluateJavaScript("window.vfFsheet && window.vfFsheet(\(json))", completionHandler: nil)
+            }
+            MemberSheetModel.shared.onAction = { json in
+                model.webView?.evaluateJavaScript("window.vfMember && window.vfMember(\(json))", completionHandler: nil)
             }
         }
     }

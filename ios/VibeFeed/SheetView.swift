@@ -9,8 +9,7 @@ import SwiftUI
 /// `{type:"sheet", title, message, preview?, buttons:[{label, action, role}]}` (NotifManager routes
 /// it to `SheetModel.shared.apply`); on a tap we call back `window.vfSheet(action)` and the WEB owns
 /// all flow (it either posts the next sheet — e.g. a delete confirmation — or posts `{close:true}`).
-
-private let vfRed = Color(red: 0xE0 / 255, green: 0x40 / 255, blue: 0x2F / 255)
+/// (vfRed is shared from GlassSheetKit.swift.)
 
 struct SheetButton: Identifiable, Equatable {
     let id: Int
