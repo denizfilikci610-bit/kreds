@@ -124,7 +124,8 @@ function postMemoryGallery(){
     labels: {
       title: t("compose.title.memory"), next: t("memory.next"), cancel: t("common.cancel"), share: t("compose.post"),
       captionPlaceholder: t("compose.ph.memory"), destLabel: t("compose.dest"), allLabel: t("feedbar.all"),
-      limited: t("photolib.limited"), manage: t("photolib.manage"), denied: t("photolib.denied"), settings: t("photolib.settings")
+      limited: t("photolib.limited"), manage: t("photolib.manage"), denied: t("photolib.denied"), settings: t("photolib.settings"),
+      trimHint: t("memory.trim_hint")
     }
   });
 }

@@ -14,7 +14,7 @@ struct PLFeed: Identifiable, Equatable { let id: String; let name: String }
 final class PhotoLibModel: NSObject, ObservableObject {
     static let shared = PhotoLibModel()
 
-    enum Step { case gallery, caption }
+    enum Step { case gallery, trim, caption }
     @Published var open = false
     @Published var step: Step = .gallery
     @Published var status: PHAuthorizationStatus = .notDetermined
@@ -25,6 +25,15 @@ final class PhotoLibModel: NSObject, ObservableObject {
     @Published var feeds: [PLFeed] = []
     @Published var sharing = false
     @Published var loadingOriginal = false
+
+    // Video trim (a picked video longer than 6 s → the user picks a 6 s window; see VideoTrimView)
+    @Published var videoDuration: Double = 0
+    @Published var trimStart: Double = 0
+    @Published var trimDuration: Double = VF_MAX_VID
+    @Published var showTrimStep = false   // did the picked video need trimming?
+    @Published var preparingTrim = false  // loading the AVAsset after "Videre"
+    @Published var trimHint = ""
+    var videoAsset: AVAsset?
 
     // labels (pushed from web)
     @Published var title = ""
@@ -73,8 +82,10 @@ final class PhotoLibModel: NSObject, ObservableObject {
             title = s(l, "title"); nextLabel = s(l, "next"); cancelLabel = s(l, "cancel"); shareLabel = s(l, "share")
             captionPlaceholder = s(l, "captionPlaceholder"); destLabel = s(l, "destLabel"); allLabel = s(l, "allLabel")
             limitedNote = s(l, "limited"); manageLabel = s(l, "manage"); deniedNote = s(l, "denied"); settingsLabel = s(l, "settings")
+            trimHint = s(l, "trimHint")
         }
         caption = ""; selected = nil; sharing = false; loadingOriginal = false; step = .gallery
+        videoAsset = nil; videoDuration = 0; trimStart = 0; trimDuration = VF_MAX_VID; showTrimStep = false; preparingTrim = false
         open = true
         requestAndLoad()
     }
@@ -137,23 +148,37 @@ final class PhotoLibModel: NSObject, ObservableObject {
     func dismiss() { open = false; onCancel?() }
     func fallbackToWeb() { open = false; onFallback?() }
 
-    /// "Del": export the selected asset to memory, then ask the web for a Storage upload URL.
+    /// "Videre" from the gallery. For a VIDEO, load the AVAsset and decide: longer than 6 s → the trim
+    /// step; otherwise straight to caption (the whole short clip is used). For an IMAGE, go to caption.
+    func prepareAndAdvance() {
+        guard let asset = selected else { return }
+        if asset.mediaType != .video { step = .caption; return }
+        preparingTrim = true
+        let opts = PHVideoRequestOptions()
+        opts.deliveryMode = .highQualityFormat
+        opts.isNetworkAccessAllowed = true
+        imageManager.requestAVAsset(forVideo: asset, options: opts) { [weak self] avAsset, _, _ in
+            guard let self else { return }
+            DispatchQueue.main.async {
+                self.preparingTrim = false
+                guard let avAsset else { self.step = .caption; return } // couldn't load → share() will retry/fail cleanly
+                self.videoAsset = avAsset
+                let dur = CMTimeGetSeconds(avAsset.duration)
+                self.videoDuration = (dur.isFinite && dur > 0) ? dur : 0
+                self.trimDuration = min(VF_MAX_VID, max(0.1, self.videoDuration))
+                self.trimStart = 0
+                self.showTrimStep = self.videoDuration > VF_MAX_VID + 0.05
+                self.step = self.showTrimStep ? .trim : .caption
+            }
+        }
+    }
+
+    /// "Del": export the picked media, then ask the web for a Storage upload URL.
     func share() {
         guard let asset = selected, !sharing else { return }
         sharing = true
         if asset.mediaType == .video {
-            let opts = PHVideoRequestOptions()
-            opts.deliveryMode = .highQualityFormat
-            opts.isNetworkAccessAllowed = true
-            imageManager.requestAVAsset(forVideo: asset, options: opts) { [weak self] avAsset, _, _ in
-                guard let self else { return }
-                guard let urlAsset = avAsset as? AVURLAsset, let data = try? Data(contentsOf: urlAsset.url) else {
-                    DispatchQueue.main.async { self.sharing = false }; return
-                }
-                let ext = urlAsset.url.pathExtension.lowercased() == "mov" ? "mov" : "mp4"
-                let mime = ext == "mov" ? "video/quicktime" : "video/mp4"
-                DispatchQueue.main.async { self.pendingData = data; self.send(isVideo: true, ext: ext, mime: mime) }
-            }
+            exportTrimmedVideo()
         } else {
             previewImageFull(asset) { [weak self] img in
                 guard let self else { return }
@@ -162,6 +187,40 @@ final class PhotoLibModel: NSObject, ObservableObject {
                 }
                 self.pendingData = data
                 self.send(isVideo: false, ext: "jpg", mime: "image/jpeg")
+            }
+        }
+    }
+
+    /// Export the chosen ≤6 s window (or the whole clip if it was already short) to a small H.264 mp4.
+    /// Trimming keeps the upload tiny + fast (a full-length video would blow the Storage size limit —
+    /// that was the "can't share video" symptom).
+    private func exportTrimmedVideo() {
+        guard let avAsset = videoAsset else { sharing = false; onUploadFailed?(); return }
+        let dur = videoDuration > 0 ? videoDuration : CMTimeGetSeconds(avAsset.duration)
+        let start = max(0, min(trimStart, max(0, dur - 0.1)))
+        let length = max(0.1, min(trimDuration, dur - start))
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mp4")
+        try? FileManager.default.removeItem(at: out)
+        guard let export = AVAssetExportSession(asset: avAsset, presetName: AVAssetExportPreset1280x720) else {
+            sharing = false; onUploadFailed?(); return
+        }
+        export.outputURL = out
+        export.outputFileType = .mp4
+        export.shouldOptimizeForNetworkUse = true
+        export.timeRange = CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 600),
+                                       duration: CMTime(seconds: length, preferredTimescale: 600))
+        export.exportAsynchronously { [weak self] in
+            guard let self else { return }
+            let ok = export.status == .completed
+            let data = ok ? try? Data(contentsOf: out) : nil
+            DispatchQueue.main.async {
+                try? FileManager.default.removeItem(at: out)
+                if let data {
+                    self.pendingData = data
+                    self.send(isVideo: true, ext: "mp4", mime: "video/mp4")
+                } else {
+                    self.sharing = false; self.onUploadFailed?()
+                }
             }
         }
     }
@@ -224,7 +283,12 @@ struct MemoryGalleryScreen: View {
             VStack(spacing: 0) {
                 navBar
                 Divider().opacity(0.4)
-                if model.step == .gallery { gallery } else { caption }
+                switch model.step {
+                case .gallery: gallery
+                case .trim:
+                    if let a = model.videoAsset { VideoTrimView(asset: a) } else { gallery }
+                case .caption: caption
+                }
             }
         }
     }
@@ -232,18 +296,30 @@ struct MemoryGalleryScreen: View {
     private var navBar: some View {
         HStack {
             Button(model.cancelLabel) {
-                if model.step == .caption { model.step = .gallery } else { model.dismiss() }
+                switch model.step {
+                case .gallery: model.dismiss()
+                case .trim: model.step = .gallery
+                case .caption: model.step = model.showTrimStep ? .trim : .gallery
+                }
             }
             .foregroundStyle(Color.primary)
             Spacer()
             Text(model.title).font(.system(size: 16, weight: .bold))
             Spacer()
-            if model.step == .gallery {
-                Button(model.nextLabel) { if model.selected != nil { model.step = .caption } }
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(model.selected == nil ? Color.secondary : vfRed)
-                    .disabled(model.selected == nil)
-            } else {
+            switch model.step {
+            case .gallery:
+                Button { model.prepareAndAdvance() } label: {
+                    if model.preparingTrim { ProgressView() }
+                    else {
+                        Text(model.nextLabel).font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(model.selected == nil ? Color.secondary : vfRed)
+                    }
+                }
+                .disabled(model.selected == nil || model.preparingTrim)
+            case .trim:
+                Button(model.nextLabel) { model.step = .caption }
+                    .font(.system(size: 16, weight: .bold)).foregroundStyle(vfRed)
+            case .caption:
                 Button { model.share() } label: {
                     if model.sharing { ProgressView() } else {
                         Text(model.shareLabel).font(.system(size: 16, weight: .bold)).foregroundStyle(vfRed)
