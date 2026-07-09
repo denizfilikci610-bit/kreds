@@ -141,8 +141,14 @@ struct ContentView: View {
         // Universal links (vibefeed.dk/?token_hash=… fra auth-mails) åbner APPEN — linket
         // sendes ind i webviewet, hvor SPA'ens landing veksler tokenet og viser bekræft-/
         // nulstillingsskærmen. Kold start håndteres af pendingDeepLink i WebViewModel.
+        // iOS leverer ad TO kanaler afhængigt af situationen (kold/varm, Mail/andre apps):
+        // browsing-web-useractivity OG openURL — lyt på begge (dobbelt levering er harmløs:
+        // samme URL loades blot igen).
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             if let url = activity.webpageURL { model.openDeepLink(url) }
+        }
+        .onOpenURL { url in
+            model.openDeepLink(url)
         }
         .onAppear {
             TabBarModel.shared.onTap = { name in
