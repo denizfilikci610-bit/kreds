@@ -669,6 +669,10 @@
   body.native .feedbar{display:none}
   /* Plads i toppen af feedet til den svævende native kreds-bar */
   body.native #view-feed{padding-top:56px}
+  /* De native glas-sheets erstatter web-sheet'et i app'en → skjul web-#fsheet/#msheet
+     (klasserne nfs/nms sættes af main.js når __vfFsheet/__vfMemberSheet er sat). */
+  body.nfs #fsheet{display:none}
+  body.nms #msheet{display:none}
   .tabbar button{
     position:relative;
     flex:1;

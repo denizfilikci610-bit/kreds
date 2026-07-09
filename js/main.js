@@ -4,7 +4,7 @@ import { el, toast, getConsent, setConsent } from "./helpers.js";
 import { t, initI18n, setLang, hasStoredLang } from "./i18n.js";
 import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, loadQuota, setFeed, nativeKredsState } from "./feed.js";
 import { initComments } from "./comments.js";
-import { initKredse, closeFeedSheet, closeMemberSheet, openFeedSheet } from "./kredse.js";
+import { initKredse, closeFeedSheet, closeMemberSheet, openFeedSheet, nativeFsheetAction, nativeMemberAction } from "./kredse.js";
 import { initCompose, renderComposeDest, openCompose } from "./compose.js";
 import { initSearch, renderSearch } from "./search.js";
 import { initProfile, closeEditSheet, closeActivitySheet, renderStories, renderMyPosts, refreshPv } from "./profile.js";
@@ -99,13 +99,31 @@ if(window.__vfNative){
       if(!sheetReplaced) postSheet({ close: true });
     }
   };
+  /* --- Native Liquid Glass BOTTOM SHEETS (Ny kreds #fsheet / Medlemmer #msheet) — web-drevne ---
+     kredse.js bygger en fuld snapshot og kalder __vfFsheetPush/__vfMemberPush; Swift tegner glasset
+     og melder handlinger tilbage via window.vfFsheet/vfMember (routes i kredse.js). nativeSheetOpen
+     skjuler de native tab-/kreds-barer mens et ark er åbent (arket har sit eget native scrim, så vi
+     rejser IKKE web-#scrim → ingen dobbelt-dæmpning). */
+  if(window.__vfFsheet) document.body.classList.add("nfs");     // CSS skjuler web-#fsheet i app'en
+  if(window.__vfMemberSheet) document.body.classList.add("nms"); // CSS skjuler web-#msheet i app'en
+  let nativeSheetOpen = false;
+  const postPanel = function(type, msg){
+    if(msg && msg.open) nativeSheetOpen = true;
+    if(msg && msg.close) nativeSheetOpen = false;
+    const mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed;
+    if(mh) mh.postMessage(Object.assign({ type: type }, msg));
+  };
+  window.__vfFsheetPush = function(msg){ postPanel("fsheet", msg); };
+  window.__vfMemberPush = function(msg){ postPanel("msheet", msg); };
+  window.vfFsheet = function(payload){ nativeFsheetAction(payload); };
+  window.vfMember = function(payload){ nativeMemberAction(payload); };
   let lastTabKey = "", lastKredsKey = "";
   const syncNative = function(){
     const mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed;
     if(!mh) return;
     const compact = document.body.classList.contains("hidebar");
     // Skjul barerne når noget ligger ovenpå ELLER vi ikke er på hoved-appen (boot-splash, login, gates)
-    const blocked = !!document.querySelector(
+    const blocked = nativeSheetOpen || !!document.querySelector(
         "#scrim.on, .compose.on, .profileview.on, #lightbox.on, #rwd-pop.on, #authview.on, #langview.on, #consentview.on"
       ) || document.body.classList.contains("lb-lock")
       || !!(el("splash") && !el("splash").classList.contains("gone"));

@@ -1,9 +1,23 @@
 import { sb } from "./config.js";
 import { me, state, ID2H } from "./store.js";
-import { el, esc, avaHTML, user, toast } from "./helpers.js";
+import { el, esc, avaHTML, user, toast, ini, imgUrl } from "./helpers.js";
 import { t } from "./i18n.js";
 import { loadFeeds, loadPosts, setFeed, feedById, renderFeedbar, renderKredshead } from "./feed.js";
 import { renderComposeDest } from "./compose.js";
+
+/* ================= Native glas-sheets (app'en) — fælles ================= */
+/* Kort-data om en ven til de native glas-sheets (rå tekst; native tegner). */
+function friendCard(h){
+  const u = user(h);
+  return {
+    handle: h,
+    name: u.name || h,
+    avatarUrl: u.avatar_path ? imgUrl(u.avatar_path) : "",
+    initials: ini(h),
+    gradient: u.g || []
+  };
+}
+let fsToken = 0, msToken = 0;
 
 /* ================= Ny kreds (sheet) ================= */
 let fsSelected = {};
@@ -13,9 +27,30 @@ function renderFsGov(){
     b.classList.toggle("on", b.dataset.gov === fsGov);
   });
 }
+/* Fuld snapshot til det native "Ny kreds"-glas-kort (native ejer navn/valg/styring lokalt). */
+function fsheetSnapshot(){
+  return {
+    open: true,
+    token: ++fsToken,
+    title: t("fs.title"),
+    namePlaceholder: t("fs.name_ph"),
+    nameMaxLength: 30,
+    govLabel: t("fs.gov_label"),
+    govVoteLabel: t("fs.gov_vote"),
+    govOwnerLabel: t("fs.gov_owner"),
+    pickLabel: t("fs.pick"),
+    createLabel: t("fs.create"),
+    emptyLabel: t("fs.empty"),
+    selectAllLabel: t("fs.select_all"),
+    deselectAllLabel: t("fs.deselect_all"),
+    friends: state.humanFriends.map(friendCard)
+  };
+}
 export function openFeedSheet(){
   fsSelected = {};
   fsGov = "vote";
+  // App'en: ægte native Liquid Glass-sheet i stedet for web-sheet'et.
+  if(window.__vfFsheet){ window.__vfFsheetPush(fsheetSnapshot()); return; }
   el("fs-name").value = "";
   renderFsList();
   renderFsAll();
@@ -26,9 +61,37 @@ export function openFeedSheet(){
   setTimeout(function(){ el("fs-name").focus(); }, 260);
 }
 export function closeFeedSheet(){
+  if(window.__vfFsheet){ window.__vfFsheetPush({ close: true }); return; }
   el("fsheet").classList.remove("on");
   if(!el("esheet").classList.contains("on") && !el("edsheet").classList.contains("on") && !el("msheet").classList.contains("on") && !el("asheet").classList.contains("on"))
     el("scrim").classList.remove("on");
+}
+/* Native "Ny kreds"-handlinger (Swift → window.vfFsheet → her). */
+export function nativeFsheetAction(obj){
+  if(!obj) return;
+  if(obj.kind === "dismiss"){ closeFeedSheet(); return; }
+  if(obj.kind === "create"){ createFeedNative(obj); return; }
+}
+async function createFeedNative(obj){
+  const name = (obj.name || "").trim();
+  const ids = (obj.handles || []).map(function(h){ return user(h).id; }).filter(Boolean);
+  const gov = obj.governance === "owner" ? "owner" : "vote";
+  if(!name || !ids.length){ window.__vfFsheetPush({ update: true, busy: false }); return; }
+  const { data, error } = await sb.rpc("create_feed", { feed_name: name, member_ids: ids, governance: gov });
+  if(error){
+    const m = String(error.message || "");
+    if(m.indexOf("blocked_content") >= 0) toast(t("err.blocked"));
+    else if(m.indexOf("bad_name") >= 0) toast(t("fs.bad_name"));
+    else if(m.indexOf("not_friend") >= 0 || m.indexOf("bad_members") >= 0) toast(t("fs.only_friends"));
+    else toast(t("err.generic"));
+    window.__vfFsheetPush({ update: true, busy: false }); // sluk spinner, hold arket åbent
+    return;
+  }
+  window.__vfFsheetPush({ close: true });
+  await loadFeeds();
+  renderComposeDest();
+  setFeed(data);
+  toast(t("fs.created", { name: name }));
 }
 function renderFsList(){
   if(!state.humanFriends.length){
@@ -79,6 +142,13 @@ export async function openMemberSheet(){
   msFeedId = state.currentFeed;
   const fid = msFeedId;
   msInvited = new Map();
+  // App'en: ægte native Liquid Glass-sheet (renderMemberSheet poster snapshot'en).
+  if(window.__vfMemberSheet){
+    renderMemberSheet();
+    await loadMsInvites(fid);
+    if(msFeedId === fid) renderMemberSheet();
+    return;
+  }
   el("ms-leave").style.display = "";
   el("ms-leave-confirm").style.display = "none";
   renderMemberSheet();
@@ -88,17 +158,68 @@ export async function openMemberSheet(){
   if(msFeedId === fid) renderMemberSheet();
 }
 export function closeMemberSheet(){
+  if(window.__vfMemberSheet){ msFeedId = null; window.__vfMemberPush({ close: true }); return; }
   el("msheet").classList.remove("on");
   msFeedId = null;
   if(!el("fsheet").classList.contains("on") && !el("esheet").classList.contains("on") && !el("edsheet").classList.contains("on") && !el("asheet").classList.contains("on"))
     el("scrim").classList.remove("on");
 }
+/* Fuld snapshot til det native medlemmer-glas-sheet (samme data som DOM-render). */
+function memberSnapshot(f, canManage, ownerMode){
+  const members = f.memberIds.map(function(id){
+    const c = friendCard(ID2H[id] || "?");
+    c.id = id;
+    c.isOwner = id === f.owner;
+    c.removable = id !== me.id && canManage;
+    return c;
+  });
+  let invitable = [];
+  if(canManage){
+    invitable = state.humanFriends.filter(function(h){
+      const u = user(h); return u.id && f.memberIds.indexOf(u.id) < 0;
+    }).map(function(h){
+      const uid = user(h).id;
+      const c = friendCard(h);
+      c.id = uid;
+      c.invited = msInvited.has(uid);
+      c.cancelable = c.invited && (msInvited.get(uid) === me.id || f.owner === me.id);
+      return c;
+    });
+  }
+  return {
+    open: true,
+    token: ++msToken,
+    feedId: String(msFeedId),
+    title: f.name,
+    canManage: canManage,
+    governanceNote: ownerMode ? t("ms.owner_governed") : "",
+    showInviteSection: canManage,
+    emptyInvitable: t("ms.all_in"),
+    members: members,
+    invitable: invitable,
+    labels: {
+      members: t("ms.members"),
+      inviteLabel: t("ms.invite_label"),
+      owner: t("ms.owner"),
+      remove: t("ms.remove"),
+      invite: t("ms.invite"),
+      invited: t("ms.invited"),
+      inviteCancel: t("ms.invite_cancel"),
+      leave: t("ms.leave"),
+      leaveConfirm: t("ms.leave_confirm"),
+      leaveYes: t("ms.leave_yes"),
+      cancel: t("common.cancel")
+    }
+  };
+}
 function renderMemberSheet(){
   const f = feedById(msFeedId);
   if(!f){ closeMemberSheet(); return; }
-  el("ms-title").textContent = f.name;
   const ownerMode = f.governance === "owner";
   const canManage = !ownerMode || f.owner === me.id;   // owner-tilstand: kun ejeren administrerer
+  // App'en: post snapshot til det native glas-sheet i stedet for at skrive DOM.
+  if(window.__vfMemberSheet){ window.__vfMemberPush(memberSnapshot(f, canManage, ownerMode)); return; }
+  el("ms-title").textContent = f.name;
   const govNote = ownerMode ? '<div class="ms-govnote">'+t("ms.owner_governed")+'</div>' : '';
   el("ms-members").innerHTML = govNote + f.memberIds.map(function(id){
     const h = ID2H[id] || "?";
@@ -142,7 +263,9 @@ function renderMemberSheet(){
 }
 /* Gen-render det åbne medlemmer-sheet (no-op hvis det er lukket) — kaldes også fra realtime */
 export function refreshMemberSheet(){
-  if(msFeedId != null && el("msheet").classList.contains("on")){
+  // Åben = msFeedId sat (native, hvor #msheet aldrig får .on) ELLER web-sheet'et er .on.
+  const open = msFeedId != null && (window.__vfMemberSheet || el("msheet").classList.contains("on"));
+  if(open){
     const fid = msFeedId;
     renderMemberSheet();
     loadMsInvites(fid).then(function(){ if(msFeedId === fid) renderMemberSheet(); }); // hold "sendt"-status frisk
@@ -164,61 +287,70 @@ function govErrToast(m){
   else if(m.indexOf("not_friend") >= 0) toast(t("gov.not_friend"));
   else toast(t("err.generic"));
 }
-async function msRemove(btn){
+/* uid-baserede kerner — delt af web-knapperne og de native handlinger.
+   Ingen btn-afhængighed: web-wrappere styrer btn.disabled; native styrer sit eget `pending`
+   og ryddes af næste snapshot. Ved fejl re-render/re-post vi, så native-rækken låses op. */
+async function doMsRemove(uid){
   const fid = msFeedId;
   const f = feedById(fid);
-  if(!f || !me || btn.disabled) return;
-  btn.disabled = true;
-  const { error } = await sb.rpc("remove_kreds_member", { f: fid, tgt: btn.dataset.rm });
-  if(error){
-    console.error(error);
-    btn.disabled = false;
-    govErrToast(String(error.message || ""));
-    return;
-  }
+  if(!f || !me) return;
+  const { error } = await sb.rpc("remove_kreds_member", { f: fid, tgt: uid });
+  if(error){ console.error(error); govErrToast(String(error.message || "")); renderMemberSheet(); return; }
   /* Serveren afgør direkte-vs-afstemning ud fra sit EGET medlemstal — aflæs resultatet
      efter refetch i stedet for at gætte ud fra det (muligvis forældede) lokale tal */
   await refreshAfterGov();
   const f2 = feedById(fid);
   if(!f2) return; // kredsen findes ikke længere for os — sheetet er allerede lukket
-  toast(f2.memberIds.indexOf(btn.dataset.rm) < 0
-    ? t("ms.removed", { name: user(ID2H[btn.dataset.rm] || "?").name })
+  toast(f2.memberIds.indexOf(uid) < 0
+    ? t("ms.removed", { name: user(ID2H[uid] || "?").name })
     : t("ms.vote_created"));
 }
-async function msAdd(btn){
+async function doMsAdd(uid){
   const fid = msFeedId;
   const f = feedById(fid);
-  if(!f || !me || btn.disabled) return;
-  btn.disabled = true;
+  if(!f || !me) return;
   /* Serveren sender nu ALTID en invitation (ingen direkte tilføjelse/afstemning her) */
-  const { error } = await sb.rpc("add_kreds_member", { f: fid, u: btn.dataset.add });
-  if(error){
-    console.error(error);
-    btn.disabled = false;
-    govErrToast(String(error.message || ""));
-    return;
-  }
-  msInvited.set(btn.dataset.add, me.id); // medlemslisten ændrer sig først når invitationen accepteres
-  toast(t("ms.invite_sent", { name: user(ID2H[btn.dataset.add] || "?").name }));
+  const { error } = await sb.rpc("add_kreds_member", { f: fid, u: uid });
+  if(error){ console.error(error); govErrToast(String(error.message || "")); renderMemberSheet(); return; }
+  msInvited.set(uid, me.id); // medlemslisten ændrer sig først når invitationen accepteres
+  toast(t("ms.invite_sent", { name: user(ID2H[uid] || "?").name }));
   renderMemberSheet(); // personen vises nu vedvarende som "Invitation sendt ✓"
 }
-/* Fortryd en sendt invitation (kun inviteren/ejeren; serveren håndhæver det også) */
-async function msCancel(btn){
+async function doMsCancel(uid){
   const fid = msFeedId;
   const f = feedById(fid);
-  if(!f || !me || btn.disabled) return;
-  btn.disabled = true;
-  const uid = btn.dataset.cancel;
+  if(!f || !me) return;
   const { error } = await sb.rpc("cancel_kreds_invite", { f: fid, u: uid });
-  if(error){
-    console.error(error);
-    btn.disabled = false;
-    govErrToast(String(error.message || ""));
-    return;
-  }
+  if(error){ console.error(error); govErrToast(String(error.message || "")); renderMemberSheet(); return; }
   msInvited.delete(uid);
   toast(t("ms.invite_cancelled", { name: user(ID2H[uid] || "?").name }));
   renderMemberSheet(); // personen kan nu inviteres igen ("Invitér")
+}
+async function doLeave(){
+  if(!me || msFeedId == null) return;
+  const { error } = await sb.rpc("leave_kreds", { f: msFeedId });
+  if(error){ console.error(error); toast(t("err.generic")); renderMemberSheet(); return; }
+  closeMemberSheet();
+  await loadFeeds();
+  renderComposeDest();
+  setFeed("all");
+  toast(t("ms.left"));
+}
+/* Web-knap-wrappere (browser): btn styrer double-submit; kernen gør resten. */
+async function msRemove(btn){ if(btn.disabled) return; btn.disabled = true; await doMsRemove(btn.dataset.rm); btn.disabled = false; }
+async function msAdd(btn){ if(btn.disabled) return; btn.disabled = true; await doMsAdd(btn.dataset.add); btn.disabled = false; }
+async function msCancel(btn){ if(btn.disabled) return; btn.disabled = true; await doMsCancel(btn.dataset.cancel); btn.disabled = false; }
+/* Native medlemmer-handlinger (Swift → window.vfMember → her). */
+export function nativeMemberAction(obj){
+  if(!obj) return;
+  if(obj.feedId != null && msFeedId != null && String(msFeedId) !== String(obj.feedId)) return; // forældet
+  switch(obj.kind){
+    case "remove": doMsRemove(obj.uid); break;
+    case "invite": doMsAdd(obj.uid); break;
+    case "cancelInvite": doMsCancel(obj.uid); break;
+    case "leaveConfirm": doLeave(); break;
+    case "dismiss": closeMemberSheet(); break;
+  }
 }
 
 export function initKredse(){
@@ -287,20 +419,10 @@ el("ms-leave-cancel").addEventListener("click", function(){
   el("ms-leave-confirm").style.display = "none";
 });
 el("ms-leave2").addEventListener("click", async function(){
-  if(!me || msFeedId == null) return;
   const btn = this;
+  if(btn.disabled) return;
   btn.disabled = true;
-  const { error } = await sb.rpc("leave_kreds", { f: msFeedId });
+  await doLeave();
   btn.disabled = false;
-  if(error){
-    console.error(error);
-    toast(t("err.generic"));
-    return;
-  }
-  closeMemberSheet();
-  await loadFeeds();
-  renderComposeDest();
-  setFeed("all");
-  toast(t("ms.left"));
 });
 }
