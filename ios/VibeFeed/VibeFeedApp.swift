@@ -123,6 +123,8 @@ struct ContentView: View {
         .modifier(FsheetHost())
         .modifier(MemberSheetHost())
         .modifier(EsheetHost())
+        // Native Instagram-style in-app photo/video gallery composer for memories.
+        .modifier(PhotoLibHost())
         .onAppear {
             TabBarModel.shared.onTap = { name in
                 model.webView?.evaluateJavaScript("window.vfTab && window.vfTab('\(name)')", completionHandler: nil)
@@ -146,6 +148,16 @@ struct ContentView: View {
             // Picked photo (base64 data URL — no quotes/backslashes) is staged in the web for Save.
             EsheetModel.shared.onAvatar = { dataURL in
                 model.webView?.evaluateJavaScript("window.vfAvatar && window.vfAvatar('\(dataURL)')", completionHandler: nil)
+            }
+            // Native memory gallery: the picked media is staged in VFMediaScheme; the web uploads+inserts.
+            PhotoLibModel.shared.onShare = { json in
+                model.webView?.evaluateJavaScript("window.vfMemory && window.vfMemory(\(json))", completionHandler: nil)
+            }
+            PhotoLibModel.shared.onCancel = {
+                model.webView?.evaluateJavaScript("window.vfMemoryCancel && window.vfMemoryCancel()", completionHandler: nil)
+            }
+            PhotoLibModel.shared.onFallback = {
+                model.webView?.evaluateJavaScript("window.vfMemoryFallback && window.vfMemoryFallback()", completionHandler: nil)
             }
         }
     }

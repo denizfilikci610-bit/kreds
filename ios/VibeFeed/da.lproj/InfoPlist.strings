@@ -1,3 +1,4 @@
 "NSCameraUsageDescription" = "VibeFeed bruger kameraet, når du vælger at tage et billede eller optage en video til et opslag eller en kommentar.";
 "NSMicrophoneUsageDescription" = "VibeFeed bruger mikrofonen, når du optager en video til et opslag.";
+"NSPhotoLibraryUsageDescription" = "VibeFeed viser dine billeder og videoer i appen, så du kan vælge et minde at dele.";
 "NSUserTrackingUsageDescription" = "Tilladelsen bruges kun til at vise reklamer, der er mere relevante for dig.";

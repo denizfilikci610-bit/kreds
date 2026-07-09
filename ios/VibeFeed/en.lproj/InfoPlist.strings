@@ -1,3 +1,4 @@
 "NSCameraUsageDescription" = "VibeFeed uses the camera when you choose to take a photo or record a video for a post or a comment.";
 "NSMicrophoneUsageDescription" = "VibeFeed uses the microphone when you record a video for a post.";
+"NSPhotoLibraryUsageDescription" = "VibeFeed shows your photos and videos in the app so you can pick a memory to share.";
 "NSUserTrackingUsageDescription" = "This permission is only used to show ads that are more relevant to you.";

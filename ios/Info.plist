@@ -46,6 +46,10 @@
 	<string>VibeFeed bruger kameraet, når du vælger at tage et billede eller optage en video til et opslag eller en kommentar.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>VibeFeed bruger mikrofonen, når du optager en video til et opslag.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>VibeFeed viser dine billeder og videoer i appen, så du kan vælge et minde at dele.</string>
+	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
+	<true/>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Tilladelsen bruges kun til at vise reklamer, der er mere relevante for dig.</string>
 	<key>GADApplicationIdentifier</key>

@@ -34,9 +34,13 @@ struct WebView: UIViewRepresentable {
         // so the web deploy is safe to ship in any order relative to this native rebuild.
         config.userContentController.addUserScript(
             WKUserScript(source: "window.__vfNative = true; window.__vfGlassCard = true;"
-                         + " window.__vfFsheet = true; window.__vfMemberSheet = true; window.__vfEsheet = true;",
+                         + " window.__vfFsheet = true; window.__vfMemberSheet = true; window.__vfEsheet = true;"
+                         + " window.__vfPhotoLib = true;",
                          injectionTime: .atDocumentStart, forMainFrameOnly: true)
         )
+        // Serve natively-picked memory media (photo/video) to the web over vfmedia:// so large videos
+        // don't cross the JS bridge as base64. The web fetch()es vfmedia://current and uploads it.
+        config.setURLSchemeHandler(VFMediaScheme.shared, forURLScheme: VFMediaScheme.scheme)
 
         // Edge-to-edge: the web view extends under the notch/home indicator (SwiftUI
         // .ignoresSafeArea), and iOS reports the real safe-area insets to the page via

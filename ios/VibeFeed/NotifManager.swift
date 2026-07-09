@@ -78,6 +78,9 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
         case "esheet":
             // The "Rediger profil" (edit profile) bottom sheet — real Liquid Glass, web-driven.
             Task { @MainActor in EsheetModel.shared.apply(dict) }
+        case "photolib":
+            // The native Instagram-style in-app photo/video gallery composer for memories.
+            Task { @MainActor in PhotoLibModel.shared.apply(dict) }
         case "logout":
             UserDefaults.standard.removeObject(forKey: secretKey)
             UserDefaults.standard.removeObject(forKey: lastCheckKey)
