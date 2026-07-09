@@ -39,16 +39,24 @@ final class PhotoLibModel: NSObject, ObservableObject {
     @Published var deniedNote = ""
     @Published var settingsLabel = ""
 
-    /// Native → web: the picked media JSON ({isVideo,caption,dest}); media is staged in VFMediaScheme.
+    /// Native → web: the picked media JSON ({isVideo,caption,dest}). The web returns a Storage upload
+    /// URL + token, and native uploads the held media directly (see performUpload).
     var onShare: ((String) -> Void)?
+    /// Native → web: media uploaded to Storage → the web creates the post.
+    var onUploaded: (() -> Void)?
+    /// Native → web: the direct upload failed.
+    var onUploadFailed: (() -> Void)?
     /// Native → web: user cancelled without posting.
     var onCancel: (() -> Void)?
     /// Native → web: fall back to the web file-picker memory compose (denied access / no library UI).
     var onFallback: (() -> Void)?
 
     private let imageManager = PHCachingImageManager()
+    private var pendingData: Data?
+    private var pendingMime = "image/jpeg"
 
     func apply(_ dict: [String: Any]) {
+        if let up = dict["upload"] as? [String: Any] { performUpload(up); return }
         if let r = dict["result"] as? String {
             if r == "ok" { open = false } else { sharing = false }
             return
@@ -129,7 +137,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
     func dismiss() { open = false; onCancel?() }
     func fallbackToWeb() { open = false; onFallback?() }
 
-    /// "Del": export the selected asset to VFMediaScheme, then tell the web to upload + insert.
+    /// "Del": export the selected asset to memory, then ask the web for a Storage upload URL.
     func share() {
         guard let asset = selected, !sharing else { return }
         sharing = true
@@ -142,9 +150,9 @@ final class PhotoLibModel: NSObject, ObservableObject {
                 guard let urlAsset = avAsset as? AVURLAsset, let data = try? Data(contentsOf: urlAsset.url) else {
                     DispatchQueue.main.async { self.sharing = false }; return
                 }
-                let mime = urlAsset.url.pathExtension.lowercased() == "mov" ? "video/quicktime" : "video/mp4"
-                VFMediaScheme.shared.stage(data, mime: mime)
-                DispatchQueue.main.async { self.send(isVideo: true) }
+                let ext = urlAsset.url.pathExtension.lowercased() == "mov" ? "mov" : "mp4"
+                let mime = ext == "mov" ? "video/quicktime" : "video/mp4"
+                DispatchQueue.main.async { self.pendingData = data; self.send(isVideo: true, ext: ext, mime: mime) }
             }
         } else {
             previewImageFull(asset) { [weak self] img in
@@ -152,8 +160,8 @@ final class PhotoLibModel: NSObject, ObservableObject {
                 guard let img, let data = img.jpegData(compressionQuality: 0.87) else {
                     self.sharing = false; return
                 }
-                VFMediaScheme.shared.stage(data, mime: "image/jpeg")
-                self.send(isVideo: false)
+                self.pendingData = data
+                self.send(isVideo: false, ext: "jpg", mime: "image/jpeg")
             }
         }
     }
@@ -167,12 +175,41 @@ final class PhotoLibModel: NSObject, ObservableObject {
                                   contentMode: .aspectFit, options: opts) { img, _ in DispatchQueue.main.async { done(img) } }
     }
 
-    private func send(isVideo: Bool) {
-        let obj: [String: Any] = ["isVideo": isVideo, "caption": caption, "dest": dest]
+    private func send(isVideo: Bool, ext: String, mime: String) {
+        pendingMime = mime
+        let obj: [String: Any] = ["isVideo": isVideo, "caption": caption, "dest": dest, "ext": ext, "mime": mime]
         guard let d = try? JSONSerialization.data(withJSONObject: obj), let s = String(data: d, encoding: .utf8) else {
-            sharing = false; return
+            sharing = false; pendingData = nil; return
         }
         onShare?(s)
+    }
+
+    /// The web returned a Storage upload URL + user token → PUT/POST the held media directly (not
+    /// bound by the web CSP or WKWebView scheme limits). Success → the web creates the post.
+    private func performUpload(_ up: [String: Any]) {
+        guard let urlStr = up["url"] as? String, let url = URL(string: urlStr),
+              let token = up["token"] as? String, let data = pendingData else {
+            sharing = false; pendingData = nil; onUploadFailed?(); return
+        }
+        let apikey = up["apikey"] as? String ?? ""
+        let ct = up["contentType"] as? String ?? pendingMime
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue(apikey, forHTTPHeaderField: "apikey")
+        req.setValue(ct, forHTTPHeaderField: "Content-Type")
+        req.setValue("max-age=3600", forHTTPHeaderField: "cache-control")
+        req.setValue("false", forHTTPHeaderField: "x-upsert")
+        req.httpBody = data
+        req.timeoutInterval = 120
+        URLSession.shared.dataTask(with: req) { [weak self] _, resp, err in
+            DispatchQueue.main.async {
+                self?.pendingData = nil
+                let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+                if err == nil, (200..<300).contains(code) { self?.onUploaded?() }
+                else { self?.sharing = false; self?.onUploadFailed?() }
+            }
+        }.resume()
     }
 }
 

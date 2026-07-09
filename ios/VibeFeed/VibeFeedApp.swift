@@ -149,9 +149,16 @@ struct ContentView: View {
             EsheetModel.shared.onAvatar = { dataURL in
                 model.webView?.evaluateJavaScript("window.vfAvatar && window.vfAvatar('\(dataURL)')", completionHandler: nil)
             }
-            // Native memory gallery: the picked media is staged in VFMediaScheme; the web uploads+inserts.
+            // Native memory gallery: the web returns a Storage upload URL, native uploads the media
+            // directly (bypassing CSP/scheme limits), then the web creates the post.
             PhotoLibModel.shared.onShare = { json in
                 model.webView?.evaluateJavaScript("window.vfMemory && window.vfMemory(\(json))", completionHandler: nil)
+            }
+            PhotoLibModel.shared.onUploaded = {
+                model.webView?.evaluateJavaScript("window.vfMemoryUploaded && window.vfMemoryUploaded()", completionHandler: nil)
+            }
+            PhotoLibModel.shared.onUploadFailed = {
+                model.webView?.evaluateJavaScript("window.vfMemoryUploadFailed && window.vfMemoryUploadFailed()", completionHandler: nil)
             }
             PhotoLibModel.shared.onCancel = {
                 model.webView?.evaluateJavaScript("window.vfMemoryCancel && window.vfMemoryCancel()", completionHandler: nil)
