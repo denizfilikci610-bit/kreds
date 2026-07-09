@@ -406,12 +406,12 @@
   }
   /* Handlinger + billedtekst + kommentarer under mediet, med normal side-margin */
   .post.memory .mbelow{padding:8px 16px 12px}
-  /* Billedtekst i serif-kursiv (keepsake), klippet til 2 linjer indtil "Se mere" */
-  .post.memory .mcap{margin-top:2px}
+  /* Billedtekst i normal skrift (opret, ikke kursiv — som en tanke), klippet til 2 linjer indtil
+     "Se mere". Ekstra top-margin giver luft mellem handlingsknapperne og teksten. */
+  .post.memory .mcap{margin-top:12px}
   .post.memory .mcap .ptext.cap{
     display:block;padding:0;margin:0;
-    font-family:Georgia,"Times New Roman",serif;font-style:italic;
-    font-size:15.5px;line-height:1.45;color:var(--ink);
+    font-size:15px;line-height:1.45;color:var(--ink);
     white-space:pre-wrap;overflow-wrap:break-word;
   }
   .post.memory .mcap:not(.open) .ptext.cap{
@@ -423,6 +423,11 @@
   }
   .post.memory .mcap.has-more .cap-more{display:block}
   .post.memory .cap-more:active{opacity:.5}
+  /* Handlingsknapper samlet tæt til venstre (Instagram-stil), rækkefølge: hjerte, kommentar, del */
+  .post.memory .pactions{justify-content:flex-start;gap:20px}
+  .post.memory .like-btn{order:1}
+  .post.memory .cmt-btn{order:2}
+  .post.memory .share-btn{order:3}
   /* Minde-compose: ingen afstemning */
   .compose.memory #pollbtn{display:none}
   /* Profil: toggle (Alt/Minder) + 3-kolonne minde-grid */
