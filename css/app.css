@@ -374,10 +374,63 @@
     78%{opacity:.95;transform:scale(1)}
     100%{opacity:0;transform:scale(.9) translateY(-10px)}
   }
-  /* ---------- Minde (Instagram-agtigt: medie i fokus, HELE billedet uden beskæring) ---------- */
-  .post.memory .pmedia{margin-top:2px}
-  .post.memory .pmedia img,.post.memory .pmedia video{max-height:none;height:auto;object-fit:contain}
-  .post.memory .ptext.cap{margin-top:9px}
+  /* ---------- Minde (fuld-bleed immersivt: medie ud til kortets kant, identitet + dato +
+     billedtekst lagt oven på en blød bund-gradient — stories-agtigt) ---------- */
+  .post.memory{display:block;padding:0;gap:0}
+  .post.memory .mmedia{
+    position:relative;
+    margin:0;border:0;border-radius:0;
+    overflow:hidden;background:#000;
+  }
+  /* HELE billedet uden beskæring (ejerens valg), men nu ud til kortets kant */
+  .post.memory .mmedia img,.post.memory .mmedia video{
+    display:block;width:100%;height:auto;max-height:none;object-fit:contain;
+    -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
+  }
+  /* Blød bund-gradient bag identitet + billedtekst — vokser med teksten så den altid er læsbar */
+  .post.memory .mover{
+    position:absolute;left:0;right:0;bottom:0;z-index:1;
+    padding:38px 16px 15px;
+    pointer-events:none;
+    background:linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,.42) 46%, rgba(0,0,0,0));
+  }
+  .post.memory .mdate{
+    display:block;margin-bottom:8px;
+    font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+    color:rgba(255,255,255,.85);text-shadow:0 1px 3px rgba(0,0,0,.5);
+  }
+  .post.memory .mid{display:flex;align-items:center;gap:8px;min-width:0}
+  .post.memory .mid .mava{flex:0 0 auto;padding:0;pointer-events:auto;border-radius:50%}
+  .post.memory .mid .av{border:1.5px solid rgba(255,255,255,.92);box-shadow:0 1px 4px rgba(0,0,0,.4)}
+  .post.memory .mid .nm{
+    font-weight:800;font-size:15px;color:#fff;
+    text-shadow:0 1px 3px rgba(0,0,0,.5);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0;
+  }
+  .post.memory .mid .badge{flex:0 0 auto;display:flex}
+  .post.memory .mid .badge svg{width:15px;height:15px}
+  .post.memory .mover .ptext.cap{
+    margin:9px 0 0;padding:0;
+    font-family:Georgia,"Times New Roman",serif;font-style:italic;
+    font-size:16px;line-height:1.42;color:#fff;
+    text-shadow:0 1px 4px rgba(0,0,0,.55);
+  }
+  /* ⋯-menu oven på mediet (øverste højre) */
+  .post.memory .mdots{
+    position:absolute;top:8px;right:6px;z-index:2;
+    padding:6px;color:#fff;pointer-events:auto;
+    filter:drop-shadow(0 1px 3px rgba(0,0,0,.55));
+  }
+  .post.memory .mdots svg{width:20px;height:20px}
+  /* NY-mærke på et nyt minde (øverste venstre) */
+  .post.memory .mnew{
+    position:absolute;top:12px;left:12px;z-index:2;
+    font-size:10px;font-weight:800;letter-spacing:.05em;line-height:1;
+    color:#fff;background:var(--red);border-radius:999px;padding:4px 8px;
+    box-shadow:0 1px 5px rgba(0,0,0,.4);
+  }
+  /* Handlinger + kommentarer sidder under mediet med normal side-margin */
+  .post.memory .mbelow{padding:2px 16px 12px}
   /* Minde-compose: ingen afstemning */
   .compose.memory #pollbtn{display:none}
   /* Profil: toggle (Alt/Minder) + 3-kolonne minde-grid */

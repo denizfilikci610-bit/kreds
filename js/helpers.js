@@ -62,6 +62,10 @@ export function fmtTime(iso){
   if(s < 7*86400) return Math.floor(s/86400)+t("time.d");
   return d.toLocaleDateString(dateLocale(), { day:"numeric", month:"long" });
 }
+/* Fuldt dato-stempel til minder ("et øjeblik") — fx "9. juli 2026" / "July 9, 2026". */
+export function fmtDate(iso){
+  return new Date(iso).toLocaleDateString(dateLocale(), { day:"numeric", month:"long", year:"numeric" });
+}
 export function imgUrl(path){
   return sb.storage.from("post-images").getPublicUrl(path).data.publicUrl;
 }
