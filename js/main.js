@@ -8,7 +8,7 @@ import { initKredse, closeFeedSheet, closeMemberSheet, openFeedSheet, nativeFshe
 import { initCompose, renderComposeDest, openCompose, nativeMemoryPost, openMemoryFallback, nativeMemoryUploaded, nativeMemoryUploadFailed } from "./compose.js";
 import { initSearch, renderSearch } from "./search.js";
 import { initProfile, closeEditSheet, closeActivitySheet, renderStories, renderMyPosts, refreshPv, nativeEsheetAction, avatarStage } from "./profile.js";
-import { initNotifs, loadNotifs } from "./notifications.js";
+import { initNotifs, loadNotifs, openFromPush } from "./notifications.js";
 import { initLightbox } from "./lightbox.js";
 import { initRealtime, scheduleRefetch } from "./realtime.js";
 import { initAuth, boot, showAuth, showRecovery, setAuthMode, refreshAuthMode, pushNativeCreds } from "./auth.js";
@@ -133,6 +133,10 @@ if(window.__vfNative){
      window.vfComments (routes i comments.js → kører de eksisterende kommentar-funktioner). */
   window.__vfCommentsPush = function(msg){ postPanel("comments", msg); };
   window.vfComments = function(payload){ nativeCommentsAction(payload); };
+  /* --- Push-notifikations-tap (native didReceive → vfOpenNotif) — åbn det indholdet handler om.
+     Payload {kind,pid,fid} = APNs custom keys (eller poll-notifikationens userInfo). Tom payload
+     (ældre pushes uden keys) falder tilbage til akt-fanen; openFromPush venter selv på boot. */
+  window.vfOpenNotif = function(payload){ openFromPush(payload || {}); };
   let lastTabKey = "", lastKredsKey = "";
   const syncNative = function(){
     const mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed;

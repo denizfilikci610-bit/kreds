@@ -465,8 +465,8 @@ export async function loadNotifs(){
 /* ---- Tap på en notifikation: hop til opslaget (eller profilen) ---- */
 async function openNotifPost(pid, isCmt){
   const { data, error } = await sb.from("posts").select("id, feed_id").eq("id", pid).maybeSingle();
-  if(error){ console.error(error); toast(t("err.generic")); return; }
-  if(!data){ toast(t("notif.post_gone")); return; }
+  if(error){ console.error(error); toast(t("err.generic")); return false; }
+  if(!data){ toast(t("notif.post_gone")); return false; }
   switchTab("feed");
   await setFeed(data.feed_id || "all");
   if(isCmt){
@@ -475,11 +475,34 @@ async function openNotifPost(pid, isCmt){
     rerenderPostCmts(pid);
   }
   const node = document.querySelector('#feed .post[data-id="'+data.id+'"]');
-  if(!node){ toast(t("notif.post_not_visible")); return; }
+  if(!node){ toast(t("notif.post_not_visible")); return false; }
   node.scrollIntoView({ block:"center" });
   resetBarHide(); // programmatisk hop må ikke skjule topbaren — genstart fra landingspositionen
   node.classList.add("flash");
   setTimeout(function(){ node.classList.remove("flash"); }, 1600);
+  return true;
+}
+
+/* ---- Deep-link fra en push-notifikation (kun i app'en; native kalder window.vfOpenNotif) ----
+   Kold start: appen kan være startet AF trykket, så payloaden kan lande FØR boot() er
+   færdig — vent derfor på at appen står klar (me sat + splash fadet væk) før der navigeres.
+   Opslags-kinds genbruger openNotifPost (samme hop som et tap i notifikationslisten);
+   person-hændelser (ven/invitation/optagelse) bor på akt-fanen. Fallback (opslag slettet,
+   ikke synligt, eller gammel push uden payload) = akt-fanen. */
+const PUSH_POST_KINDS = { like:1, comment:1, reply:1, comment_like:1, post:1, post_kreds:1, kvote:1 };
+const PUSH_CMT_KINDS = { comment:1, reply:1, comment_like:1 };
+function pushBootReady(){
+  const s = el("splash");
+  return !!me && (!s || s.classList.contains("gone"));
+}
+export async function openFromPush(payload){
+  for(let i = 0; i < 120 && !pushBootReady(); i++)
+    await new Promise(function(r){ setTimeout(r, 250); });
+  if(!pushBootReady()) return; // ikke logget ind (auth-skærm) — naviger ikke
+  const kind = payload && payload.kind;
+  const pid = payload && payload.pid;
+  if(kind && PUSH_POST_KINDS[kind] && pid && await openNotifPost(pid, !!PUSH_CMT_KINDS[kind])) return;
+  switchTab("akt");
 }
 
 /* ---- Fjern en række og vis evt. tom-tilstand ---- */

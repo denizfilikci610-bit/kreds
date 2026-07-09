@@ -128,6 +128,59 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
         }
     }
 
+    // MARK: - Tap-to-open (deep link from a tapped notification)
+
+    /// Wired by ContentView: evaluates window.vfOpenNotif(json) in the web view and reports
+    /// whether the web was ready to take it (false → retry).
+    var onNotifTap: ((String, @escaping (Bool) -> Void) -> Void)?
+    private var pendingTapJSON: String?
+    private var tapDeliveryRunning = false
+
+    /// Called by the app delegate when the user taps a notification. On a cold start the
+    /// app was launched BY the tap — the web view hasn't loaded the page yet — so the
+    /// payload stays pending and delivery retries until window.vfOpenNotif exists (the web
+    /// side then waits for its own boot before navigating).
+    func handleNotificationTap(_ userInfo: [AnyHashable: Any]) {
+        var payload: [String: Any] = [:]
+        if let kind = userInfo["kind"] as? String { payload["kind"] = kind }
+        if let pid = userInfo["pid"] as? NSNumber { payload["pid"] = pid }
+        else if let pid = userInfo["pid"] as? String { payload["pid"] = pid }
+        if let fid = userInfo["fid"] as? String { payload["fid"] = fid }
+        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+              let json = String(data: data, encoding: .utf8) else { return }
+        DispatchQueue.main.async {
+            self.pendingTapJSON = json // en nyere payload afløser en evt. uleveret ældre
+            if !self.tapDeliveryRunning {
+                self.tapDeliveryRunning = true
+                self.deliverPendingTap(attempt: 0)
+            }
+        }
+    }
+
+    /// Main-thread single-flight delivery loop (0.5 s × 60 ≈ 30 s — rigeligt til en kold start).
+    private func deliverPendingTap(attempt: Int) {
+        guard let json = pendingTapJSON else { tapDeliveryRunning = false; return }
+        let retry: () -> Void = {
+            if attempt < 60 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.deliverPendingTap(attempt: attempt + 1)
+                }
+            } else {
+                self.pendingTapJSON = nil
+                self.tapDeliveryRunning = false
+            }
+        }
+        guard let deliver = onNotifTap else { retry(); return }
+        deliver(json) { delivered in
+            if delivered {
+                if self.pendingTapJSON == json { self.pendingTapJSON = nil }
+                self.deliverPendingTap(attempt: 0) // leverer en evt. nyere payload, ellers stopper loopet
+            } else {
+                retry()
+            }
+        }
+    }
+
     // MARK: - Permissions & scheduling
 
     func requestPermission() {
@@ -215,6 +268,14 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
                 content.title = "VibeFeed"
                 content.body = text
                 content.sound = .default
+                // Deep-link payload (mirrors the APNs custom keys) so a tap can open the
+                // content. Nil-safe: older notif-poll versions send no kind/pid/fid.
+                var userInfo: [AnyHashable: Any] = [:]
+                if let kind = event["kind"] as? String { userInfo["kind"] = kind }
+                if let pid = event["pid"] as? NSNumber { userInfo["pid"] = pid }
+                else if let pid = event["pid"] as? String { userInfo["pid"] = pid }
+                if let fid = event["fid"] as? String { userInfo["fid"] = fid }
+                content.userInfo = userInfo
                 let req = UNNotificationRequest(identifier: UUID().uuidString,
                                                 content: content, trigger: nil)
                 UNUserNotificationCenter.current().add(req)

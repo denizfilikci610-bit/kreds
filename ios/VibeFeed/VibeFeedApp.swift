@@ -27,6 +27,17 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         completionHandler([.banner, .sound, .badge])
     }
+
+    // Tap on a notification (APNs push or poll-generated local) → open the content it is
+    // about. For APNs the custom keys {kind,pid,fid} sit directly in userInfo (next to
+    // "aps"); local notifications mirror them. On a cold start the app was launched BY
+    // the tap, so NotifManager keeps the payload pending until the web app can take it.
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        NotifManager.shared.handleNotificationTap(response.notification.request.content.userInfo)
+        completionHandler()
+    }
 }
 
 @main
@@ -171,6 +182,14 @@ struct ContentView: View {
             // The comment sheet sends a JSON object literal (send/like/reply/delete/dismiss carry payload).
             CommentsModel.shared.onAction = { json in
                 model.webView?.evaluateJavaScript("window.vfComments && window.vfComments(\(json))", completionHandler: nil)
+            }
+            // Notification tap → hand the payload to the web app. Reports whether the web
+            // was ready (vfOpenNotif defined); NotifManager retries on a cold start until it is.
+            NotifManager.shared.onNotifTap = { json, done in
+                guard let web = model.webView else { done(false); return }
+                web.evaluateJavaScript("window.vfOpenNotif ? (window.vfOpenNotif(\(json)), true) : false") { result, _ in
+                    done((result as? Bool) == true)
+                }
             }
         }
     }
