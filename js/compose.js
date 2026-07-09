@@ -28,6 +28,7 @@ export function updateRing(){
 }
 export function canPost(){
   const t = ta.value.trim();
+  if(composeKind === "memory"){ el("compose-post").disabled = !(pendingImg || pendingVid); return; } // minde kræver medie
   el("compose-post").disabled = pollOn
     ? !(t && pollReady())
     : !(pendingImg || pendingVid || t.length > 0);
@@ -41,7 +42,8 @@ export function renderComposeDest(){
   });
   el("compose-dest").innerHTML = html;
   const f = feedById(composeDest);
-  ta.placeholder = pollOn ? t("compose.ph.poll") : (f ? t("compose.ph.feed", { name: f.name }) : t("compose.ph.default"));
+  ta.placeholder = composeKind === "memory" ? t("compose.ph.memory")
+    : (pollOn ? t("compose.ph.poll") : (f ? t("compose.ph.feed", { name: f.name }) : t("compose.ph.default")));
 }
 
 /* ---- Meningsmåling (poll-mode) ---- */
@@ -75,15 +77,43 @@ export function resetPoll(){
   renderPollBox();
   renderComposeDest();
 }
-export function openCompose(){
+/* To opslagstyper: 'thought' (tanke, tekst i fokus) og 'memory' (minde, medie i fokus). */
+let composeKind = "thought";
+export function getComposeKind(){ return composeKind; }
+function openComposeWith(kind){
+  composeKind = (kind === "memory") ? "memory" : "thought";
   composeDest = state.currentFeed;
-  renderComposeDest();
+  clearPendingImg();          // frisk medie hver gang (vælgeren sidder nu FØR compose)
+  ta.value = ""; updateRing();
+  el("compose").classList.toggle("memory", composeKind === "memory");
+  const title = document.querySelector("#compose .ctitle");
+  if(title) title.textContent = composeKind === "memory" ? t("compose.title.memory") : t("compose.title");
+  resetPoll();                // pollOn=false (minde har ingen afstemning) + renderComposeDest
+  canPost();
   el("compose").classList.add("on");
-  setTimeout(function(){ ta.focus(); }, 260);
+  if(composeKind !== "memory") setTimeout(function(){ ta.focus(); }, 260); // minde: fokus stjæles ikke fra billed-valg
 }
+/* + → vælger (Post en tanke / Post et minde). Native glas-kort i app'en, CSS-modal i browseren. */
+function openChooser(){
+  if(window.__vfGlassCard && window.__vfSheetPost){
+    window.__vfSheetPost({
+      title: t("chooser.title"),
+      buttons: [
+        { label: t("chooser.thought"), action: "thought" },
+        { label: t("chooser.memory"), action: "memory" },
+        { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+      ]
+    }, function(a){ if(a === "thought" || a === "memory") openComposeWith(a); });
+    return;
+  }
+  el("composemenu").classList.add("on");
+}
+export function openCompose(){ openChooser(); }
 export function closeCompose(){
   closeMediaMenu();
   el("compose").classList.remove("on");
+  el("compose").classList.remove("memory");
+  composeKind = "thought";
 }
 
 /* ---- Vedhæftning (billede/video, gensidigt udelukkende) ---- */
@@ -223,7 +253,13 @@ el("mm-cancel").addEventListener("click", closeMediaMenu);
 el("mm-photo").addEventListener("click", function(){ closeMediaMenu(); el("cam-photo").click(); });
 el("mm-video").addEventListener("click", function(){ closeMediaMenu(); el("cam-video").click(); });
 el("mm-lib").addEventListener("click", function(){ closeMediaMenu(); el("file-input").click(); });
+/* Opslags-type-vælger (browser-fallback for det native glas-kort) */
+el("cm-thought").addEventListener("click", function(){ el("composemenu").classList.remove("on"); openComposeWith("thought"); });
+el("cm-memory").addEventListener("click", function(){ el("composemenu").classList.remove("on"); openComposeWith("memory"); });
+el("cm-cancel").addEventListener("click", function(){ el("composemenu").classList.remove("on"); });
+el("composemenu").addEventListener("click", function(e){ if(e.target === el("composemenu")) el("composemenu").classList.remove("on"); });
 el("pollbtn").addEventListener("click", function(){
+  if(composeKind === "memory") return; // et minde har ingen afstemning
   if(pollOn){ resetPoll(); canPost(); return; }
   if(pendingImg){ toast(t("compose.conflict_img")); return; }
   if(pendingVid){ toast(t("compose.conflict_vid")); return; }
@@ -351,7 +387,8 @@ el("compose-post").addEventListener("click", async function(){
       feed_id: dest === "all" ? null : dest,
       text: text || null,
       image_path: imgPath,
-      video_path: vidPath
+      video_path: vidPath,
+      kind: composeKind
     });
     if(ins.error) throw ins.error;
 

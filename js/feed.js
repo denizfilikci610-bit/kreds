@@ -38,6 +38,7 @@ export function mapPost(row){
   return {
     id: row.id,
     u: h,
+    kind: row.kind || "thought",
     created: row.created_at,
     t: fmtTime(row.created_at),
     text: row.text || undefined,
@@ -120,6 +121,15 @@ function govPostText(text){
   if(!m) return esc(text);
   return esc(m[1]) + "<b>" + esc(m[2]) + "</b>" + esc(m[3]);
 }
+/* Krop: et minde sætter mediet i fokus (billede/video øverst, billedtekst under, ingen afstemning);
+   en tanke beholder tekst → medie → afstemning. */
+function postBody(p, media){
+  const textHTML = p.text
+    ? '<div class="ptext'+(p.kind === "memory" ? " cap" : "")+'">'+(p.poll && p.poll.gov ? govPostText(p.text) : esc(p.text))+'</div>'
+    : '';
+  if(p.kind === "memory") return media + textHTML;
+  return textHTML + media + pollHTML(p);
+}
 export function postHTML(p){
   let media = '';
   if(p.video){
@@ -134,7 +144,7 @@ export function postHTML(p){
       '</div>';
   }
   return (
-    '<article class="post" data-id="'+p.id+'">'+
+    '<article class="post'+(p.kind === "memory" ? " memory" : "")+'" data-id="'+p.id+'">'+
       '<button class="pavab" data-u="'+esc(p.u)+'" aria-label="'+t("aria.profile")+'">'+
         avaHTML(p.u, 40)+
       '</button>'+
@@ -148,9 +158,7 @@ export function postHTML(p){
             '<svg viewBox="0 0 24 24"><g class="fillic"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></g></svg>'+
           '</button>'+
         '</div>'+
-        (p.text ? '<div class="ptext">'+(p.poll && p.poll.gov ? govPostText(p.text) : esc(p.text))+'</div>' : '')+
-        media+
-        pollHTML(p)+
+        postBody(p, media)+
         '<div class="pactions">'+
           '<button class="cmt-btn" data-id="'+p.id+'" aria-label="'+t("aria.comments")+'">'+
             '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>'+

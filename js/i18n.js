@@ -239,6 +239,14 @@ const DA = {
 
   /* Skriv (compose) */
   "compose.title": "Nyt opslag",
+  "compose.title.memory": "Nyt minde",
+  "compose.ph.memory": "Skriv en billedtekst …",
+  "chooser.title": "Hvad vil du dele?",
+  "chooser.thought": "Post en tanke",
+  "chooser.memory": "Post et minde",
+  "memories.empty": "Ingen minder endnu.",
+  "prof.grid": "Minder",
+  "prof.list": "Alt",
   "compose.post": "Del",
   "compose.label": "Skriv et opslag",
   "compose.dest": "Del til:",
@@ -623,6 +631,14 @@ const EN = {
 
   /* Compose */
   "compose.title": "New post",
+  "compose.title.memory": "New memory",
+  "compose.ph.memory": "Write a caption …",
+  "chooser.title": "What do you want to share?",
+  "chooser.thought": "Post a thought",
+  "chooser.memory": "Post a memory",
+  "memories.empty": "No memories yet.",
+  "prof.grid": "Memories",
+  "prof.list": "All",
   "compose.post": "Share",
   "compose.label": "Write a post",
   "compose.dest": "Share to:",
