@@ -7,7 +7,7 @@ import { initComments } from "./comments.js";
 import { initKredse, closeFeedSheet, closeMemberSheet, openFeedSheet, nativeFsheetAction, nativeMemberAction } from "./kredse.js";
 import { initCompose, renderComposeDest, openCompose } from "./compose.js";
 import { initSearch, renderSearch } from "./search.js";
-import { initProfile, closeEditSheet, closeActivitySheet, renderStories, renderMyPosts, refreshPv } from "./profile.js";
+import { initProfile, closeEditSheet, closeActivitySheet, renderStories, renderMyPosts, refreshPv, nativeEsheetAction, avatarStage } from "./profile.js";
 import { initNotifs, loadNotifs } from "./notifications.js";
 import { initLightbox } from "./lightbox.js";
 import { initRealtime, scheduleRefetch } from "./realtime.js";
@@ -117,6 +117,10 @@ if(window.__vfNative){
   window.__vfMemberPush = function(msg){ postPanel("msheet", msg); };
   window.vfFsheet = function(payload){ nativeFsheetAction(payload); };
   window.vfMember = function(payload){ nativeMemberAction(payload); };
+  if(window.__vfEsheet) document.body.classList.add("nep"); // CSS skjuler web-#esheet i app'en
+  window.__vfEsheetPush = function(msg){ postPanel("esheet", msg); };
+  window.vfEsheet = function(payload){ nativeEsheetAction(payload); };
+  window.vfAvatar = function(dataURL){ avatarStage(dataURL); }; // stager valgt foto til Gem
   let lastTabKey = "", lastKredsKey = "";
   const syncNative = function(){
     const mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed;

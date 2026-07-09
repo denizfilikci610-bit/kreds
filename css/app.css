@@ -673,6 +673,7 @@
      (klasserne nfs/nms sættes af main.js når __vfFsheet/__vfMemberSheet er sat). */
   body.nfs #fsheet{display:none}
   body.nms #msheet{display:none}
+  body.nep #esheet{display:none}
   .tabbar button{
     position:relative;
     flex:1;

@@ -1,7 +1,7 @@
 import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab } from "./store.js";
-import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConsent, setConsent } from "./helpers.js";
-import { t, setLang } from "./i18n.js";
+import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConsent, setConsent, imgUrl, ini } from "./helpers.js";
+import { t, setLang, getLang, policyURL } from "./i18n.js";
 import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts } from "./feed.js";
 import { openCompose } from "./compose.js";
 import { renderSearch, refreshSearchAfterFriendAdd } from "./search.js";
@@ -54,6 +54,7 @@ export function setOwnUI(){
 }
 
 export function closeEditSheet(){
+  if(window.__vfEsheet){ epStagedAvatar = null; window.__vfEsheetPush({ close: true }); return; }
   el("esheet").classList.remove("on");
   if(!el("fsheet").classList.contains("on") && !el("edsheet").classList.contains("on") && !el("msheet").classList.contains("on") && !el("asheet").classList.contains("on"))
     el("scrim").classList.remove("on");
@@ -65,6 +66,133 @@ function syncAdsChips(){
   const c = getConsent();
   el("ads-personal").classList.toggle("on", c === "personal");
   el("ads-limited").classList.toggle("on", c === "limited");
+}
+
+/* ================= Rediger profil — native glas-sheet (app'en) =================
+   "Gem gør alt": navn/bio/aktivitet/sprog/samtykke + et evt. valgt foto samles og
+   committes FØRST når man trykker Gem. Web'en ejer alle mutationer; native staged'er. */
+let epStagedAvatar = null; // data-URL for et valgt (endnu ikke gemt) profilbillede
+let epToken = 0;
+
+function epheetSnapshot(){
+  return {
+    open: true,
+    token: ++epToken,
+    title: t("profile.edit"),
+    picLabel: t("ep.pic"),
+    nameLabel: t("ep.name"), namePlaceholder: t("ep.name_ph"), nameMaxLength: 40,
+    bioLabel: t("ep.bio"), bioPlaceholder: t("ep.bio_ph"), bioMaxLength: 160,
+    activityLabel: t("ep.activity"), shareLabel: t("ep.share"), shareNote: t("ep.share_note"),
+    langLabel: t("ep.lang"), langDaLabel: "Dansk", langEnLabel: "English",
+    privacyLabel: t("ep.privacy"), adsPersonalLabel: t("ep.ads_personal"), adsLimitedLabel: t("ep.ads_limited"),
+    policyLabel: t("consent.policy"),
+    saveLabel: t("common.save"), deleteOpenLabel: t("del.title"),
+    delSure: t("del.sure"), delText: t("del.text"), delBtn: t("del.btn"), cancelLabel: t("common.cancel"),
+    avatar: meAvatarCard(),
+    name: me ? (me.name || "") : "",
+    bio: me ? (me.bio || "") : "",
+    share: me ? (me.show_activity !== false) : true,
+    lang: getLang(),
+    consent: getConsent()
+  };
+}
+function meAvatarCard(){
+  if(!me) return { avatarUrl: "", initials: "?", gradient: [] };
+  return { avatarUrl: me.avatar_path ? imgUrl(me.avatar_path) : "", initials: ini(me.handle), gradient: user(me.handle).g || [] };
+}
+/* Native → web: window.vfAvatar(dataURL) — stager billedet (uploades først ved Gem). */
+export function avatarStage(dataURL){ epStagedAvatar = dataURL || null; }
+/* Native → web: window.vfEsheet(obj). Sprog/samtykke sendes KUN i 'save' (Gem gør alt). */
+export function nativeEsheetAction(obj){
+  if(!obj) return;
+  switch(obj.kind){
+    case "dismiss": closeEditSheet(); break;
+    case "policy": window.open(policyURL(), "_blank"); break;
+    case "save": nativeEsheetSave(obj); break;
+    case "delete": nativeEsheetDelete(); break;
+  }
+}
+/* Fælles avatar-pipeline (delt af web-fil-input og det native Gem). */
+function imgFromSource(src){
+  return new Promise(function(resolve, reject){
+    const img = new Image();
+    img.onload = function(){ resolve(img); };
+    img.onerror = function(){ reject(new Error("img_load")); };
+    img.src = src;
+  });
+}
+function avatarBlobFromImage(img){
+  return new Promise(function(resolve){
+    const side = Math.min(img.width, img.height);
+    const c = document.createElement("canvas");
+    c.width = c.height = 512;
+    c.getContext("2d").drawImage(img, (img.width - side)/2, (img.height - side)/2, side, side, 0, 0, 512, 512);
+    c.toBlob(function(blob){ resolve(blob); }, "image/jpeg", 0.85);
+  });
+}
+async function uploadAvatarBlob(blob){
+  let path = me.id + "/avatar-" + uuid() + ".jpg";
+  const up = await sb.storage.from("post-images").upload(path, blob, { contentType: "image/jpeg" });
+  if(up.error) throw up.error;
+  return (up.data && up.data.path) ? up.data.path : path;
+}
+/* Gem gør ALT: upload evt. staged foto → profil-felter (+ avatar) → sprog + samtykke → luk. */
+async function nativeEsheetSave(obj){
+  if(!me){ window.__vfEsheetPush({ update: true, saving: false }); return; }
+  const name = (obj.name || "").trim();
+  const bio = (obj.bio || "").trim().slice(0, 160);
+  const share = obj.share !== false;
+  if(!name){ window.__vfEsheetPush({ update: true, saving: false }); return; }
+  try{
+    let newPath = null; const oldPath = me.avatar_path;
+    if(epStagedAvatar){
+      const img = await imgFromSource(epStagedAvatar);
+      const blob = await avatarBlobFromImage(img);
+      if(!blob) throw new Error("img");
+      newPath = await uploadAvatarBlob(blob);
+    }
+    const patch = { name: name, bio: bio || null, show_activity: share };
+    if(newPath) patch.avatar_path = newPath;
+    const { error } = await sb.from("profiles").update(patch).eq("id", me.id);
+    if(error){
+      if(newPath) sb.storage.from("post-images").remove([newPath]).catch(function(){});
+      throw error;
+    }
+    if(newPath && oldPath) sb.storage.from("post-images").remove([oldPath]).catch(function(){});
+    me.name = name; me.bio = bio || null; me.show_activity = share;
+    if(newPath) me.avatar_path = newPath;
+    registerProfile(me);
+    const newConsent = obj.consent === "limited" ? "limited" : "personal";
+    if(newConsent !== getConsent()) setConsent(newConsent); // per-enhed; poster til ad-broen
+    epStagedAvatar = null;
+    window.__vfEsheetPush({ close: true });
+    setOwnUI(); renderFeed(); renderStories(); renderMyPosts(); setTabIcons(curTab); refreshPv();
+    if(el("view-search").classList.contains("active")) renderSearch();
+    const newLang = obj.lang === "en" ? "en" : "da";
+    if(newLang !== getLang()) setLang(newLang); // kun ved faktisk skift: gen-renderer hele app'en
+    toast(t("profile.updated"));
+  }catch(err){
+    console.error(err);
+    toast(String((err && err.message) || "").indexOf("blocked_content") >= 0 ? t("err.blocked") : t("err.generic"));
+    window.__vfEsheetPush({ update: true, saving: false });
+  }
+}
+async function nativeEsheetDelete(){
+  if(!me){ window.__vfEsheetPush({ update: true, deleting: false }); return; }
+  try{
+    const { data, error } = await sb.functions.invoke("delete-account", { body: {} });
+    if(error || !data || !data.ok) throw (error || new Error("delete_failed"));
+    nativeLogout();
+    try{ await sb.auth.signOut(); }catch(_e){}
+    closeEditSheet();
+    resetApp();
+    showAuth();
+    toast(t("account.deleted"));
+  }catch(err){
+    console.error(err);
+    toast(t("account.delete_failed"));
+    window.__vfEsheetPush({ update: true, deleting: false });
+  }
 }
 
 /* ================= Aktivitet (samtykke-styret visning af likes/kommentarer) ================= */
@@ -269,6 +397,8 @@ export function refreshPv(){
 export function initProfile(){
 el("editprof").addEventListener("click", function(){
   if(!me) return;
+  // App'en: ægte native Liquid Glass-sheet i stedet for web-sheet'et.
+  if(window.__vfEsheet){ epStagedAvatar = null; window.__vfEsheetPush(epheetSnapshot()); return; }
   el("ep-name").value = me.name || "";
   el("ep-bio").value = me.bio || "";
   el("ep-share").checked = me.show_activity !== false;
