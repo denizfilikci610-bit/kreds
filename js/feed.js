@@ -897,6 +897,28 @@ let menuPid = null, editPid = null;
 
 export function openPostMenu(id){
   menuPid = Number(id);
+  // App'en: ægte native Liquid Glass-kort, samme flow som web-modalen.
+  if(window.__vfGlassCard && window.__vfSheetPost){
+    window.__vfSheetPost({
+      buttons: [
+        { label: t("pm.edit"), action: "edit" },
+        { label: t("pm.delete"), action: "todelete", role: "destructive" },
+        { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+      ]
+    }, function(a){
+      if(a === "edit"){ openPostEdit(menuPid); return; }
+      if(a !== "todelete") return;
+      // Trin 2: bekræft permanent sletning (som web-flowets pmenu-confirm).
+      window.__vfSheetPost({
+        title: t("pm.confirm"),
+        buttons: [
+          { label: t("pm.del"), action: "delete", role: "destructive" },
+          { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+        ]
+      }, function(b){ if(b === "delete") deleteOwnPost(); });
+    });
+    return;
+  }
   el("pmenu-main").style.display = "";
   el("pmenu-confirm").style.display = "none";
   el("pmenu").classList.add("on");
@@ -909,12 +931,43 @@ export function closePostMenu(){
 /* ================= Andres opslag: anmeld (⋯-menu) ================= */
 let reportPid = null;
 
+// Preview-data om et opslag (til det native glas-kort — rå tekst, ingen HTML).
+function reportPreview(p){
+  const u = user(p.u);
+  const nm = u.name || p.u;
+  const snip = p.text ? p.text.slice(0, 90) : (p.img ? t("media.image") : "");
+  const initials = nm.trim().split(/\s+/).map(function(w){ return w.charAt(0); }).slice(0, 2).join("").toUpperCase();
+  return { name: nm, snippet: snip, initials: initials, avatarUrl: u.avatar_path ? imgUrl(u.avatar_path) : "" };
+}
+
 export function openReportMenu(id){
   reportPid = Number(id);
-  // Preview af opslaget øverst i kortet, så det er tydeligt hvad man anmelder.
+  const p = findPost(reportPid);
+  // App'en: ægte native Liquid Glass-kort, samme 2-trins-flow som web-modalen.
+  if(window.__vfGlassCard && window.__vfSheetPost){
+    window.__vfSheetPost({
+      preview: p ? reportPreview(p) : null,
+      buttons: [
+        { label: t("rm.report"), action: "toconfirm", role: "destructive" },
+        { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+      ]
+    }, function(a){
+      if(a !== "toconfirm") return;
+      // Trin 2: bekræft (som web-flowets rmenu-confirm).
+      window.__vfSheetPost({
+        title: t("rm.confirm"),
+        message: t("rm.note"),
+        buttons: [
+          { label: t("rm.do"), action: "report", role: "destructive" },
+          { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+        ]
+      }, function(b){ if(b === "report") reportPost(); });
+    });
+    return;
+  }
+  // Browser-fallback: web-modal med CSS-glas + preview øverst.
   const prev = el("rm-prev");
   if(prev){
-    const p = findPost(reportPid);
     if(p){
       const snip = p.text ? esc(p.text.slice(0, 90))
                  : (p.img ? esc(p.img.alt || t("media.image")) : "");

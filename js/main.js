@@ -73,6 +73,32 @@ if(window.__vfNative){
     if(id === "__new"){ openFeedSheet(); return; }
     setFeed(id);
   };
+  /* --- Native Liquid Glass action-sheet-kort (ægte iOS 26-glas; kun builds med __vfGlassCard) ---
+     Web ejer flowet: __vfSheetPost(spec, onAction) poster kort-specen (titel/besked/preview/knapper
+     med lokaliseret tekst) til Swift og gemmer onAction. Swift kalder vfSheet(action) tilbage med den
+     valgte knap; handleren kører logikken og poster ENTEN et opfølgende kort (fx slet-bekræftelsen)
+     ELLER intet — i så fald lukkes kortet automatisk ({close:true}). Så kortet er 100% web-drevet. */
+  const postSheet = function(msg){
+    const mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed;
+    if(mh) mh.postMessage(Object.assign({ type: "sheet" }, msg));
+  };
+  let pendingSheet = null, sheetReplaced = false;
+  window.__vfSheetPost = function(spec, onAction){
+    pendingSheet = onAction || null;
+    sheetReplaced = true; // et (nyt) kort vises nu
+    postSheet(spec);
+  };
+  window.vfSheet = function(action){
+    const h = pendingSheet;
+    pendingSheet = null;
+    sheetReplaced = false;
+    try{
+      if(h && action && action !== "__cancel") h(action);
+    }finally{
+      // Postede handleren ikke et opfølgende kort, er flowet slut → luk kortet.
+      if(!sheetReplaced) postSheet({ close: true });
+    }
+  };
   let lastTabKey = "", lastKredsKey = "";
   const syncNative = function(){
     const mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed;

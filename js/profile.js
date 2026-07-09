@@ -143,6 +143,17 @@ function renderPvRelation(h){
 let ufHandle = null;
 function openUnfriendMenu(h){
   ufHandle = h;
+  // App'en: ægte native Liquid Glass-kort i stedet for web-modalen.
+  if(window.__vfGlassCard && window.__vfSheetPost){
+    window.__vfSheetPost({
+      title: t("pv.remove_confirm", { name: user(h).name }),
+      buttons: [
+        { label: t("pv.remove"), action: "unfriend", role: "destructive" },
+        { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+      ]
+    }, function(a){ if(a === "unfriend") doRemoveFriend(); });
+    return;
+  }
   el("uf-title").innerHTML = t("pv.remove_confirm", { name: esc(user(h).name) });
   el("uf-confirm").disabled = false;
   el("ufmenu").classList.add("on");
