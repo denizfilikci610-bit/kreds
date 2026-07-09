@@ -1,4 +1,4 @@
-import { sb } from "./config.js";
+import { sb, SB_URL, SB_KEY } from "./config.js";
 import { me, state } from "./store.js";
 import { el, esc, toast, uuid } from "./helpers.js";
 import { t } from "./i18n.js";
@@ -131,41 +131,57 @@ function postMemoryGallery(){
 function ackMemory(result){ const mh = vfmh(); if(mh) mh.postMessage({ type: "photolib", result: result }); }
 /* Native → web: window.vfMemoryFallback() — brug web-compose (nægtet fotoadgang). */
 export function openMemoryFallback(){ openComposeWith("memory"); }
-/* Native → web: window.vfMemory({isVideo,caption,dest}) — mediet ligger på vfmedia://current. */
+
+/* Native uploader mediet DIREKTE til Supabase Storage (native URLSession er ikke bundet af web'ens
+   CSP eller WKWebView-scheme-begrænsninger; virker for både billeder og store videoer). Flow:
+   1) window.vfMemory({isVideo,caption,dest}) → web henter access-token + sender upload-URL+headers til native.
+   2) native POST'er mediet til Storage → window.vfMemoryUploaded() → web opretter minde-opslaget. */
+let pendingMemory = null;
 export async function nativeMemoryPost(obj){
   if(!me || !obj){ ackMemory("err"); return; }
-  let path = null;
   try{
-    const res = await fetch("vfmedia://current");
-    const blob = await res.blob();
-    if(!blob || !blob.size) throw new Error("no_media");
-    if(obj.isVideo && blob.size > MAX_VID_BYTES){ toast(t("vid.too_big")); ackMemory("err"); return; }
+    const { data } = await sb.auth.getSession();
+    const token = data && data.session ? data.session.access_token : null;
+    if(!token) throw new Error("no_session");
     const dest = obj.dest || "all";
-    path = me.id + "/" + uuid() + (obj.isVideo ? ".mp4" : ".jpg");
-    const up = await sb.storage.from("post-images").upload(path, blob, { contentType: blob.type || (obj.isVideo ? "video/mp4" : "image/jpeg") });
-    if(up.error) throw up.error;
-    if(up.data && up.data.path) path = up.data.path;
+    const ext = obj.ext || (obj.isVideo ? "mp4" : "jpg");
+    const path = me.id + "/" + uuid() + "." + ext;
+    pendingMemory = { path: path, isVideo: !!obj.isVideo, caption: obj.caption || "", dest: dest };
+    const mh = vfmh();
+    if(!mh) throw new Error("no_bridge");
+    mh.postMessage({ type: "photolib", upload: {
+      url: SB_URL + "/storage/v1/object/post-images/" + path,
+      token: token, apikey: SB_KEY, contentType: obj.mime || (obj.isVideo ? "video/mp4" : "image/jpeg")
+    }});
+  }catch(err){ console.error(err); pendingMemory = null; toast(t("compose.share_failed")); ackMemory("err"); }
+}
+/* Native → web: window.vfMemoryUploaded() — mediet er uploadet; opret opslaget. */
+export async function nativeMemoryUploaded(){
+  const m = pendingMemory; pendingMemory = null;
+  if(!m || !me){ ackMemory("err"); return; }
+  try{
     const ins = await sb.from("posts").insert({
       author: me.id,
-      feed_id: dest === "all" ? null : dest,
-      text: (obj.caption || "").trim().slice(0, 280) || null,
-      image_path: obj.isVideo ? null : path,
-      video_path: obj.isVideo ? path : null,
+      feed_id: m.dest === "all" ? null : m.dest,
+      text: (m.caption || "").trim().slice(0, 280) || null,
+      image_path: m.isVideo ? null : m.path,
+      video_path: m.isVideo ? m.path : null,
       kind: "memory"
     });
-    if(ins.error) throw ins.error;
+    if(ins.error){ sb.storage.from("post-images").remove([m.path]).catch(function(){}); throw ins.error; }
     ackMemory("ok");
-    switchTab("feed"); setFeed(dest);
-    const df = feedById(dest);
+    switchTab("feed"); setFeed(m.dest);
+    const df = feedById(m.dest);
     toast(df ? t("compose.shared_in", { name: df.name }) : t("compose.shared_all"));
     offerRewardAfterPost();
   }catch(err){
     console.error(err);
-    if(path){ sb.storage.from("post-images").remove([path]).catch(function(){}); }
     toast(String((err && err.message) || "").indexOf("blocked_content") >= 0 ? t("err.blocked") : t("compose.share_failed"));
     ackMemory("err");
   }
 }
+/* Native → web: window.vfMemoryUploadFailed() — upload fejlede. */
+export function nativeMemoryUploadFailed(){ pendingMemory = null; toast(t("compose.share_failed")); ackMemory("err"); }
 export function closeCompose(){
   closeMediaMenu();
   el("compose").classList.remove("on");

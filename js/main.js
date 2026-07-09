@@ -5,7 +5,7 @@ import { t, initI18n, setLang, hasStoredLang } from "./i18n.js";
 import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, loadQuota, setFeed, nativeKredsState } from "./feed.js";
 import { initComments } from "./comments.js";
 import { initKredse, closeFeedSheet, closeMemberSheet, openFeedSheet, nativeFsheetAction, nativeMemberAction } from "./kredse.js";
-import { initCompose, renderComposeDest, openCompose, nativeMemoryPost, openMemoryFallback } from "./compose.js";
+import { initCompose, renderComposeDest, openCompose, nativeMemoryPost, openMemoryFallback, nativeMemoryUploaded, nativeMemoryUploadFailed } from "./compose.js";
 import { initSearch, renderSearch } from "./search.js";
 import { initProfile, closeEditSheet, closeActivitySheet, renderStories, renderMyPosts, refreshPv, nativeEsheetAction, avatarStage } from "./profile.js";
 import { initNotifs, loadNotifs } from "./notifications.js";
@@ -121,8 +121,10 @@ if(window.__vfNative){
   window.__vfEsheetPush = function(msg){ postPanel("esheet", msg); };
   window.vfEsheet = function(payload){ nativeEsheetAction(payload); };
   window.vfAvatar = function(dataURL){ avatarStage(dataURL); }; // stager valgt foto til Gem
-  // Native Instagram-galleri → minde
+  // Native Instagram-galleri → minde (native uploader direkte til Storage)
   window.vfMemory = function(obj){ nativeMemoryPost(obj); };
+  window.vfMemoryUploaded = function(){ nativeMemoryUploaded(); };
+  window.vfMemoryUploadFailed = function(){ nativeMemoryUploadFailed(); };
   window.vfMemoryCancel = function(){};
   window.vfMemoryFallback = function(){ openMemoryFallback(); };
   let lastTabKey = "", lastKredsKey = "";
