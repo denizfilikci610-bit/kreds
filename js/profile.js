@@ -30,15 +30,10 @@ export function renderStories(){
 /* ---- Profil-tidslinje: toggle "Tanker" (kort, KUN tanker) / "Minder" (3-kolonne grid, KUN minder).
    Grid-tap på et minde → hele opslaget (likes/kommentarer) i samme container (genbruger timelineClick). ---- */
 let myTab = "list", pvTab = "list"; // 'list' (Tanker) | 'grid' (Minder)
-let myDetail = null, pvDetail = null; // opslag-id vist i detalje (grid-tap)
 const P_GRID_ICON = '<svg viewBox="0 0 24 24" width="17" height="17"><g fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/></g></svg>';
 const P_LIST_ICON = '<svg viewBox="0 0 24 24" width="17" height="17"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></g></svg>';
-const P_BACK_ICON = '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M15 5l-7 7 7 7"/></svg>';
-function timelineHTML(posts, tab, emptyHTML, detailId){
-  if(detailId != null){
-    const p = posts.find(function(x){ return String(x.id) === String(detailId); });
-    if(p) return '<button class="tl-back" data-back="1">'+P_BACK_ICON+'<span>'+esc(t("common.back"))+'</span></button>'+postHTML(p);
-  }
+/* Et minde åbnes nu i en dedikeret fuldskærms-side (#memview), ikke inline i profilen. */
+function timelineHTML(posts, tab, emptyHTML){
   const bar = '<div class="profbar">'+
     '<button class="profbar-btn'+(tab === "grid" ? " on" : "")+'" data-ptab="grid" aria-label="'+esc(t("prof.grid"))+'">'+P_GRID_ICON+'</button>'+
     '<button class="profbar-btn'+(tab === "list" ? " on" : "")+'" data-ptab="list" aria-label="'+esc(t("prof.list"))+'">'+P_LIST_ICON+'</button>'+
@@ -61,6 +56,22 @@ function timelineHTML(posts, tab, emptyHTML, detailId){
   return bar + body;
 }
 
+/* Ét minde i fuldskærms-siden #memview (glider ind fra højre). Genbruger den delte postHTML, så
+   HELE minde-kortet (header, fuld-bleed billede, samlede knapper, billedtekst, kommentarer) vises;
+   alle interaktioner (like/kommentar/del/⋯/dobbelttryk/lightbox + det native kommentar-sheet) virker
+   via feed.js' delegering, som også er bundet til #mv-body. */
+function openMemView(p){
+  if(!p) return;
+  el("mv-body").innerHTML = postHTML(p);
+  clampMemCaps(el("mv-body"));
+  el("mv-body").scrollTop = 0;
+  el("memview").classList.add("on");
+}
+function closeMemView(){
+  el("memview").classList.remove("on");
+  el("mv-body").innerHTML = ""; // stop evt. videoafspilning + frigiv
+}
+
 export async function renderMyPosts(){
   if(!me) return;
   const mine = state.wholePosts.filter(function(p){ return p.u === me.handle; });
@@ -68,7 +79,7 @@ export async function renderMyPosts(){
   el("stat-friends").textContent = state.humanFriends.length;
   el("stat-kredse").textContent = state.feeds.length;
   const vsnap = snapVideos(el("myposts"));
-  el("myposts").innerHTML = timelineHTML(mine, myTab, '<div class="emptynote">'+t("myposts.empty")+'</div>', myDetail);
+  el("myposts").innerHTML = timelineHTML(mine, myTab, '<div class="emptynote">'+t("myposts.empty")+'</div>');
   restoreVideos(el("myposts"), vsnap);
   clampMemCaps(el("myposts"));
   loadQuota();
@@ -395,7 +406,7 @@ export async function openProfile(h){
 export async function loadPvPosts(){
   const h = pv.u;
   if(!h || !user(h).id) return;
-  pvDetail = null; pvTab = "list"; // frisk profil starter på Tanker, ingen detalje
+  pvTab = "list"; // frisk profil starter på Tanker
   const { data, error } = await postQuery().eq("author", user(h).id).is("feed_id", null);
   if(pv.u !== h) return;
   if(error){
@@ -407,7 +418,7 @@ export async function loadPvPosts(){
   el("pv-count").textContent = t("pv.count", { n: pv.posts.length });
   el("pv-stat-posts").textContent = pv.posts.length;
   const vsnap = snapVideos(el("pv-posts"));
-  el("pv-posts").innerHTML = timelineHTML(pv.posts, pvTab, pvEmptyNote(h), pvDetail); // RLS giver tom liste for ikke-venner
+  el("pv-posts").innerHTML = timelineHTML(pv.posts, pvTab, pvEmptyNote(h)); // RLS giver tom liste for ikke-venner
   restoreVideos(el("pv-posts"), vsnap);
   clampMemCaps(el("pv-posts"));
 }
@@ -419,7 +430,7 @@ export function refreshPv(){
     el("pv-count").textContent = t("pv.count", { n: pv.posts.length });
     el("pv-stat-posts").textContent = pv.posts.length;
     const vsnap = snapVideos(el("pv-posts"));
-    el("pv-posts").innerHTML = timelineHTML(pv.posts, pvTab, pvEmptyNote(pv.u), pvDetail);
+    el("pv-posts").innerHTML = timelineHTML(pv.posts, pvTab, pvEmptyNote(pv.u));
     restoreVideos(el("pv-posts"), vsnap);
     clampMemCaps(el("pv-posts"));
     el("pv-ava").innerHTML = avaHTML(pv.u, 86);
@@ -430,17 +441,21 @@ export function initProfile(){
 /* Profil-tidslinje: toggle (Alt/Minder) + grid-tap → åbn opslaget. Delegeret pr. container;
    post-interaktioner håndteres separat af feed.js timelineClick, så de to lever fint sammen. */
 function profTimelineClick(e, isPv){
-  const back = e.target.closest(".tl-back");
-  if(back){ if(isPv){ pvDetail = null; refreshPv(); } else { myDetail = null; renderMyPosts(); } return; }
   const tb = e.target.closest(".profbar-btn");
   if(tb){
     const tab = tb.dataset.ptab === "grid" ? "grid" : "list";
-    if(isPv){ pvDetail = null; pvTab = tab; refreshPv(); }
-    else { myDetail = null; myTab = tab; renderMyPosts(); }
+    if(isPv){ pvTab = tab; refreshPv(); }
+    else { myTab = tab; renderMyPosts(); }
     return;
   }
   const gi = e.target.closest(".pgrid-item");
-  if(gi){ if(isPv){ pvDetail = gi.dataset.mem; refreshPv(); } else { myDetail = gi.dataset.mem; renderMyPosts(); } }
+  if(gi){
+    // Åbn mindet i den dedikerede fuldskærms-side (#memview)
+    const id = gi.dataset.mem;
+    const list = isPv ? pv.posts : state.wholePosts.filter(function(p){ return p.u === me.handle; });
+    const p = list.find(function(x){ return String(x.id) === String(id); });
+    if(p) openMemView(p);
+  }
 }
 el("myposts").addEventListener("click", function(e){ profTimelineClick(e, false); });
 el("pv-posts").addEventListener("click", function(e){ profTimelineClick(e, true); });
@@ -584,6 +599,7 @@ el("logoutbtn").addEventListener("click", async function(){
   if(error){ console.error(error); toast(t("err.generic")); }
 });
 el("pv-back").addEventListener("click", closeProfile);
+el("mv-back").addEventListener("click", closeMemView); // luk minde-siden
 /* ---- "Se aktivitet": samtykke-tjek via RPC, derefter fladt bottom sheet ---- */
 el("pv-act").addEventListener("click", async function(){
   const h = pv.u;

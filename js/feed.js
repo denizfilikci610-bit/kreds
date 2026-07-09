@@ -1343,7 +1343,7 @@ el("feedbar").addEventListener("input", function(e){
   }
 });
 /* Hjerte-chippens klik håndteres i rewarded.js (video-genvej i appen, saldo-toast i browseren). */
-["feed","myposts","pv-posts"].forEach(function(id){
+["feed","myposts","pv-posts","mv-body"].forEach(function(id){
   el(id).addEventListener("click", timelineClick);
   el(id).addEventListener("input", cInput);
   el(id).addEventListener("keydown", cKey);

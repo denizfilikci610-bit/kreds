@@ -1111,6 +1111,16 @@
     display:flex;flex-direction:column;
   }
   .profileview.on{transform:translateX(0)}
+  /* Minde-side: ét minde i fuld skærm — samme glid-ind fra højre som en profil, men et lag over
+     (så den også kan lægge sig oven på en anden brugers profil). Genbruger .pv-head/.back/.t1/.pv-body. */
+  .postview{
+    position:absolute;inset:0;z-index:90;
+    background:var(--bg);
+    transform:translateX(103%);
+    transition:transform .28s cubic-bezier(.32,.72,.25,1);
+    display:flex;flex-direction:column;
+  }
+  .postview.on{transform:translateX(0)}
   .pv-head{
     display:flex;align-items:center;gap:16px;
     height:calc(52px + env(safe-area-inset-top));
