@@ -3,8 +3,8 @@ import { me, expandedCmts, curTab } from "./store.js";
 import { el, esc, avaHTML, user, fmtTime, toast, registerProfile } from "./helpers.js";
 import { t } from "./i18n.js";
 import { scheduleRefetch } from "./realtime.js";
-import { switchTab, setFeed, resetBarHide } from "./feed.js";
-import { rerenderPostCmts } from "./comments.js";
+import { switchTab, setFeed, resetBarHide, findPost } from "./feed.js";
+import { rerenderPostCmts, openNativeComments } from "./comments.js";
 import { openProfile } from "./profile.js";
 
 /* ================= Notifikations-prik (session-only, ingen persistens) ================= */
@@ -333,7 +333,7 @@ export async function loadNotifs(){
     if(myCmtIds.length){
       iReplies = reqs.push(sb.from("comments").select("id, created_at, post_id, text, image_path, author_profile:profiles!author(*)").in("parent_id", myCmtIds).neq("author", me.id).gte("created_at", dayStartIso)) - 1;
       // Likes PÅ mine kommentarer (comment_likes → comment.post_id for at kunne åbne opslaget)
-      iClikes = reqs.push(sb.from("comment_likes").select("created_at, comment:comments!comment_id(post_id), liker:profiles!user_id(*)").in("comment_id", myCmtIds).neq("user_id", me.id).gte("created_at", dayStartIso)) - 1;
+      iClikes = reqs.push(sb.from("comment_likes").select("created_at, comment_id, comment:comments!comment_id(post_id), liker:profiles!user_id(*)").in("comment_id", myCmtIds).neq("user_id", me.id).gte("created_at", dayStartIso)) - 1;
     }
     const [res, admResR] = await Promise.all([
       Promise.all(reqs),
@@ -396,7 +396,7 @@ export async function loadNotifs(){
         if(r.author_profile){
           registerProfile(r.author_profile);
           replyIds.add(r.id);
-          items.push({ type:"reply", u:r.author_profile.handle, at:r.created_at, pid:r.post_id, snip:r.text || (r.image_path ? t("notif.photo") : "") });
+          items.push({ type:"reply", u:r.author_profile.handle, at:r.created_at, pid:r.post_id, cid:r.id, snip:r.text || (r.image_path ? t("notif.photo") : "") });
         }
       });
     }
@@ -410,7 +410,7 @@ export async function loadNotifs(){
         // Et svar på MIN kommentar (på mit eget opslag) vises som "svarede dig", ikke dobbelt
         if(r.author_profile && !replyIds.has(r.id)){
           registerProfile(r.author_profile);
-          items.push({ type:"cmt", u:r.author_profile.handle, at:r.created_at, pid:r.post_id, snip:r.text || (r.image_path ? t("notif.photo") : "") });
+          items.push({ type:"cmt", u:r.author_profile.handle, at:r.created_at, pid:r.post_id, cid:r.id, snip:r.text || (r.image_path ? t("notif.photo") : "") });
         }
       });
     }
@@ -418,7 +418,7 @@ export async function loadNotifs(){
       (res[iClikes].data || []).forEach(function(r){
         if(r.liker && r.comment){
           registerProfile(r.liker);
-          items.push({ type:"clike", u:r.liker.handle, at:r.created_at, pid:r.comment.post_id });
+          items.push({ type:"clike", u:r.liker.handle, at:r.created_at, pid:r.comment.post_id, cid:r.comment_id });
         }
       });
     }
@@ -439,9 +439,9 @@ export async function loadNotifs(){
     el("notifs").innerHTML = top.length
       ? top.map(function(n){
           if(n.type === "like")   return row(H, "heart",  n.u, t("notif.liked"), n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="like"', isUnread(n.at));
-          if(n.type === "clike")  return row(H, "heart",  n.u, t("notif.liked_comment"), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
-          if(n.type === "reply")  return row(B, "bubble", n.u, t("notif.replied"),   n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
-          if(n.type === "cmt")    return row(B, "bubble", n.u, t("notif.commented"),  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="cmt"', isUnread(n.at));
+          if(n.type === "clike")  return row(H, "heart",  n.u, t("notif.liked_comment"), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-cid="'+esc(n.cid)+'" data-type="cmt"', isUnread(n.at));
+          if(n.type === "reply")  return row(B, "bubble", n.u, t("notif.replied"),   n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-cid="'+esc(n.cid)+'" data-type="cmt"', isUnread(n.at));
+          if(n.type === "cmt")    return row(B, "bubble", n.u, t("notif.commented"),  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-cid="'+esc(n.cid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "kvote" && n.request) return kvoteReqRow(n);
           if(n.type === "kvote")  return row(K, "kvote",  n.u, n.owner ? t("notif.vote_owner", { k: esc(n.k) }) : t(n.rm ? "notif.vote_remove" : "notif.vote_add", { name: esc(n.sub || ""), k: esc(n.k) }), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
           if(n.type === "kpost")  return row(K, "kpost",  n.u, t("notif.posted_kreds", { k: esc(n.k) }), n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="post"', isUnread(n.at));
@@ -462,24 +462,33 @@ export async function loadNotifs(){
   }
 }
 
-/* ---- Tap på en notifikation: hop til opslaget (eller profilen) ---- */
-async function openNotifPost(pid, isCmt){
+/* ---- Tap på en notifikation: hop til opslaget (eller profilen) ----
+   cid (valgfri) = hop til PRÆCIS den kommentar: inline-tråde scroller til og fremhæver
+   selve kommentar-rækken; et minde i app'en åbner det native kommentar-sheet fokuseret
+   på kommentaren (inline-kommentarer findes ikke for minder dér). Mangler kommentaren
+   (slettet), lander vi blot på opslaget som før. */
+async function openNotifPost(pid, isCmt, cid){
   const { data, error } = await sb.from("posts").select("id, feed_id").eq("id", pid).maybeSingle();
   if(error){ console.error(error); toast(t("err.generic")); return false; }
   if(!data){ toast(t("notif.post_gone")); return false; }
   switchTab("feed");
   await setFeed(data.feed_id || "all");
-  if(isCmt){
+  const p = findPost(pid);
+  const nativeMemCmts = !!(isCmt && window.__vfNative && window.__vfComments && p && p.kind === "memory");
+  if(isCmt && !nativeMemCmts){
     // Fold kommentartråden ud, så svarene er synlige når vi lander
     expandedCmts.add(Number(pid));
     rerenderPostCmts(pid);
   }
   const node = document.querySelector('#feed .post[data-id="'+data.id+'"]');
   if(!node){ toast(t("notif.post_not_visible")); return false; }
-  node.scrollIntoView({ block:"center" });
+  const crow = (!nativeMemCmts && cid) ? node.querySelector('.crow[data-cid="'+cid+'"]') : null;
+  (crow || node).scrollIntoView({ block:"center" });
   resetBarHide(); // programmatisk hop må ikke skjule topbaren — genstart fra landingspositionen
-  node.classList.add("flash");
-  setTimeout(function(){ node.classList.remove("flash"); }, 1600);
+  const hl = crow || node;
+  hl.classList.add("flash");
+  setTimeout(function(){ hl.classList.remove("flash"); }, 1600);
+  if(nativeMemCmts) openNativeComments(pid, cid);
   return true;
 }
 
@@ -501,7 +510,8 @@ export async function openFromPush(payload){
   if(!pushBootReady()) return; // ikke logget ind (auth-skærm) — naviger ikke
   const kind = payload && payload.kind;
   const pid = payload && payload.pid;
-  if(kind && PUSH_POST_KINDS[kind] && pid && await openNotifPost(pid, !!PUSH_CMT_KINDS[kind])) return;
+  const cid = payload && payload.cid;
+  if(kind && PUSH_POST_KINDS[kind] && pid && await openNotifPost(pid, !!PUSH_CMT_KINDS[kind], cid)) return;
   switchTab("akt");
 }
 
@@ -597,7 +607,7 @@ async function notifClick(e){
     // Tap på selve rækken (ikke Godkend/Afvis): åbn opslag eller profil
     const n = e.target.closest(".notif");
     if(!n || !me) return;
-    if(n.dataset.pid){ openNotifPost(n.dataset.pid, n.dataset.type === "cmt"); return; }
+    if(n.dataset.pid){ openNotifPost(n.dataset.pid, n.dataset.type === "cmt", n.dataset.cid); return; }
     if(n.dataset.friend){ openProfile(n.dataset.friend); return; }
     return;
   }

@@ -257,8 +257,9 @@
   }
   /* Fastgjort-label (officielt opslag øverst i 'Hele kredsen') */
   .pinlabel{padding:10px 16px 0;font-size:12px;font-weight:700;color:var(--gray)}
-  /* Flash-highlight når man hopper til et opslag fra en notifikation */
+  /* Flash-highlight når man hopper til et opslag (eller en kommentar) fra en notifikation */
   .post.flash{animation:postflash 1.6s ease}
+  .crow.flash{animation:postflash 1.6s ease;border-radius:12px}
   @keyframes postflash{
     0%,100%{background:transparent}
     25%,60%{background:var(--chip)}
@@ -1331,7 +1332,7 @@
 
   @media(prefers-reduced-motion:reduce){
     .fsheet,.compose,.profileview,.scrim,.toast,.topbar,.feedbar,.searchhead,.epswitch,.epswitch::after{transition:none}
-    .bigheart.go svg,.like-btn.on svg,.post.flash{animation:none}
+    .bigheart.go svg,.like-btn.on svg,.post.flash,.crow.flash{animation:none}
     .bigheart.go svg{opacity:0}
-    .post.flash{background:var(--chip)}
+    .post.flash,.crow.flash{background:var(--chip)}
   }

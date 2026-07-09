@@ -63,6 +63,7 @@ final class CommentsModel: ObservableObject {
     @Published var replyingToHandle = ""
     @Published var focusToken = 0   // bumped to request keyboard focus (reply tapped)
     @Published var scrollToken = 0  // bumped after I post → scroll to the newest comment
+    @Published var focusId: String? = nil // deep-link: scroll to/highlight this comment on open
 
     var onAction: ((String) -> Void)?
 
@@ -79,6 +80,9 @@ final class CommentsModel: ObservableObject {
         canPost = (dict["canPost"] as? Bool) ?? false
         emoji = (dict["emoji"] as? [String]) ?? []
         comments = parseComments(dict["comments"])
+        // Only the deep-link OPENING snapshot carries "focus" — later syncs reset it,
+        // so the sheet never re-scrolls while the user is reading/typing.
+        focusId = dict["focus"] as? String
         if let l = dict["labels"] as? [String: Any] { labels = l.compactMapValues { $0 as? String } }
         if fresh { text = ""; replyingToId = nil; replyingToHandle = "" }
         // If the comment we were replying to is gone, drop the reply target.
@@ -151,6 +155,7 @@ struct GlassCommentsSheet: View {
     @StateObject private var kb = KeyboardObserver()
     @FocusState private var focused: Bool
     @State private var deleteArmId: String? = nil
+    @State private var highlightId: String? = nil  // deep-link: briefly highlighted comment
 
     var body: some View {
         GlassBottomSheet(maxHeightFraction: 0.9, onDismiss: { model.dismiss() }) {
@@ -178,6 +183,11 @@ struct GlassCommentsSheet: View {
                             withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(last, anchor: .bottom) }
                         }
                     }
+                    // Deep-link fra en notifikation: sheet'et er kun i hierarkiet mens det er
+                    // åbent, så åbnings-snapshottet håndteres i onAppear (token-onChange kan
+                    // ikke nå at fyre) — genåbning mens det allerede er åbent via token.
+                    .onAppear { focusIfNeeded(proxy) }
+                    .onChange(of: model.token) { _, _ in focusIfNeeded(proxy) }
                 }
 
                 composer
@@ -239,6 +249,24 @@ struct GlassCommentsSheet: View {
         }
         .padding(.leading, c.indent > 0 ? 34 : 0)
         .padding(.horizontal, 16).padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.primary.opacity(highlightId == c.id ? 0.08 : 0))
+                .padding(.horizontal, 8)
+        )
+    }
+
+    /// Scroll to and briefly highlight the deep-linked comment (one-shot per opening snapshot).
+    private func focusIfNeeded(_ proxy: ScrollViewProxy) {
+        guard let f = model.focusId, model.comments.contains(where: { $0.id == f }) else { return }
+        model.focusId = nil
+        highlightId = f
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo(f, anchor: .center) }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+            withAnimation(.easeOut(duration: 0.4)) { if highlightId == f { highlightId = nil } }
+        }
     }
 
     private func armDelete(_ id: String) {

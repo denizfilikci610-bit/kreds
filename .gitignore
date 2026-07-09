@@ -6,3 +6,6 @@ ios/DerivedData/
 # CocoaPods: commit Podfile, Podfile.lock and the .xcworkspace, but not the
 # downloaded pod sources (restored with `pod install`).
 ios/Pods/
+
+# Lokal derived-data fra CLI-builds (xcodebuild -derivedDataPath ios/dd)
+ios/dd/

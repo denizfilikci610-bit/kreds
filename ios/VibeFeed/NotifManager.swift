@@ -135,36 +135,39 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
     var onNotifTap: ((String, @escaping (Bool) -> Void) -> Void)?
     private var pendingTapJSON: String?
     private var tapDeliveryRunning = false
+    private var tapAttemptsLeft = 0
 
     /// Called by the app delegate when the user taps a notification. On a cold start the
     /// app was launched BY the tap — the web view hasn't loaded the page yet — so the
     /// payload stays pending and delivery retries until window.vfOpenNotif exists (the web
     /// side then waits for its own boot before navigating).
     func handleNotificationTap(_ userInfo: [AnyHashable: Any]) {
+        // Forward every scalar custom key generically (kind/pid/fid/cid + fremtidige),
+        // so new payload fields never require an app rebuild. "aps" is Apple's own dict.
         var payload: [String: Any] = [:]
-        if let kind = userInfo["kind"] as? String { payload["kind"] = kind }
-        if let pid = userInfo["pid"] as? NSNumber { payload["pid"] = pid }
-        else if let pid = userInfo["pid"] as? String { payload["pid"] = pid }
-        if let fid = userInfo["fid"] as? String { payload["fid"] = fid }
+        for (k, v) in userInfo {
+            guard let key = k as? String, key != "aps" else { continue }
+            if v is String || v is NSNumber { payload[key] = v }
+        }
         guard let data = try? JSONSerialization.data(withJSONObject: payload),
               let json = String(data: data, encoding: .utf8) else { return }
         DispatchQueue.main.async {
-            self.pendingTapJSON = json // en nyere payload afløser en evt. uleveret ældre
+            self.pendingTapJSON = json // en nyere payload afløser en evt. uleveret ældre...
+            self.tapAttemptsLeft = 60  // ...og får sit EGET friske retry-budget (arver ikke den gamles)
             if !self.tapDeliveryRunning {
                 self.tapDeliveryRunning = true
-                self.deliverPendingTap(attempt: 0)
+                self.deliverPendingTap()
             }
         }
     }
 
-    /// Main-thread single-flight delivery loop (0.5 s × 60 ≈ 30 s — rigeligt til en kold start).
-    private func deliverPendingTap(attempt: Int) {
+    /// Main-thread single-flight delivery loop (0.5 s × 60 ≈ 30 s pr. payload — rigeligt til en kold start).
+    private func deliverPendingTap() {
         guard let json = pendingTapJSON else { tapDeliveryRunning = false; return }
         let retry: () -> Void = {
-            if attempt < 60 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    self.deliverPendingTap(attempt: attempt + 1)
-                }
+            if self.tapAttemptsLeft > 0 {
+                self.tapAttemptsLeft -= 1
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.deliverPendingTap() }
             } else {
                 self.pendingTapJSON = nil
                 self.tapDeliveryRunning = false
@@ -174,7 +177,7 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
         deliver(json) { delivered in
             if delivered {
                 if self.pendingTapJSON == json { self.pendingTapJSON = nil }
-                self.deliverPendingTap(attempt: 0) // leverer en evt. nyere payload, ellers stopper loopet
+                self.deliverPendingTap() // leverer en evt. nyere payload, ellers stopper loopet
             } else {
                 retry()
             }
@@ -269,12 +272,11 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
                 content.body = text
                 content.sound = .default
                 // Deep-link payload (mirrors the APNs custom keys) so a tap can open the
-                // content. Nil-safe: older notif-poll versions send no kind/pid/fid.
+                // content. Nil-safe: older notif-poll versions send no kind/pid/fid/cid.
                 var userInfo: [AnyHashable: Any] = [:]
-                if let kind = event["kind"] as? String { userInfo["kind"] = kind }
-                if let pid = event["pid"] as? NSNumber { userInfo["pid"] = pid }
-                else if let pid = event["pid"] as? String { userInfo["pid"] = pid }
-                if let fid = event["fid"] as? String { userInfo["fid"] = fid }
+                for key in ["kind", "pid", "fid", "cid"] {
+                    if let v = event[key], v is String || v is NSNumber { userInfo[key] = v }
+                }
                 content.userInfo = userInfo
                 let req = UNNotificationRequest(identifier: UUID().uuidString,
                                                 content: content, trigger: nil)

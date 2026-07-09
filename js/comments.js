@@ -333,10 +333,13 @@ function cmtSnapshot(pid){
     }
   };
 }
-export function openNativeComments(pid){
+export function openNativeComments(pid, focusCid){
   pid = Number(pid);
   const snap = cmtSnapshot(pid);
   if(!snap) return;
+  // focus = scroll til/fremhæv denne kommentar (deep-link fra en notifikation).
+  // KUN i åbnings-snapshottet — senere syncs (pushNativeComments) må ikke gen-scrolle.
+  if(focusCid != null) snap.focus = String(focusCid);
   nativeCmtPid = pid;
   if(window.__vfCommentsPush) window.__vfCommentsPush(snap);
 }
