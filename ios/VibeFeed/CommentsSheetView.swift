@@ -71,7 +71,14 @@ final class CommentsModel: ObservableObject {
     func L(_ k: String) -> String { labels[k] ?? "" }
 
     func apply(_ dict: [String: Any]) {
-        if (dict["close"] as? Bool) == true { open = false; return }
+        if (dict["close"] as? Bool) == true {
+            // Ryd flygtig composer-state ved luk — ellers genopstod et gammelt armeret
+            // "Svarer @bruger" + udkast ved genåbning af SAMME mindes sheet, og den
+            // næste kommentar blev uventet et svar på det gamle mål.
+            open = false
+            text = ""; replyingToId = nil; replyingToHandle = ""
+            return
+        }
         guard (dict["open"] as? Bool) == true else { return }
         let pid = dict["postId"] as? String ?? ""
         let fresh = pid != postId   // a different post → reset the draft/reply
@@ -130,9 +137,14 @@ final class CommentsModel: ObservableObject {
     }
 
     func sendEmoji(_ e: String) {
-        // The approved behaviour: tapping a quick-emoji posts it immediately as a top-level comment.
+        // Quick-emoji poster straks — men RESPEKTERER et armeret svar ("Svarer @bruger"-chippen):
+        // ellers postede ❤️ som top-niveau OG efterlod chippen armeret, så en SENERE tekst
+        // uventet blev et svar på det gamle mål.
+        var obj: [String: Any] = ["kind": "send", "postId": postId, "text": e]
+        if let rid = replyingToId { obj["replyTo"] = rid; obj["replyToU"] = replyingToHandle }
+        replyingToId = nil; replyingToHandle = ""
         scrollToken += 1
-        send(["kind": "send", "postId": postId, "text": e])
+        send(obj)
     }
 
     func like(_ id: String) { send(["kind": "like", "postId": postId, "commentId": id]) }
@@ -231,19 +243,25 @@ struct GlassCommentsSheet: View {
                         .padding(.top, 2)
                 }
 
-                HStack(spacing: 14) {
+                // Svar/Slet får rigtige tap-mål (44pt-reglen): en nøgen 12pt-tekst var ~15pt
+                // høj — mis-tap armerede aldrig svaret, og kommentaren blev postet top-niveau.
+                HStack(spacing: 8) {
                     Text(c.time).font(.system(size: 12)).foregroundStyle(.secondary)
                     if c.likeCount > 0 {
                         Text("\(c.likeCount)").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
                     }
                     Button { model.reply(c.id, c.handle) } label: {
                         Text(model.L("reply")).font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                            .padding(.vertical, 10).padding(.horizontal, 5)
+                            .contentShape(Rectangle())
                     }.buttonStyle(.plain)
                     if c.mine {
                         Button { armDelete(c.id) } label: {
                             Text(deleteArmId == c.id ? model.L("delConfirm") : model.L("del"))
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(deleteArmId == c.id ? vfRed : .secondary)
+                                .padding(.vertical, 10).padding(.horizontal, 5)
+                                .contentShape(Rectangle())
                         }.buttonStyle(.plain)
                     }
                 }

@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import UIKit
 
 /// Native Liquid Glass "Rediger profil" (edit profile) bottom sheet. A staged form: name, bio, share,
 /// language, ad-consent and a picked photo are all held natively and committed together on Save (the
@@ -30,6 +31,7 @@ final class EsheetModel: ObservableObject {
     @Published var adsPersonalLabel = ""
     @Published var adsLimitedLabel = ""
     @Published var policyLabel = ""
+    var policyUrl = "" // sat af apply(); ikke UI-bundet
     @Published var saveLabel = ""
     @Published var deleteOpenLabel = ""
     @Published var delSure = ""
@@ -77,6 +79,7 @@ final class EsheetModel: ObservableObject {
         langLabel = str(dict, "langLabel"); langDaLabel = str(dict, "langDaLabel"); langEnLabel = str(dict, "langEnLabel")
         privacyLabel = str(dict, "privacyLabel"); adsPersonalLabel = str(dict, "adsPersonalLabel")
         adsLimitedLabel = str(dict, "adsLimitedLabel"); policyLabel = str(dict, "policyLabel")
+        policyUrl = str(dict, "policyUrl") // absolut URL fra web (sprogafhængig); tom på ældre web → fallback
         saveLabel = str(dict, "saveLabel"); deleteOpenLabel = str(dict, "deleteOpenLabel")
         delSure = str(dict, "delSure"); delText = str(dict, "delText"); delBtn = str(dict, "delBtn"); cancelLabel = str(dict, "cancelLabel")
         nameMaxLength = (dict["nameMaxLength"] as? Int) ?? 40
@@ -108,7 +111,14 @@ final class EsheetModel: ObservableObject {
     func dismiss() { send(["kind": "dismiss"]) }
     func chooseLang(_ v: String) { lang = v }
     func chooseConsent(_ v: String) { consent = v }
-    func openPolicy() { send(["kind": "policy"]) }
+    /// Åbner privatlivspolitikken i Safari OVENPÅ appen — sheetet (og de stagede ændringer)
+    /// bliver stående. Den gamle vej ({kind:"policy"} → web window.open) var dobbelt defekt:
+    /// WKWebView blokerer window.open uden side-gestus, og en navigation væk fra index.html
+    /// ville dræbe SPA'en under sheetet (frosne native barer, fastlåst scrim).
+    func openPolicy() {
+        let s = policyUrl.isEmpty ? "https://vibefeed.dk/privatliv.html" : policyUrl
+        if let url = URL(string: s) { UIApplication.shared.open(url) }
+    }
     func confirmDelete() { guard !deleting else { return }; deleting = true; send(["kind": "delete"]) }
 
     func stagePickedImage(_ image: UIImage, dataURL: String) {

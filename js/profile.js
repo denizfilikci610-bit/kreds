@@ -130,6 +130,9 @@ function epheetSnapshot(){
     langLabel: t("ep.lang"), langDaLabel: "Dansk", langEnLabel: "English",
     privacyLabel: t("ep.privacy"), adsPersonalLabel: t("ep.ads_personal"), adsLimitedLabel: t("ep.ads_limited"),
     policyLabel: t("consent.policy"),
+    // Absolut, sprogafhængig URL — native åbner den selv i Safari (window.open over broen
+    // blokeres af WKWebView, og en navigation væk fra index.html ville dræbe SPA'en)
+    policyUrl: location.origin + policyURL(),
     saveLabel: t("common.save"), deleteOpenLabel: t("del.title"),
     delSure: t("del.sure"), delText: t("del.text"), delBtn: t("del.btn"), cancelLabel: t("common.cancel"),
     avatar: meAvatarCard(),
