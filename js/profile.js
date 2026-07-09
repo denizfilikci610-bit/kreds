@@ -27,11 +27,18 @@ export function renderStories(){
 }
 
 /* ================= Egen profil ================= */
-/* ---- Profil-tidslinje: toggle mellem "Alt" (kort) og "Minder" (3-kolonne grid) ---- */
-let myTab = "list", pvTab = "list"; // 'list' | 'grid' (egen / andres profil)
+/* ---- Profil-tidslinje: toggle "Tanker" (kort, KUN tanker) / "Minder" (3-kolonne grid, KUN minder).
+   Grid-tap på et minde → hele opslaget (likes/kommentarer) i samme container (genbruger timelineClick). ---- */
+let myTab = "list", pvTab = "list"; // 'list' (Tanker) | 'grid' (Minder)
+let myDetail = null, pvDetail = null; // opslag-id vist i detalje (grid-tap)
 const P_GRID_ICON = '<svg viewBox="0 0 24 24" width="17" height="17"><g fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/></g></svg>';
 const P_LIST_ICON = '<svg viewBox="0 0 24 24" width="17" height="17"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></g></svg>';
-function timelineHTML(posts, tab, emptyHTML){
+const P_BACK_ICON = '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M15 5l-7 7 7 7"/></svg>';
+function timelineHTML(posts, tab, emptyHTML, detailId){
+  if(detailId != null){
+    const p = posts.find(function(x){ return String(x.id) === String(detailId); });
+    if(p) return '<button class="tl-back" data-back="1">'+P_BACK_ICON+'<span>'+esc(t("common.back"))+'</span></button>'+postHTML(p);
+  }
   const bar = '<div class="profbar">'+
     '<button class="profbar-btn'+(tab === "grid" ? " on" : "")+'" data-ptab="grid" aria-label="'+esc(t("prof.grid"))+'">'+P_GRID_ICON+'</button>'+
     '<button class="profbar-btn'+(tab === "list" ? " on" : "")+'" data-ptab="list" aria-label="'+esc(t("prof.list"))+'">'+P_LIST_ICON+'</button>'+
@@ -48,21 +55,10 @@ function timelineHTML(posts, tab, emptyHTML){
         }).join("")+'</div>'
       : '<div class="emptynote">'+t("memories.empty")+'</div>';
   } else {
-    body = posts.length ? posts.map(postHTML).join("") : emptyHTML;
+    const thoughts = posts.filter(function(p){ return p.kind !== "memory"; }); // Tanker: minder vises IKKE her
+    body = thoughts.length ? thoughts.map(postHTML).join("") : emptyHTML;
   }
   return bar + body;
-}
-/* Grid-tap → åbn hele opslaget: skift til liste + scroll til opslaget (+ kort highlight). */
-function openMemoryInList(containerId, id, isPv){
-  if(isPv){ pvTab = "list"; refreshPv(); } else { myTab = "list"; renderMyPosts(); }
-  setTimeout(function(){
-    const node = el(containerId).querySelector('.post[data-id="'+id+'"]');
-    if(node){
-      node.scrollIntoView({ behavior: "smooth", block: "start" });
-      node.classList.add("flash");
-      setTimeout(function(){ node.classList.remove("flash"); }, 1400);
-    }
-  }, 80);
 }
 
 export async function renderMyPosts(){
@@ -72,7 +68,7 @@ export async function renderMyPosts(){
   el("stat-friends").textContent = state.humanFriends.length;
   el("stat-kredse").textContent = state.feeds.length;
   const vsnap = snapVideos(el("myposts"));
-  el("myposts").innerHTML = timelineHTML(mine, myTab, '<div class="emptynote">'+t("myposts.empty")+'</div>');
+  el("myposts").innerHTML = timelineHTML(mine, myTab, '<div class="emptynote">'+t("myposts.empty")+'</div>', myDetail);
   restoreVideos(el("myposts"), vsnap);
   loadQuota();
   const r = await sb.from("posts").select("id", { count:"exact", head:true }).eq("author", me.id).is("feed_id", null);
@@ -398,6 +394,7 @@ export async function openProfile(h){
 export async function loadPvPosts(){
   const h = pv.u;
   if(!h || !user(h).id) return;
+  pvDetail = null; pvTab = "list"; // frisk profil starter på Tanker, ingen detalje
   const { data, error } = await postQuery().eq("author", user(h).id).is("feed_id", null);
   if(pv.u !== h) return;
   if(error){
@@ -409,7 +406,7 @@ export async function loadPvPosts(){
   el("pv-count").textContent = t("pv.count", { n: pv.posts.length });
   el("pv-stat-posts").textContent = pv.posts.length;
   const vsnap = snapVideos(el("pv-posts"));
-  el("pv-posts").innerHTML = timelineHTML(pv.posts, pvTab, pvEmptyNote(h)); // RLS giver tom liste for ikke-venner
+  el("pv-posts").innerHTML = timelineHTML(pv.posts, pvTab, pvEmptyNote(h), pvDetail); // RLS giver tom liste for ikke-venner
   restoreVideos(el("pv-posts"), vsnap);
 }
 export function closeProfile(){
@@ -420,7 +417,7 @@ export function refreshPv(){
     el("pv-count").textContent = t("pv.count", { n: pv.posts.length });
     el("pv-stat-posts").textContent = pv.posts.length;
     const vsnap = snapVideos(el("pv-posts"));
-    el("pv-posts").innerHTML = timelineHTML(pv.posts, pvTab, pvEmptyNote(pv.u));
+    el("pv-posts").innerHTML = timelineHTML(pv.posts, pvTab, pvEmptyNote(pv.u), pvDetail);
     restoreVideos(el("pv-posts"), vsnap);
     el("pv-ava").innerHTML = avaHTML(pv.u, 86);
   }
@@ -429,19 +426,21 @@ export function refreshPv(){
 export function initProfile(){
 /* Profil-tidslinje: toggle (Alt/Minder) + grid-tap → åbn opslaget. Delegeret pr. container;
    post-interaktioner håndteres separat af feed.js timelineClick, så de to lever fint sammen. */
-function profTimelineClick(e, containerId, isPv){
+function profTimelineClick(e, isPv){
+  const back = e.target.closest(".tl-back");
+  if(back){ if(isPv){ pvDetail = null; refreshPv(); } else { myDetail = null; renderMyPosts(); } return; }
   const tb = e.target.closest(".profbar-btn");
   if(tb){
     const tab = tb.dataset.ptab === "grid" ? "grid" : "list";
-    if(isPv){ if(pvTab !== tab){ pvTab = tab; refreshPv(); } }
-    else { if(myTab !== tab){ myTab = tab; renderMyPosts(); } }
+    if(isPv){ pvDetail = null; pvTab = tab; refreshPv(); }
+    else { myDetail = null; myTab = tab; renderMyPosts(); }
     return;
   }
   const gi = e.target.closest(".pgrid-item");
-  if(gi){ openMemoryInList(containerId, gi.dataset.mem, isPv); }
+  if(gi){ if(isPv){ pvDetail = gi.dataset.mem; refreshPv(); } else { myDetail = gi.dataset.mem; renderMyPosts(); } }
 }
-el("myposts").addEventListener("click", function(e){ profTimelineClick(e, "myposts", false); });
-el("pv-posts").addEventListener("click", function(e){ profTimelineClick(e, "pv-posts", true); });
+el("myposts").addEventListener("click", function(e){ profTimelineClick(e, false); });
+el("pv-posts").addEventListener("click", function(e){ profTimelineClick(e, true); });
 el("editprof").addEventListener("click", function(){
   if(!me) return;
   // App'en: ægte native Liquid Glass-sheet i stedet for web-sheet'et.
