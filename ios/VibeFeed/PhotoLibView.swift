@@ -63,6 +63,8 @@ final class PhotoLibModel: NSObject, ObservableObject {
     private let imageManager = PHCachingImageManager()
     private var pendingData: Data?
     private var pendingMime = "image/jpeg"
+    private var trimReqSeq = 0                          // supersedes out-of-order AVAsset loads
+    private var exportSession: AVAssetExportSession?    // in-flight trim export (for the safety timeout)
 
     func apply(_ dict: [String: Any]) {
         if let up = dict["upload"] as? [String: Any] { performUpload(up); return }
@@ -86,6 +88,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
         }
         caption = ""; selected = nil; sharing = false; loadingOriginal = false; step = .gallery
         videoAsset = nil; videoDuration = 0; trimStart = 0; trimDuration = VF_MAX_VID; showTrimStep = false; preparingTrim = false
+        pendingData = nil; exportSession = nil; trimReqSeq += 1
         open = true
         requestAndLoad()
     }
@@ -152,7 +155,9 @@ final class PhotoLibModel: NSObject, ObservableObject {
     /// step; otherwise straight to caption (the whole short clip is used). For an IMAGE, go to caption.
     func prepareAndAdvance() {
         guard let asset = selected else { return }
-        if asset.mediaType != .video { step = .caption; return }
+        if asset.mediaType != .video { showTrimStep = false; step = .caption; return }
+        trimReqSeq += 1
+        let seq = trimReqSeq   // the grid is frozen while preparingTrim, so `selected` == `asset` in the callback
         preparingTrim = true
         let opts = PHVideoRequestOptions()
         opts.deliveryMode = .highQualityFormat
@@ -160,8 +165,9 @@ final class PhotoLibModel: NSObject, ObservableObject {
         imageManager.requestAVAsset(forVideo: asset, options: opts) { [weak self] avAsset, _, _ in
             guard let self else { return }
             DispatchQueue.main.async {
+                guard seq == self.trimReqSeq else { return } // superseded by a newer request / reopen
                 self.preparingTrim = false
-                guard let avAsset else { self.step = .caption; return } // couldn't load → share() will retry/fail cleanly
+                guard let avAsset else { self.showTrimStep = false; self.step = .caption; return }
                 self.videoAsset = avAsset
                 let dur = CMTimeGetSeconds(avAsset.duration)
                 self.videoDuration = (dur.isFinite && dur > 0) ? dur : 0
@@ -170,6 +176,11 @@ final class PhotoLibModel: NSObject, ObservableObject {
                 self.showTrimStep = self.videoDuration > VF_MAX_VID + 0.05
                 self.step = self.showTrimStep ? .trim : .caption
             }
+        }
+        // Safety: never leave the "Videre" spinner stuck if the callback is dropped (rare iCloud edge).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in
+            guard let self, self.preparingTrim, seq == self.trimReqSeq else { return }
+            self.preparingTrim = false
         }
     }
 
@@ -197,6 +208,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
     private func exportTrimmedVideo() {
         guard let avAsset = videoAsset else { sharing = false; onUploadFailed?(); return }
         let dur = videoDuration > 0 ? videoDuration : CMTimeGetSeconds(avAsset.duration)
+        guard dur.isFinite, dur > 0 else { sharing = false; onUploadFailed?(); return } // corrupt/unloadable metadata
         let start = max(0, min(trimStart, max(0, dur - 0.1)))
         let length = max(0.1, min(trimDuration, dur - start))
         let out = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mp4")
@@ -204,6 +216,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
         guard let export = AVAssetExportSession(asset: avAsset, presetName: AVAssetExportPreset1280x720) else {
             sharing = false; onUploadFailed?(); return
         }
+        exportSession = export
         export.outputURL = out
         export.outputFileType = .mp4
         export.shouldOptimizeForNetworkUse = true
@@ -212,9 +225,11 @@ final class PhotoLibModel: NSObject, ObservableObject {
         export.exportAsynchronously { [weak self] in
             guard let self else { return }
             let ok = export.status == .completed
-            let data = ok ? try? Data(contentsOf: out) : nil
+            let data = ok ? try? Data(contentsOf: out) : nil   // runs on the export's queue, not main
             DispatchQueue.main.async {
                 try? FileManager.default.removeItem(at: out)
+                guard self.exportSession === export else { return } // superseded by the safety timeout / reopen
+                self.exportSession = nil
                 if let data {
                     self.pendingData = data
                     self.send(isVideo: true, ext: "mp4", mime: "video/mp4")
@@ -222,6 +237,14 @@ final class PhotoLibModel: NSObject, ObservableObject {
                     self.sharing = false; self.onUploadFailed?()
                 }
             }
+        }
+        // Safety: unblock the "Del" spinner if the export never reports back (app backgrounded, etc.).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 90) { [weak self] in
+            guard let self, self.exportSession === export else { return }
+            export.cancelExport()
+            self.exportSession = nil
+            self.sharing = false
+            self.onUploadFailed?()
         }
     }
 
@@ -238,7 +261,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
         pendingMime = mime
         let obj: [String: Any] = ["isVideo": isVideo, "caption": caption, "dest": dest, "ext": ext, "mime": mime]
         guard let d = try? JSONSerialization.data(withJSONObject: obj), let s = String(data: d, encoding: .utf8) else {
-            sharing = false; pendingData = nil; return
+            sharing = false; pendingData = nil; onUploadFailed?(); return
         }
         onShare?(s)
     }
@@ -351,7 +374,7 @@ struct MemoryGalleryScreen: View {
             LazyVGrid(columns: cols, spacing: 2) {
                 ForEach(model.assets, id: \.localIdentifier) { a in
                     MemoryThumbCell(asset: a, selected: model.selected?.localIdentifier == a.localIdentifier)
-                        .onTapGesture { model.selected = a }
+                        .onTapGesture { if !model.preparingTrim { model.selected = a } } // freeze selection while loading the AVAsset
                 }
             }
         }

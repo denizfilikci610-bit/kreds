@@ -31,20 +31,26 @@ final class TrimController: ObservableObject {
     private var token: Any?
     private var start: Double = 0
     private var dur: Double = VF_MAX_VID
+    private var seeking = false   // guards against a seek-storm at the loop boundary
     init(asset: AVAsset) {
         player = AVPlayer(playerItem: AVPlayerItem(asset: asset))
         player.isMuted = true
-        token = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.04, preferredTimescale: 600), queue: .main) { [weak self] t in
-            guard let self else { return }
-            if CMTimeGetSeconds(t) >= self.start + self.dur - 0.02 { self.seekStart() }
+        token = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.05, preferredTimescale: 600), queue: .main) { [weak self] t in
+            guard let self, !self.seeking else { return }
+            if CMTimeGetSeconds(t) >= self.start + self.dur { self.seek() }
         }
+        seek()
         player.play()
     }
-    func setWindow(start: Double, dur: Double) { self.start = start; self.dur = dur; seekStart() }
-    func seekStart() {
-        player.seek(to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
-        player.play()
+    /// Move the trim window (seek to its start) WITHOUT changing the play/pause state.
+    func setWindow(start: Double, dur: Double) { self.start = start; self.dur = dur; seek() }
+    private func seek() {
+        seeking = true
+        player.seek(to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+            self?.seeking = false
+        }
     }
+    func play() { player.play() }
     func pause() { player.pause() }
     deinit { if let token { player.removeTimeObserver(token) }; player.pause() }
 }
@@ -139,12 +145,12 @@ struct VideoTrimView: View {
                                 DragGesture()
                                     .onChanged { v in
                                         let base = dragBase ?? model.trimStart
-                                        if dragBase == nil { dragBase = base }
+                                        if dragBase == nil { dragBase = base; controller.pause() } // freeze on the frame while scrubbing
                                         let dxSec = Double(v.translation.width / travel) * range
                                         model.trimStart = min(range, max(0, base + dxSec))
                                         controller.setWindow(start: model.trimStart, dur: model.trimDuration)
                                     }
-                                    .onEnded { _ in dragBase = nil }
+                                    .onEnded { _ in dragBase = nil; controller.play() } // resume the looping preview
                             )
                     }
                 }
