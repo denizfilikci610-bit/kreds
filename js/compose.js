@@ -103,12 +103,69 @@ function openChooser(){
         { label: t("chooser.memory"), action: "memory" },
         { label: t("common.cancel"), action: "__cancel", role: "cancel" }
       ]
-    }, function(a){ if(a === "thought" || a === "memory") openComposeWith(a); });
+    }, function(a){
+      if(a === "memory" && window.__vfPhotoLib){ postMemoryGallery(); return; } // native IG-galleri
+      if(a === "thought" || a === "memory") openComposeWith(a);
+    });
     return;
   }
   el("composemenu").classList.add("on");
 }
 export function openCompose(){ openChooser(); }
+
+/* ---- Minde: native Instagram-galleri (app'en) ---- */
+function vfmh(){ return window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed; }
+function postMemoryGallery(){
+  const mh = vfmh();
+  if(!mh){ openComposeWith("memory"); return; } // ingen bro → web-fallback
+  mh.postMessage({
+    type: "photolib", open: true, dest: state.currentFeed || "all",
+    feeds: state.feeds.map(function(f){ return { id: f.id, name: f.name }; }),
+    labels: {
+      title: t("compose.title.memory"), next: t("memory.next"), cancel: t("common.cancel"), share: t("compose.post"),
+      captionPlaceholder: t("compose.ph.memory"), destLabel: t("compose.dest"), allLabel: t("feedbar.all"),
+      limited: t("photolib.limited"), manage: t("photolib.manage"), denied: t("photolib.denied"), settings: t("photolib.settings")
+    }
+  });
+}
+function ackMemory(result){ const mh = vfmh(); if(mh) mh.postMessage({ type: "photolib", result: result }); }
+/* Native → web: window.vfMemoryFallback() — brug web-compose (nægtet fotoadgang). */
+export function openMemoryFallback(){ openComposeWith("memory"); }
+/* Native → web: window.vfMemory({isVideo,caption,dest}) — mediet ligger på vfmedia://current. */
+export async function nativeMemoryPost(obj){
+  if(!me || !obj){ ackMemory("err"); return; }
+  let path = null;
+  try{
+    const res = await fetch("vfmedia://current");
+    const blob = await res.blob();
+    if(!blob || !blob.size) throw new Error("no_media");
+    if(obj.isVideo && blob.size > MAX_VID_BYTES){ toast(t("vid.too_big")); ackMemory("err"); return; }
+    const dest = obj.dest || "all";
+    path = me.id + "/" + uuid() + (obj.isVideo ? ".mp4" : ".jpg");
+    const up = await sb.storage.from("post-images").upload(path, blob, { contentType: blob.type || (obj.isVideo ? "video/mp4" : "image/jpeg") });
+    if(up.error) throw up.error;
+    if(up.data && up.data.path) path = up.data.path;
+    const ins = await sb.from("posts").insert({
+      author: me.id,
+      feed_id: dest === "all" ? null : dest,
+      text: (obj.caption || "").trim().slice(0, 280) || null,
+      image_path: obj.isVideo ? null : path,
+      video_path: obj.isVideo ? path : null,
+      kind: "memory"
+    });
+    if(ins.error) throw ins.error;
+    ackMemory("ok");
+    switchTab("feed"); setFeed(dest);
+    const df = feedById(dest);
+    toast(df ? t("compose.shared_in", { name: df.name }) : t("compose.shared_all"));
+    offerRewardAfterPost();
+  }catch(err){
+    console.error(err);
+    if(path){ sb.storage.from("post-images").remove([path]).catch(function(){}); }
+    toast(String((err && err.message) || "").indexOf("blocked_content") >= 0 ? t("err.blocked") : t("compose.share_failed"));
+    ackMemory("err");
+  }
+}
 export function closeCompose(){
   closeMediaMenu();
   el("compose").classList.remove("on");
