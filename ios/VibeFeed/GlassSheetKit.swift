@@ -88,6 +88,15 @@ struct GlassBottomSheet<Content: View>: View {
         UnevenRoundedRectangle(cornerRadii: .init(topLeading: 22, topTrailing: 22), style: .continuous)
     }
 
+    /// The device's bottom safe-area inset (home indicator), so the glass can run all the way to the
+    /// physical screen bottom while the content still clears the home indicator.
+    private var bottomInset: CGFloat {
+        (UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }?
+            .keyWindow?.safeAreaInsets.bottom) ?? 0
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             Capsule()
@@ -111,8 +120,10 @@ struct GlassBottomSheet<Content: View>: View {
         }
         .frame(maxWidth: .infinity)
         .frame(maxHeight: UIScreen.main.bounds.height * maxHeightFraction, alignment: .top)
+        .padding(.bottom, bottomInset)   // content sits above the home indicator; glass fills below it
         .glassBG(sheetShape)
         .offset(y: dragY)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .ignoresSafeArea(edges: .bottom) // glass runs to the physical bottom (no gap under the sheet)
     }
 }
