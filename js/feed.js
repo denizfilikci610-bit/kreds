@@ -1,10 +1,10 @@
 import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, expandedCmts, pv, cstate, curTab, setCurTab, setCfilePid, ID2H, FRIEND_SINCE } from "./store.js";
-import { el, esc, avaHTML, user, grad, toast, fmtTime, fmtDate, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
+import { el, esc, richText, avaHTML, user, grad, toast, fmtTime, fmtDate, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
 import { t, likesLabel } from "./i18n.js";
 import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, deleteComment, cInput, cKey, clearReply, clearCImg, openNativeComments, pushNativeComments } from "./comments.js";
 import { openFeedSheet, openMemberSheet } from "./kredse.js";
-import { openProfile, closeProfile, renderMyPosts, renderStories, refreshPv } from "./profile.js";
+import { openProfile, closeProfile, closeMemView, renderMyPosts, renderStories, refreshPv } from "./profile.js";
 import { renderSearch } from "./search.js";
 import { loadNotifs, setNotifDot } from "./notifications.js";
 import { scheduleRefetch } from "./realtime.js";
@@ -12,7 +12,7 @@ import { mapPoll, pollHTML, votePoll } from "./polls.js";
 import { openLightbox } from "./lightbox.js";
 import { AD_EVERY, adsEnabled, adSlotHTML, reportAdLayout, initAds } from "./ads.js";
 
-export const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id), poll_options(*, poll_votes(user_id))";
+export const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id), poll_options(*, poll_votes(user_id)), membership_proposals(resolved)";
 
 export function mapComment(c){
   if(c.author_profile) registerProfile(c.author_profile);
@@ -121,10 +121,11 @@ function govPostText(text){
   if(!m) return esc(text);
   return esc(m[1]) + "<b>" + esc(m[2]) + "</b>" + esc(m[3]);
 }
-/* Krop for en tanke: tekst → medie → afstemning. (Et minde har sin egen skal, memoryHTML.) */
+/* Krop for en tanke: tekst → medie → afstemning. (Et minde har sin egen skal, memoryHTML.)
+   richText gør @handles klikbare — governance-tekster (serverskabte) beholder govPostText. */
 function postBody(p, media){
   const textHTML = p.text
-    ? '<div class="ptext">'+(p.poll && p.poll.gov ? govPostText(p.text) : esc(p.text))+'</div>'
+    ? '<div class="ptext">'+(p.poll && p.poll.gov ? govPostText(p.text) : richText(p.text))+'</div>'
     : '';
   return textHTML + media + pollHTML(p);
 }
@@ -169,7 +170,7 @@ function memoryHTML(p, inner){
   const openCap = capsOpen.has(Number(p.id));
   const cap = p.text
     ? '<div class="mcap'+(openCap ? " open" : "")+'" data-id="'+p.id+'">'+
-        '<div class="ptext cap">'+esc(p.text)+'</div>'+
+        '<div class="ptext cap">'+richText(p.text)+'</div>'+
         '<button class="cap-more" data-id="'+p.id+'">'+t(openCap ? "memory.less" : "memory.more")+'</button>'+
       '</div>'
     : '';
@@ -1099,6 +1100,8 @@ export function openPostEdit(id){
   el("edsheet").classList.add("on");
   setTimeout(function(){ el("ed-field").focus(); }, 260);
 }
+/* @-autocompleten (mentions.js) skal kende opslaget bag #ed-field */
+export function getEditPid(){ return editPid; }
 export function closePostEdit(){
   el("edsheet").classList.remove("on");
   editPid = null;
@@ -1195,6 +1198,17 @@ export function resetTapState(){
   lastTap = { id:null, t:0 };
 }
 function timelineClick(e){
+  // @-mention i opslag/caption/kommentar → åbn profilen (egen → profil-fanen, jf. .pavab-grenen).
+  // Minde-fuldskærmssiden (#memview, z-index 90) ligger OVER profilen (z-70) — luk den først,
+  // ellers åbner profilen usynligt bagved.
+  const men = e.target.closest(".mention");
+  if(men){
+    const u = men.dataset.u;
+    if(el("memview").classList.contains("on")) closeMemView();
+    if(me && u === me.handle){ closeProfile(); switchTab("profil"); }
+    else openProfile(u);
+    return;
+  }
   const tq = e.target.closest(".treq");
   if(tq){
     if(tq.disabled) return;
@@ -1280,6 +1294,8 @@ function timelineClick(e){
   }
   const pr = e.target.closest(".pavab");
   if(pr && pr.dataset.u){
+    // Fra minde-fuldskærmssiden: luk #memview (z-90) først, ellers gemmer profilen (z-70) sig bagved
+    if(el("memview").classList.contains("on")) closeMemView();
     if(me && pr.dataset.u === me.handle){ closeProfile(); switchTab("profil"); }
     else openProfile(pr.dataset.u);
     return;

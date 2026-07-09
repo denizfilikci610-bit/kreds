@@ -4,6 +4,7 @@ import { el, esc, toast, uuid } from "./helpers.js";
 import { t } from "./i18n.js";
 import { feedById, setFeed, switchTab } from "./feed.js";
 import { offerRewardAfterPost } from "./rewarded.js";
+import { mentionCards } from "./mentions.js";
 
 /* ================= Skriv ================= */
 let pendingImg = null; // { blob, url }
@@ -34,6 +35,8 @@ export function canPost(){
     : !(pendingImg || pendingVid || t.length > 0);
 }
 let composeDest = "all";
+/* @-autocompleten (mentions.js) skal kende destinationen for at foreslå de rigtige folk */
+export function getComposeDest(){ return composeDest; }
 export function renderComposeDest(){
   let html = '<span class="dlabel">'+t("compose.dest")+'</span>'+
     '<button class="fpill'+(composeDest === "all" ? " on" : "")+'" data-d="all">'+t("feedbar.all")+'</button>';
@@ -118,9 +121,14 @@ function vfmh(){ return window.webkit && window.webkit.messageHandlers && window
 function postMemoryGallery(){
   const mh = vfmh();
   if(!mh){ openComposeWith("memory"); return; } // ingen bro → web-fallback
+  // @-autocomplete i den native caption: kandidat-kort pr. destination ("all" = venner;
+  // pr. kreds = venner + medlemmer) — native filtrerer lokalt når dest-pillen skiftes.
+  const mentionables = { all: mentionCards("all") };
+  state.feeds.forEach(function(f){ mentionables[f.id] = mentionCards(f.id); });
   mh.postMessage({
     type: "photolib", open: true, dest: state.currentFeed || "all",
     feeds: state.feeds.map(function(f){ return { id: f.id, name: f.name }; }),
+    mentionables: mentionables,
     labels: {
       title: t("compose.title.memory"), next: t("memory.next"), cancel: t("common.cancel"), share: t("compose.post"),
       captionPlaceholder: t("compose.ph.memory"), destLabel: t("compose.dest"), allLabel: t("feedbar.all"),

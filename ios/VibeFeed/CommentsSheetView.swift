@@ -55,6 +55,7 @@ final class CommentsModel: ObservableObject {
     @Published var canPost = false
     @Published var emoji: [String] = []
     @Published var comments: [CmtItem] = []
+    @Published var mentionables: [MentionCard] = [] // @-kandidater (opslagets publikum, fra web)
     @Published var labels: [String: String] = [:]
 
     // Ephemeral, native-local UI state (never crosses to the web on its own)
@@ -80,6 +81,7 @@ final class CommentsModel: ObservableObject {
         canPost = (dict["canPost"] as? Bool) ?? false
         emoji = (dict["emoji"] as? [String]) ?? []
         comments = parseComments(dict["comments"])
+        mentionables = MentionSupport.parseCards(dict["mentionables"])
         // Only the deep-link OPENING snapshot carries "focus" — later syncs reset it,
         // so the sheet never re-scrolls while the user is reading/typing.
         focusId = dict["focus"] as? String
@@ -135,6 +137,11 @@ final class CommentsModel: ObservableObject {
 
     func like(_ id: String) { send(["kind": "like", "postId": postId, "commentId": id]) }
     func del(_ id: String) { send(["kind": "delete", "postId": postId, "commentId": id]) }
+    /// Tap på en kommentators avatar → web lukker sheetet og åbner profilen.
+    func profile(_ handle: String) {
+        guard !handle.isEmpty else { return }
+        send(["kind": "profile", "postId": postId, "handle": handle])
+    }
 
     func reply(_ id: String, _ handle: String) {
         replyingToId = id; replyingToHandle = handle; focusToken += 1
@@ -204,7 +211,12 @@ struct GlassCommentsSheet: View {
 
     private func row(_ c: CmtItem) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            GlassAvatar(url: c.avatarUrl, initials: c.initials, gradient: c.gradient, size: 30)
+            // Avataren åbner kommentatorens profil (navnet er konkateneret med kommentar-
+            // teksten i ét Text-view for ombrydningen, så kun avataren er tappable).
+            Button { model.profile(c.handle) } label: {
+                GlassAvatar(url: c.avatarUrl, initials: c.initials, gradient: c.gradient, size: 30)
+            }
+            .buttonStyle(.plain)
             VStack(alignment: .leading, spacing: 3) {
                 (Text(c.name).font(.system(size: 14, weight: .semibold)).foregroundColor(.primary)
                     + Text("  ")
@@ -279,8 +291,33 @@ struct GlassCommentsSheet: View {
 
     // MARK: - Composer (emoji quick-bar + reply chip + text input)
 
+    /// @-kandidater der matcher det token brugeren er ved at skrive (tom når inaktiv)
+    private var mentionHits: [MentionCard] {
+        model.canPost ? MentionSupport.hits(model.text, model.mentionables) : []
+    }
+
     private var composer: some View {
         VStack(spacing: 8) {
+            if !mentionHits.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(mentionHits) { m in
+                            Button { model.text = MentionSupport.insert(model.text, m.handle) } label: {
+                                HStack(spacing: 6) {
+                                    GlassAvatar(url: m.avatarUrl, initials: m.initials, gradient: m.gradient, size: 22)
+                                    Text("@\(m.handle)")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(Color.primary)
+                                }
+                                .padding(.horizontal, 10).padding(.vertical, 6)
+                                .glassBG(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
             if model.replyingToId != nil {
                 HStack(spacing: 8) {
                     Text(model.L("replyingTo").replacingOccurrences(of: "{u}", with: model.replyingToHandle))

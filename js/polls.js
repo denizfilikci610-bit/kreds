@@ -20,15 +20,26 @@ export function mapPoll(row){
       total += vs.length;
       return { id:o.id, idx:o.idx, text:o.text || "", votes:vs.length };
     });
-  // Governance-afstemning? (server-tekst "Afstemning: Skal …" — bruges til tydelig styling)
+  // Governance-afstemning? (server-tekst "Afstemning: Skal …" — bruges kun til styling;
+  // en bruger kan selv skrive en måling der starter sådan, så præfikset er forfalskbart)
   const gov = typeof row.text === "string" && row.text.indexOf("Afstemning: ") === 0;
+  // ÆGTE governance = der findes en membership_proposal for opslaget (embeddet i POST_SELECT;
+  // RLS viser den for kredsens medlemmer). KUN den må fjerne knapper — almindelige målinger
+  // (også dem der ligner) lukker aldrig og skal beholde deres knapper for evigt.
+  const prop = (row.membership_proposals || [])[0];
+  // Afgjort? Serveren appender " — Vedtaget ✅"/" — Afvist ❌" til teksten ved afgørelse.
+  const done = gov && (row.text.indexOf("✅") >= 0 || row.text.indexOf("❌") >= 0);
   // Sekunder tilbage til fristen (10 min efter oprettelse) — null hvis ikke gov eller allerede afgjort
   let left = null;
-  if(gov && row.created_at && row.text.indexOf("✅") < 0 && row.text.indexOf("❌") < 0){
+  if(gov && row.created_at && !done){
     const deadline = new Date(row.created_at).getTime() + 10 * 60 * 1000;
     left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
   }
-  return { options: options, total: total, myVote: myVote, gov: gov, left: left };
+  // resolved dækker DB-afgørelsen (proposal.resolved), tekst-markøren (✅/❌) og en lokalt
+  // udløbet frist hvor DB'ens lazy close endnu ikke er kørt — serveren afviser alligevel
+  // stemmer efter fristen med 'poll_closed'.
+  return { options: options, total: total, myVote: myVote, gov: gov, left: left,
+           resolved: !!prop && (!!prop.resolved || done || left === 0) };
 }
 
 function CHECK(){
@@ -38,11 +49,16 @@ function CHECK(){
 export function pollHTML(p){
   const poll = p.poll;
   if(!poll) return "";
-  const showRes = poll.myVote != null || (me && p.u === me.handle);
+  // Afgjort governance-afstemning: Ja/Nej "forsvinder" — resultat-rækkerne renderes som
+  // ikke-klikbare <div> uden data-vote (klik-delegaten matcher så intet), men slutresultatet
+  // kan stadig aflæses. Almindelige meningsmålinger lukker aldrig og beholder deres knapper.
+  const resolved = !!(poll.gov && poll.resolved);
+  const showRes = resolved || poll.myVote != null || (me && p.u === me.handle);
   let html = '<div class="pollwrap'+(poll.gov ? " gov" : "")+'" data-id="'+p.id+'">';
   if(poll.gov){
     let head = t("gov.vote_label");
-    if(poll.left != null) head += poll.left > 0
+    if(resolved) head += " · " + t("poll.closed");
+    else if(poll.left != null) head += poll.left > 0
       ? " · " + t("gov.closes_in_min", { m: Math.ceil(poll.left / 60) })
       : " · " + t("gov.closing");
     html += '<div class="gov-head">'+head+'</div>';
@@ -51,11 +67,14 @@ export function pollHTML(p){
     poll.options.forEach(function(o){
       const pct = poll.total ? Math.round(o.votes / poll.total * 100) : 0;
       const mine = poll.myVote === o.id;
-      html += '<button class="poll-res'+(mine ? " mine" : "")+'" data-vote="'+o.id+'" data-pid="'+p.id+'" aria-label="'+t("poll.vote_aria", { opt: esc(o.text) })+'">'+
+      const cls = 'poll-res'+(mine ? " mine" : "");
+      html += (resolved
+          ? '<div class="'+cls+'">'
+          : '<button class="'+cls+'" data-vote="'+o.id+'" data-pid="'+p.id+'" aria-label="'+t("poll.vote_aria", { opt: esc(o.text) })+'">')+
         '<span class="pfill" style="width:'+pct+'%"></span>'+
         '<span class="ptxt">'+esc(o.text)+(mine ? CHECK() : '')+'</span>'+
         '<span class="ppct">'+pct+'%</span>'+
-      '</button>';
+      (resolved ? '</div>' : '</button>');
     });
   } else {
     poll.options.forEach(function(o){
@@ -93,6 +112,9 @@ export async function votePoll(pid, oid){
   pid = Number(pid); oid = Number(oid);
   const posts = findPostAll(pid);
   if(!posts.length || !posts[0].poll) return;
+  // Afgjort governance-afstemning: intet klikbart renderes, men gardér alligevel
+  // (fx et tap i sekundet før re-render) — serveren ville også afvise ('poll_closed').
+  if(posts[0].poll.gov && posts[0].poll.resolved){ toast(t("poll.closed")); return; }
   const prev = posts[0].poll.myVote;
   if(prev === oid) return;
   const seq = (voteSeq.get(pid) || 0) + 1;

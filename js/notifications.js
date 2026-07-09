@@ -169,7 +169,9 @@ async function hasUnseenNotifs(){
     sb.from("friend_requests").select("*", head).eq("to_id", me.id).gt("created_at", sinceIso),
     sb.from("kreds_invites").select("*", head).eq("user_id", me.id).gt("created_at", sinceIso),
     // Kreds-opslag fra andre (RLS viser kun mine kredse) → prikken følger listen (kun i dag)
-    sb.from("posts").select("*", head).not("feed_id", "is", null).neq("author", me.id).gt("created_at", reactIso)
+    sb.from("posts").select("*", head).not("feed_id", "is", null).neq("author", me.id).gt("created_at", reactIso),
+    // @-mentions af mig (samme dags-grænse som listen)
+    sb.from("mentions").select("*", head).eq("mentioned", me.id).gt("created_at", reactIso)
   ];
   if(ids.length){
     probes.push(sb.from("likes").select("*", head).in("post_id", ids).neq("user_id", me.id).gt("created_at", reactIso));
@@ -220,6 +222,7 @@ export async function loadNotifs(){
   const B = '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>';
   const P = '<svg viewBox="0 0 24 24"><g class="stroke"><circle cx="10" cy="8" r="3.4"/><path d="M3.8 19.5c.7-3.3 3.2-5 6.2-5s5.5 1.7 6.2 5"/><path d="M18.5 6.5v6M15.5 9.5h6"/></g></svg>';
   const K = '<svg viewBox="0 0 24 24"><g class="stroke"><circle cx="9" cy="9" r="3.1"/><path d="M3.6 19c.6-3 2.6-4.6 5.4-4.6s4.8 1.6 5.4 4.6"/><circle cx="17.2" cy="8" r="2.3"/><path d="M15.7 13.2c2.5.1 4.2 1.5 4.7 3.9"/></g></svg>';
+  const AT = '<svg viewBox="0 0 24 24"><g class="stroke"><circle cx="12" cy="12" r="4"/><path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.5 7.1"/></g></svg>';
   function row(icon, cls, u, text, snip, tm, attrs, unread){
     return '<div class="notif'+(unread ? " unread" : "")+'"'+(attrs || "")+'>'+
       (unread ? '<span class="udot"></span>' : '')+
@@ -323,7 +326,10 @@ export async function loadNotifs(){
       sb.from("friend_requests").select("created_at, from_profile:profiles!from_id(*)").eq("to_id", me.id),
       // Kreds-opslag i mine kredse (ikke egne). RLS begrænser til synlige kredse.
       sb.from("posts").select("id, created_at, text, image_path, feed_id, author_profile:profiles!author(*), feed:feeds!feed_id(name)")
-        .not("feed_id", "is", null).neq("author", me.id).gte("created_at", dayStartIso).order("created_at", { ascending:false }).limit(30)
+        .not("feed_id", "is", null).neq("author", me.id).gte("created_at", dayStartIso).order("created_at", { ascending:false }).limit(30),
+      // @-mentions af mig (mentions-tabellen udfyldes af DB-triggeren; RLS = kun mine)
+      sb.from("mentions").select("post_id, comment_id, created_at, author_profile:profiles!author(*)")
+        .eq("mentioned", me.id).gte("created_at", dayStartIso).order("created_at", { ascending:false }).limit(30)
     ];
     let iLikes = -1, iCmts = -1, iReplies = -1, iClikes = -1;
     if(ids.length){
@@ -389,6 +395,13 @@ export async function loadNotifs(){
         }
       }
     });
+    // @-mentions: "nævnte dig" — klik åbner opslaget (eller den præcise kommentar)
+    (res[5].data || []).forEach(function(r){
+      if(r.author_profile){
+        registerProfile(r.author_profile);
+        items.push({ type:"mention", u:r.author_profile.handle, at:r.created_at, pid:r.post_id, cid:r.comment_id || undefined });
+      }
+    });
     // Svar PÅ mine kommentarer først — så deres id'er kan udelukkes fra "kommentar på dit opslag"
     const replyIds = new Set();
     if(iReplies >= 0){
@@ -427,18 +440,31 @@ export async function loadNotifs(){
       items.push({ type:"mres", u:OFFICIAL_HANDLE, at:r.created_at, f:r.feed_id, k:r.feed_name || "",
                    admitted: !!r.admitted, request: !!r.is_request });
     });
-    items.sort(function(a,b){ return new Date(b.at) - new Date(a.at); });
+    /* Dedupe: en mention er den PRÆCISE udgave af samme hændelse — den generiske række
+       (kommentar/svar med samme cid, kreds-opslag med samme pid) skjules. Push-laget gør
+       det samme (tg_push_comment/tg_push_post springer mentionerede modtagere over). */
+    const menCids = new Set(), menPids = new Set();
+    items.forEach(function(n){
+      if(n.type === "mention"){ if(n.cid) menCids.add(String(n.cid)); else menPids.add(String(n.pid)); }
+    });
+    const deduped = items.filter(function(n){
+      if((n.type === "cmt" || n.type === "reply") && n.cid && menCids.has(String(n.cid))) return false;
+      if(n.type === "kpost" && menPids.has(String(n.pid))) return false;
+      return true;
+    });
+    deduped.sort(function(a,b){ return new Date(b.at) - new Date(a.at); });
     /* Invitationer/anmodninger er handlingskrævende — de må aldrig ryge ud af 30-loftet.
        Optagelses-resultatet (mres) fritages også, så en "Tillykke …" ikke skubbes ud en travl dag. */
     const isAct = function(n){ return n.type === "inv" || n.type === "kreq" || n.type === "freq" || n.type === "mres"; };
-    const acts = items.filter(isAct);
-    const rest = items.filter(function(n){ return !isAct(n); })
+    const acts = deduped.filter(isAct);
+    const rest = deduped.filter(function(n){ return !isAct(n); })
       .slice(0, Math.max(0, 30 - acts.length));
     const top = acts.concat(rest);
     if(seq !== notifSeq) return; // et nyere kald er i gang — lad det vinde
     el("notifs").innerHTML = top.length
       ? top.map(function(n){
           if(n.type === "like")   return row(H, "heart",  n.u, t("notif.liked"), n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-type="like"', isUnread(n.at));
+          if(n.type === "mention") return row(AT, "mention", n.u, t("notif.mentioned"), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'"'+(n.cid ? ' data-cid="'+esc(n.cid)+'"' : '')+' data-type="'+(n.cid ? "cmt" : "post")+'"', isUnread(n.at));
           if(n.type === "clike")  return row(H, "heart",  n.u, t("notif.liked_comment"), "", fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-cid="'+esc(n.cid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "reply")  return row(B, "bubble", n.u, t("notif.replied"),   n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-cid="'+esc(n.cid)+'" data-type="cmt"', isUnread(n.at));
           if(n.type === "cmt")    return row(B, "bubble", n.u, t("notif.commented"),  n.snip, fmtTime(n.at), ' data-pid="'+esc(n.pid)+'" data-cid="'+esc(n.cid)+'" data-type="cmt"', isUnread(n.at));
@@ -498,7 +524,7 @@ async function openNotifPost(pid, isCmt, cid){
    Opslags-kinds genbruger openNotifPost (samme hop som et tap i notifikationslisten);
    person-hændelser (ven/invitation/optagelse) bor på akt-fanen. Fallback (opslag slettet,
    ikke synligt, eller gammel push uden payload) = akt-fanen. */
-const PUSH_POST_KINDS = { like:1, comment:1, reply:1, comment_like:1, post:1, post_kreds:1, kvote:1 };
+const PUSH_POST_KINDS = { like:1, comment:1, reply:1, comment_like:1, post:1, post_kreds:1, kvote:1, mention:1 };
 const PUSH_CMT_KINDS = { comment:1, reply:1, comment_like:1 };
 function pushBootReady(){
   const s = el("splash");
@@ -511,7 +537,9 @@ export async function openFromPush(payload){
   const kind = payload && payload.kind;
   const pid = payload && payload.pid;
   const cid = payload && payload.cid;
-  if(kind && PUSH_POST_KINDS[kind] && pid && await openNotifPost(pid, !!PUSH_CMT_KINDS[kind], cid)) return;
+  // En mention er kun kommentar-agtig når den skete I en kommentar (cid sat)
+  const isCmt = kind === "mention" ? !!cid : !!PUSH_CMT_KINDS[kind];
+  if(kind && PUSH_POST_KINDS[kind] && pid && await openNotifPost(pid, isCmt, cid)) return;
   switchTab("akt");
 }
 

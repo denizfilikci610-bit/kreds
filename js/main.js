@@ -14,6 +14,7 @@ import { initRealtime, scheduleRefetch } from "./realtime.js";
 import { initAuth, boot, showAuth, showRecovery, setAuthMode, refreshAuthMode, pushNativeCreds } from "./auth.js";
 import { initRewarded } from "./rewarded.js";
 import { initPullRefresh } from "./pullrefresh.js";
+import { initMentions } from "./mentions.js";
 
 /* ================= i18n =================
    Callback ved sprogskifte: statisk markup er allerede opdateret af setLang
@@ -45,6 +46,7 @@ initProfile();
 initNotifs();
 initLightbox();
 initRealtime();
+initMentions();
 initAuth();
 initRewarded(); // rewarded-video-genvej + belønnings-bro (no-op i browsere)
 initPullRefresh(); // ren pull-to-refresh for hele appen (erstatter native webview-bounce)

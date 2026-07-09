@@ -53,6 +53,23 @@ export function avaHTML(h, size, cls){
   const fs = Math.max(8, Math.round(size * 0.38));
   return '<span class="'+c+'" style="'+style+'font-size:'+fs+'px;background:'+esc(grad(h))+'">'+ini(h)+'</span>';
 }
+/* Escape + gør @handles klikbare. Kun handles der matcher en KENDT profil (USERS[h].id
+   sættes kun af registerProfile) bliver markup — vilkårligt "@tekst" forbliver ren tekst.
+   Præfiks-tjekket (ikke bogstav/./@ før @) undgår at ramme e-mail-adresser. "@Anna" (iOS
+   auto-capitalization) lowercases; "tak @anna." dot-trimmes til 'anna' hvis 'anna.' ikke
+   findes — SPEJLER DB'ens mention_uids, så highlight og notifikation altid følges ad.
+   Bruges på opslags-tekst, minde-captions og kommentarer; ALDRIG på governance-tekst. */
+export function richText(s){
+  return esc(s).replace(/(^|[^a-zA-Z0-9_.@])@([a-zA-Z0-9_.]{2,20})/g, function(m, pre, h){
+    let hh = h.toLowerCase(), rest = "";
+    while(hh.length >= 2 && !(USERS[hh] && USERS[hh].id) && hh.slice(-1) === "."){
+      hh = hh.slice(0, -1);
+      rest = "." + rest;
+    }
+    if(!USERS[hh] || !USERS[hh].id) return m;
+    return pre+'<button class="mention" data-u="'+hh+'">@'+hh+'</button>'+rest;
+  });
+}
 export function fmtTime(iso){
   const d = new Date(iso);
   const s = Math.max(0, (Date.now() - d.getTime())/1000);

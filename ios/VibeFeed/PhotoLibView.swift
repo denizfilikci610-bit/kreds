@@ -22,6 +22,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
     @Published var selected: PHAsset?
     @Published var caption = ""
     @Published var dest = "all"
+    @Published var mentionables: [String: [MentionCard]] = [:] // @-kandidater pr. destination (fra web)
     @Published var feeds: [PLFeed] = []
     @Published var sharing = false
     @Published var loadingOriginal = false
@@ -85,6 +86,13 @@ final class PhotoLibModel: NSObject, ObservableObject {
             captionPlaceholder = s(l, "captionPlaceholder"); destLabel = s(l, "destLabel"); allLabel = s(l, "allLabel")
             limitedNote = s(l, "limited"); manageLabel = s(l, "manage"); deniedNote = s(l, "denied"); settingsLabel = s(l, "settings")
             trimHint = s(l, "trimHint")
+        }
+        // @-kandidater pr. destination ("all" = venner; pr. kreds = venner + medlemmer) —
+        // strippen filtrerer lokalt og følger dest-pillen. Ældre web uden feltet → tom (ingen strip).
+        if let m = dict["mentionables"] as? [String: Any] {
+            mentionables = m.mapValues { MentionSupport.parseCards($0) }
+        } else {
+            mentionables = [:]
         }
         caption = ""; selected = nil; sharing = false; loadingOriginal = false; step = .gallery
         videoAsset = nil; videoDuration = 0; trimStart = 0; trimDuration = VF_MAX_VID; showTrimStep = false; preparingTrim = false
@@ -416,6 +424,27 @@ struct MemoryGalleryScreen: View {
                 TextField(model.captionPlaceholder, text: $model.caption, axis: .vertical)
                     .font(.system(size: 16)).lineLimit(1...5)
                     .padding(.horizontal, 16).padding(.vertical, 12)
+                if !mentionHits.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(mentionHits) { m in
+                                Button { model.caption = MentionSupport.insert(model.caption, m.handle) } label: {
+                                    HStack(spacing: 6) {
+                                        GlassAvatar(url: m.avatarUrl, initials: m.initials, gradient: m.gradient, size: 22)
+                                        Text("@\(m.handle)")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(Color.primary)
+                                    }
+                                    .padding(.horizontal, 10).padding(.vertical, 6)
+                                    .glassBG(Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                    .padding(.bottom, 8)
+                }
                 Divider().opacity(0.4)
                 Text(model.destLabel.uppercased()).font(.system(size: 12, weight: .bold))
                     .foregroundStyle(.secondary).kerning(0.4).padding(.leading, 16).padding(.top, 14).padding(.bottom, 6)
@@ -427,6 +456,11 @@ struct MemoryGalleryScreen: View {
                 }
             }
         }
+    }
+
+    /// @-kandidater der matcher det token brugeren er ved at skrive i captionen
+    private var mentionHits: [MentionCard] {
+        MentionSupport.hits(model.caption, model.mentionables[model.dest] ?? model.mentionables["all"] ?? [])
     }
 
     private func destPill(_ id: String, _ name: String) -> some View {

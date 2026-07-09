@@ -1,8 +1,10 @@
 import { sb } from "./config.js";
 import { me, expandedCmts, composers, cstate, cfilePid } from "./store.js";
-import { el, esc, avaHTML, toast, uuid, HEART_SVG, user, ini, grad, imgUrl } from "./helpers.js";
+import { el, esc, avaHTML, richText, toast, uuid, HEART_SVG, user, ini, grad, imgUrl } from "./helpers.js";
 import { t, likesLabel } from "./i18n.js";
-import { findPost, findPostAll, allPostArrays, mapComment } from "./feed.js";
+import { findPost, findPostAll, allPostArrays, mapComment, switchTab } from "./feed.js";
+import { openProfile, closeProfile, closeMemView } from "./profile.js";
+import { mentionCards } from "./mentions.js";
 
 /* ================= Kommentartråd (inline, sammenklappet som standard) ================= */
 function buildThread(p){
@@ -39,9 +41,9 @@ function cmtRowHTML(item){
   // Vis ALTID hvem svaret er rettet til (ikke kun ved dyb nesting)
   const prefix = item.parentU ? '<span class="cat">@'+esc(item.parentU)+'</span> ' : '';
   return '<div class="crow'+(lvl > 0 ? " cnest" : "")+'"'+(ind ? ' style="margin-left:'+ind+'px"' : '')+' data-cid="'+c.id+'">'+
-    avaHTML(c.u, 28)+
+    '<button class="pavab" data-u="'+esc(c.u)+'" aria-label="'+t("aria.profile")+'">'+avaHTML(c.u, 28)+'</button>'+
     '<div class="cbody">'+
-      '<div class="ctext"><b>'+esc(c.u)+'</b>'+prefix+(c.text ? esc(c.text) : '')+'</div>'+
+      '<div class="ctext"><b>'+esc(c.u)+'</b>'+prefix+(c.text ? richText(c.text) : '')+'</div>'+
       (c.img ? '<img class="cimg" src="'+esc(c.img)+'" alt="'+t("cmt.img_alt")+'">' : '')+
       '<div class="cmeta">'+
         '<span>'+esc(c.t)+'</span>'+
@@ -321,6 +323,8 @@ function cmtSnapshot(pid){
     canPost: !!me,
     emoji: CMT_EMOJI,
     comments: comments,
+    // @-autocomplete i det native input: opslagets publikum (venner/medlemmer + forfatter)
+    mentionables: mentionCards(p.feed || "all", [p.u]),
     labels: {
       empty: t("cmt.empty"),
       placeholder: t("cmt.ph"),
@@ -354,6 +358,19 @@ export function nativeCommentsAction(payload){
   if(kind === "dismiss"){
     nativeCmtPid = null;
     if(window.__vfCommentsPush) window.__vfCommentsPush({ close: true }); // nulstil native-bar-tilstand
+    return;
+  }
+  if(kind === "profile"){
+    // Tap på en kommentators avatar i det native sheet: luk sheetet (spejler dismiss-grenen,
+    // så nativeSheetOpen i main.js også nulstilles), luk evt. minde-fuldskærmssiden (#memview
+    // ligger med z-index OVER profilen og ville ellers skjule den) og åbn profilen.
+    const h = payload.handle;
+    if(!h) return;
+    nativeCmtPid = null; // FØR navigation — ellers kan et realtime-push genåbne sheetet
+    if(window.__vfCommentsPush) window.__vfCommentsPush({ close: true });
+    if(el("memview") && el("memview").classList.contains("on")) closeMemView();
+    if(me && h === me.handle){ closeProfile(); switchTab("profil"); }
+    else openProfile(h);
     return;
   }
   const pid = Number(payload.postId != null ? payload.postId : nativeCmtPid);

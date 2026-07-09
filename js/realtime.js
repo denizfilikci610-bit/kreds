@@ -89,6 +89,9 @@ export function subscribeRealtime(){
       scheduleRefetch();                          // nyt venskab (fx nogen accepterede mig) → frisk vennerne live
       realtimeNotify("friendships", payload);
     })
+    .on("postgres_changes", { event:"INSERT", schema:"public", table:"mentions" }, function(payload){
+      realtimeNotify("mentions", payload); // RLS leverer kun MINE mentions → pålidelig prik
+    })
     .subscribe();
   startPolling();
 }

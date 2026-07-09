@@ -509,6 +509,8 @@
     padding:9px 12px;margin-top:6px;
     text-align:left;background:none;
   }
+  /* Afgjort governance-afstemning: resultat-rækkerne er statiske <div>, ikke knapper */
+  div.poll-res{cursor:default}
   .poll-res .pfill{position:absolute;left:0;top:0;bottom:0;background:var(--chip)}
   .poll-res .ptxt{position:relative;flex:1;min-width:0;font-size:14px;color:var(--ink);overflow-wrap:break-word;display:flex;align-items:center;gap:6px}
   .poll-res.mine .ptxt{font-weight:700}
@@ -535,10 +537,28 @@
   .cthread{padding:4px 0 0}
   .crow{display:flex;gap:9px;padding:6px 0;align-items:flex-start}
   .crow.cnest{padding-left:10px}
+  /* Kommentator-avataren er en knap (åbner profilen) — samme mønster som post-avatarer */
+  .crow>.pavab{flex:0 0 auto;display:flex;padding:0}
   .crow .cbody{flex:1;min-width:0}
   .crow .ctext{font-size:14px;color:var(--ink);overflow-wrap:break-word}
   .crow .ctext b{font-weight:700;font-size:13px;margin-right:5px}
   .crow .ctext .cat{color:var(--red);font-weight:600}
+  /* @-mention i opslag/captions/kommentarer: klikbart handle i brand-farven */
+  .mention{display:inline;padding:0;font:inherit;color:var(--red);font-weight:700}
+  .mention:active{opacity:.6}
+  /* @-autocomplete-dropdown (mentions.js — ét delt, fixed-positioneret) */
+  .mdrop{
+    display:none;position:fixed;z-index:260;
+    max-height:216px;overflow-y:auto;
+    background:var(--bg);border:1px solid var(--line);border-radius:12px;
+    box-shadow:0 8px 28px rgba(0,0,0,.16);
+  }
+  .mitem{display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;text-align:left}
+  .mitem:active{background:var(--chip)}
+  .mitem .av{flex:0 0 auto;display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:700;object-fit:cover}
+  .mitem .mi-col{display:flex;flex-direction:column;min-width:0}
+  .mitem .mi-col b{font-size:13.5px;color:var(--ink)}
+  .mitem .mi-col span{font-size:12px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .cimg{display:block;margin-top:5px;max-height:180px;max-width:70%;border-radius:8px;object-fit:cover;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
   .cmeta{display:flex;align-items:center;gap:12px;margin-top:3px;font-size:12px;color:var(--gray)}
   .cmeta .csvar{font-size:12px;font-weight:700;color:var(--gray);padding:0}
@@ -644,6 +664,7 @@
   .notif .nicon.bubble{color:var(--gray)}
   .notif .nicon.friend{color:var(--red)}
   .notif .nicon.kpost{color:var(--red)}
+  .notif .nicon.mention{color:var(--red)}
   /* Ulæste notifikationer (siden sidste åbning af fanen): rød prik + tonet række */
   .notif.unread{background:var(--chip)}
   .notif.unread .ntext{font-weight:600}

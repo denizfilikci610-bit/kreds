@@ -67,7 +67,7 @@ function openMemView(p){
   el("mv-body").scrollTop = 0;
   el("memview").classList.add("on");
 }
-function closeMemView(){
+export function closeMemView(){
   el("memview").classList.remove("on");
   el("mv-body").innerHTML = ""; // stop evt. videoafspilning + frigiv
 }
