@@ -459,6 +459,15 @@
       <div class="auth-policy" id="su-policy"></div>
     </form>
 
+    <!-- Tjek din mail (e-mailbekræftelse efter oprettelse / ubekræftet login) -->
+    <form class="auth-form" id="auth-confirm" style="display:none">
+      <div class="auth-note" data-i18n="auth.confirm_note">Vi har sendt dig en mail — tryk på linket i den for at bekræfte din e-mail.</div>
+      <div class="auth-note" data-i18n="auth.confirm_hint">Tjek også uønsket post.</div>
+      <div class="auth-err" id="cf-err" aria-live="polite"></div>
+      <button class="auth-btn" id="cf-resend" type="button" data-i18n="auth.resend">Send mailen igen</button>
+      <button type="button" class="auth-back" id="cf-back" data-i18n="auth.back_login">Tilbage til log ind</button>
+    </form>
+
     <div class="auth-alt" id="auth-alt"><span id="auth-alt-txt">Har du ikke en profil?</span> <button type="button" id="auth-toggle">Opret en</button></div>
     </div>
   </div>

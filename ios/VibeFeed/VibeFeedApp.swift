@@ -138,6 +138,12 @@ struct ContentView: View {
         .modifier(PhotoLibHost())
         // Native Instagram-style comment bottom sheet for memory posts, web-driven.
         .modifier(CommentsSheetHost())
+        // Universal links (vibefeed.dk/?token_hash=… fra auth-mails) åbner APPEN — linket
+        // sendes ind i webviewet, hvor SPA'ens landing veksler tokenet og viser bekræft-/
+        // nulstillingsskærmen. Kold start håndteres af pendingDeepLink i WebViewModel.
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            if let url = activity.webpageURL { model.openDeepLink(url) }
+        }
         .onAppear {
             TabBarModel.shared.onTap = { name in
                 model.webView?.evaluateJavaScript("window.vfTab && window.vfTab('\(name)')", completionHandler: nil)

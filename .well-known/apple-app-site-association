@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["XWHTX7B356.dk.vibefeed.app"],
+        "components": [
+          {
+            "/": "/",
+            "?": { "token_hash": "?*" },
+            "comment": "Auth-links fra mails (bekræft e-mail / vælg ny adgangskode) åbner appen"
+          }
+        ]
+      }
+    ]
+  }
+}

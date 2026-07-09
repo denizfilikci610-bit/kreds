@@ -216,6 +216,36 @@ setTabIcons("feed");
 (async function init(){
   if(!hasStoredLang()) await showLangPicker(); // FØR auth/boot — intet skip
   if(!getConsent()) await showConsentGate();   // efter sprogvalget — ingen lukning uden valg
+  // Universal-link-landing: mail-links peger direkte på vibefeed.dk/?token_hash=…&type=…
+  // (så iOS kan åbne APPEN i stedet for Safari). Tokenet veksles med verifyOtp — virker i
+  // enhver browser/app-kontekst, uafhængigt af hvor mailen blev bestilt.
+  const q = new URLSearchParams(location.search);
+  const tokenHash = q.get("token_hash");
+  if(tokenHash){
+    const linkType = q.get("type");
+    history.replaceState(null, "", location.pathname); // engangstoken ud af URL/historik
+    try{
+      const { data, error } = await sb.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: linkType === "recovery" ? "recovery" : "signup"
+      });
+      if(error){
+        console.error(error);
+        setAuthMode("login");
+        showAuth(t("auth.link_used"));
+        return;
+      }
+      if(linkType === "recovery"){ showRecovery(); return; }
+      toast(t("auth.email_confirmed"));
+      await boot(data.session);
+      return;
+    }catch(err){
+      console.error(err);
+      setAuthMode("login");
+      showAuth(t("err.generic"));
+      return;
+    }
+  }
   if(recoveryLinkError){
     history.replaceState(null, "", location.pathname);
     setAuthMode("login");

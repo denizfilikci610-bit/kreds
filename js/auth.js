@@ -23,12 +23,14 @@ const SIGNUP_ERRORS = {
   signup_failed: "err.generic"
 };
 let authMode = "login";
+let pendingConfirmEmail = ""; // e-mail til gensend-knappen på "Tjek din mail"-skærmen
 export function setAuthMode(mode){
   authMode = mode;
   el("auth-login").style.display = mode === "login" ? "flex" : "none";
   el("auth-signup").style.display = mode === "signup" ? "flex" : "none";
   el("auth-reset").style.display = mode === "reset" ? "flex" : "none";
   el("auth-recover").style.display = mode === "recover" ? "flex" : "none";
+  el("auth-confirm").style.display = mode === "confirm" ? "flex" : "none";
   el("auth-alt").style.display = (mode === "login" || mode === "signup") ? "" : "none";
   el("auth-alt-txt").textContent = mode === "login" ? t("auth.alt_login") : t("auth.alt_signup");
   el("auth-toggle").textContent = mode === "login" ? t("auth.toggle_login") : t("auth.toggle_signup");
@@ -41,6 +43,8 @@ export function setAuthMode(mode){
   el("fp-err").textContent = "";
   el("fp-err").classList.remove("ok");
   el("rc-err").textContent = "";
+  el("cf-err").textContent = "";
+  el("cf-err").classList.remove("ok");
 }
 /* Gen-anvend teksterne for den aktuelle auth-tilstand (kaldes ved sprogskifte) */
 export function refreshAuthMode(){ setAuthMode(authMode); }
@@ -234,6 +238,33 @@ el("rc-back").addEventListener("click", function(){
   history.replaceState(null, "", location.pathname);
   setAuthMode("login");
 });
+el("cf-back").addEventListener("click", function(){
+  setAuthMode("login");
+});
+el("cf-resend").addEventListener("click", async function(){
+  if(!pendingConfirmEmail) { setAuthMode("login"); return; }
+  const btn = el("cf-resend");
+  btn.disabled = true;
+  el("cf-err").textContent = "";
+  el("cf-err").classList.remove("ok");
+  try{
+    const { error } = await sb.auth.resend({ type: "signup", email: pendingConfirmEmail,
+                                             options: { emailRedirectTo: window.location.origin } });
+    if(error){
+      // 429 = "Minimum interval per user" i Supabase (60 s) — bed brugeren vente lidt
+      el("cf-err").textContent = (error.status === 429) ? t("auth.reset_rate") : t("err.generic");
+      btn.disabled = false;
+      return;
+    }
+    el("cf-err").textContent = t("auth.resent");
+    el("cf-err").classList.add("ok");
+    setTimeout(function(){ btn.disabled = false; }, 60000); // matcher server-intervallet
+  }catch(err){
+    console.error(err);
+    el("cf-err").textContent = t("err.generic");
+    btn.disabled = false;
+  }
+});
 el("auth-reset").addEventListener("submit", async function(e){
   e.preventDefault();
   const email = el("fp-email").value.trim();
@@ -321,6 +352,13 @@ el("auth-login").addEventListener("submit", async function(e){
   try{
     const { data, error } = await sb.auth.signInWithPassword({ email:email, password:pass });
     if(error){
+      // Ubekræftet e-mail: vis "Tjek din mail"-skærmen med gensend-knap i stedet for en fejl
+      if(error.code === "email_not_confirmed" || /not confirmed/i.test(error.message || "")){
+        pendingConfirmEmail = email;
+        setAuthMode("confirm");
+        el("cf-err").textContent = t("auth.e.not_confirmed");
+        return;
+      }
       el("li-err").textContent = (error.code === "invalid_credentials" || /invalid/i.test(error.message || ""))
         ? t("auth.wrong_login")
         : t("err.generic");
@@ -356,12 +394,14 @@ el("auth-signup").addEventListener("submit", async function(e){
         : t(SIGNUP_ERRORS[code] || "err.generic");
       return;
     }
-    const si = await sb.auth.signInWithPassword({ email:email, password:pass });
-    if(si.error){
-      el("su-err").textContent = t("auth.signup_login_failed");
-      return;
-    }
-    await boot(si.data.session);
+    // E-mailbekræftelse: kontoen er oprettet UBEKRÆFTET (signup-edge-fn'en sender ingen mail
+    // selv) — send bekræftelsesmailen og vis "Tjek din mail". Fejler gensend (fx rate limit)
+    // vises skærmen alligevel; gensend-knappen kan bruges bagefter.
+    pendingConfirmEmail = email;
+    try{
+      await sb.auth.resend({ type: "signup", email: email, options: { emailRedirectTo: window.location.origin } });
+    }catch(_e){}
+    setAuthMode("confirm");
   }catch(err){
     console.error(err);
     el("su-err").textContent = t("err.generic");

@@ -6,10 +6,22 @@ let vibefeedURL = URL(string: "https://vibefeed.dk")!
 final class WebViewModel: ObservableObject {
     @Published var failed = false
     weak var webView: WKWebView?
+    /// Universal link (fx vibefeed.dk/?token_hash=…) der ankom FØR webviewet var klar (kold start)
+    var pendingDeepLink: URL?
 
     func retry() {
         failed = false
         webView?.load(URLRequest(url: vibefeedURL))
+    }
+
+    /// Åbn et universal link i webviewet — auth-links (token_hash) fører til bekræft-/
+    /// nulstillings-skærmen i SPA'en. Ved kold start gemmes linket til makeUIView.
+    func openDeepLink(_ url: URL) {
+        if let webView {
+            webView.load(URLRequest(url: url))
+        } else {
+            pendingDeepLink = url
+        }
     }
 }
 
@@ -66,7 +78,9 @@ struct WebView: UIViewRepresentable {
         model.webView = webView
         // Let the ad manager call back into the page (fill/collapse slots).
         AdsManager.shared.setWebView(webView)
-        webView.load(URLRequest(url: vibefeedURL))
+        // Kold start via universal link: load linket (auth-landing) i stedet for bare forsiden
+        webView.load(URLRequest(url: model.pendingDeepLink ?? vibefeedURL))
+        model.pendingDeepLink = nil
         return webView
     }
 
