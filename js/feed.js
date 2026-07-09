@@ -2,7 +2,7 @@ import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, expandedCmts, pv, cstate, curTab, setCurTab, setCfilePid, ID2H, FRIEND_SINCE } from "./store.js";
 import { el, esc, avaHTML, user, grad, toast, fmtTime, fmtDate, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
 import { t, likesLabel } from "./i18n.js";
-import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, deleteComment, cInput, cKey, clearReply, clearCImg } from "./comments.js";
+import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, deleteComment, cInput, cKey, clearReply, clearCImg, openNativeComments, pushNativeComments } from "./comments.js";
 import { openFeedSheet, openMemberSheet } from "./kredse.js";
 import { openProfile, closeProfile, renderMyPosts, renderStories, refreshPv } from "./profile.js";
 import { renderSearch } from "./search.js";
@@ -147,33 +147,51 @@ function actionsHTML(p){
   );
 }
 const DOTS_SVG = '<svg viewBox="0 0 24 24"><g class="fillic"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></g></svg>';
-/* Minde-skal: fuld-bleed medie ud til kortets kant med identitet + dato + billedtekst lagt oven på
-   en blød bund-gradient (stories-agtigt). Genbruger samme knap-klasser/data-id som en tanke, så
-   like/kommentar/del/anmeld/lightbox/dobbelttryk-hjerte virker uændret. */
+/* Minde-billedtekster der er foldet UD (Set overlever en re-render, så en åben tekst ikke
+   klapper sammen midt i læsningen ved en baggrunds-refetch). */
+const capsOpen = new Set();
+/* Vis kun "Se mere" når billedteksten faktisk løber over de 2 klippede linjer (måles efter render).
+   Kaldes fra renderFeed + profil-render, så det virker i både feed og profilens minde-detalje. */
+export function clampMemCaps(root){
+  (root || document).querySelectorAll(".mcap").forEach(function(w){
+    const tx = w.querySelector(".ptext.cap");
+    if(!tx) return;
+    if(w.classList.contains("open")){ w.classList.add("has-more"); return; } // udfoldet → behold "Se mindre"
+    w.classList.toggle("has-more", tx.scrollHeight > tx.clientHeight + 2);
+  });
+}
+/* Minde-skal (Instagram-agtig): header med avatar+navn+dato ØVERST, fuld-bleed medie ud til
+   kortets kant, derefter handlinger, billedtekst UNDER (klippet til 2 linjer med "Se mere") og
+   kommentarer. I app'en med det native kommentar-sheet vises kommentarerne native i stedet for inline.
+   Genbruger samme knap-klasser/data-id som en tanke, så like/kommentar/del/anmeld/lightbox/
+   dobbelttryk-hjerte virker uændret. */
 function memoryHTML(p, inner){
-  const cap = p.text ? '<div class="ptext cap">'+esc(p.text)+'</div>' : '';
+  const openCap = capsOpen.has(Number(p.id));
+  const cap = p.text
+    ? '<div class="mcap'+(openCap ? " open" : "")+'" data-id="'+p.id+'">'+
+        '<div class="ptext cap">'+esc(p.text)+'</div>'+
+        '<button class="cap-more" data-id="'+p.id+'">'+t(openCap ? "memory.less" : "memory.more")+'</button>'+
+      '</div>'
+    : '';
+  const nativeCmts = window.__vfNative && window.__vfComments; // native sheet ejer kommentarerne i app'en
   return (
     '<article class="post memory" data-id="'+p.id+'">'+
-      '<div class="mmedia pmedia" data-id="'+p.id+'">'+
-        inner+
-        BIGHEART+
-        '<button class="dots mdots" data-id="'+p.id+'" aria-label="'+t("aria.more")+'">'+DOTS_SVG+'</button>'+
-        (p.isNew ? '<span class="mnew">'+t("post.new")+'</span>' : '')+
-        '<div class="mover">'+
+      '<div class="mhead">'+
+        '<button class="pavab mava" data-u="'+esc(p.u)+'" aria-label="'+t("aria.profile")+'">'+
+          avaHTML(p.u, 34)+
+        '</button>'+
+        '<div class="mhcol">'+
+          '<span class="mhrow"><span class="nm">'+esc(user(p.u).name)+'</span><span class="badge">'+BADGE()+'</span></span>'+
           '<span class="mdate">'+esc(fmtDate(p.created))+'</span>'+
-          '<div class="mid">'+
-            '<button class="pavab mava" data-u="'+esc(p.u)+'" aria-label="'+t("aria.profile")+'">'+
-              avaHTML(p.u, 30)+
-            '</button>'+
-            '<span class="nm">'+esc(user(p.u).name)+'</span>'+
-            '<span class="badge">'+BADGE()+'</span>'+
-          '</div>'+
-          cap+
         '</div>'+
+        (p.isNew ? '<span class="newchip">'+t("post.new")+'</span>' : '')+
+        '<button class="dots" data-id="'+p.id+'" aria-label="'+t("aria.more")+'">'+DOTS_SVG+'</button>'+
       '</div>'+
-      '<div class="pcol mbelow">'+
+      '<div class="mmedia pmedia" data-id="'+p.id+'">'+inner+BIGHEART+'</div>'+
+      '<div class="mbelow">'+
         actionsHTML(p)+
-        cmtSectionHTML(p)+
+        cap+
+        (nativeCmts ? '' : cmtSectionHTML(p))+
       '</div>'+
     '</article>'
   );
@@ -377,6 +395,8 @@ export function renderFeed(){
   const vsnap = snapVideos(el("feed"));
   el("feed").innerHTML = html;
   restoreVideos(el("feed"), vsnap);
+  clampMemCaps(el("feed")); // vis "Se mere" kun hvor minde-billedteksten løber over
+  pushNativeComments();     // hold et evt. åbent native kommentar-sheet i sync (realtime)
   if(fpid){
     const nf = el("feed").querySelector('.cbox[data-id="'+fpid+'"] .cfield');
     if(nf){ nf.focus(); try{ nf.setSelectionRange(selS, selE); }catch(_){} }
@@ -1221,8 +1241,25 @@ function timelineClick(e){
   if(sd){ sendComment(sd.dataset.id); return; }
   const tg = e.target.closest(".cmt-toggle");
   if(tg){ toggleCmtSection(tg.dataset.id); return; }
+  const cm = e.target.closest(".cap-more");
+  if(cm){
+    // Fold minde-billedteksten ud/ind ("Se mere"/"Se mindre") — direkte DOM-toggle, ingen re-render
+    const w = cm.closest(".mcap");
+    if(!w) return;
+    const open = !w.classList.contains("open");
+    w.classList.toggle("open", open);
+    if(open) capsOpen.add(Number(cm.dataset.id)); else capsOpen.delete(Number(cm.dataset.id));
+    cm.textContent = t(open ? "memory.less" : "memory.more");
+    return;
+  }
   const cmt = e.target.closest(".cmt-btn");
   if(cmt){
+    // I app'en åbner et minde sine kommentarer i det native Liquid Glass-sheet (ikke inline)
+    const cp = findPost(cmt.dataset.id);
+    if(window.__vfNative && window.__vfComments && cp && cp.kind === "memory"){
+      openNativeComments(cp.id);
+      return;
+    }
     const opened = toggleCmtSection(cmt.dataset.id);
     if(opened){
       const node = cmt.closest(".post");

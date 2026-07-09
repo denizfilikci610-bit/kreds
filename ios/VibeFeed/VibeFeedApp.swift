@@ -125,6 +125,8 @@ struct ContentView: View {
         .modifier(EsheetHost())
         // Native Instagram-style in-app photo/video gallery composer for memories.
         .modifier(PhotoLibHost())
+        // Native Instagram-style comment bottom sheet for memory posts, web-driven.
+        .modifier(CommentsSheetHost())
         .onAppear {
             TabBarModel.shared.onTap = { name in
                 model.webView?.evaluateJavaScript("window.vfTab && window.vfTab('\(name)')", completionHandler: nil)
@@ -165,6 +167,10 @@ struct ContentView: View {
             }
             PhotoLibModel.shared.onFallback = {
                 model.webView?.evaluateJavaScript("window.vfMemoryFallback && window.vfMemoryFallback()", completionHandler: nil)
+            }
+            // The comment sheet sends a JSON object literal (send/like/reply/delete/dismiss carry payload).
+            CommentsModel.shared.onAction = { json in
+                model.webView?.evaluateJavaScript("window.vfComments && window.vfComments(\(json))", completionHandler: nil)
             }
         }
     }

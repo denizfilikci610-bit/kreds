@@ -3,7 +3,7 @@ import { me, curTab } from "./store.js";
 import { el, toast, getConsent, setConsent } from "./helpers.js";
 import { t, initI18n, setLang, hasStoredLang } from "./i18n.js";
 import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, loadQuota, setFeed, nativeKredsState } from "./feed.js";
-import { initComments } from "./comments.js";
+import { initComments, nativeCommentsAction } from "./comments.js";
 import { initKredse, closeFeedSheet, closeMemberSheet, openFeedSheet, nativeFsheetAction, nativeMemberAction } from "./kredse.js";
 import { initCompose, renderComposeDest, openCompose, nativeMemoryPost, openMemoryFallback, nativeMemoryUploaded, nativeMemoryUploadFailed } from "./compose.js";
 import { initSearch, renderSearch } from "./search.js";
@@ -127,6 +127,12 @@ if(window.__vfNative){
   window.vfMemoryUploadFailed = function(){ nativeMemoryUploadFailed(); };
   window.vfMemoryCancel = function(){};
   window.vfMemoryFallback = function(){ openMemoryFallback(); };
+  /* --- Native Liquid Glass KOMMENTAR-sheet (Instagram-agtigt; KUN minder) — web-drevet ---
+     comments.js bygger en fuld snapshot (tråd + emoji-bar + labels) og kalder __vfCommentsPush;
+     Swift tegner glasset og melder handlinger (send/like/svar/slet/dismiss) tilbage via
+     window.vfComments (routes i comments.js → kører de eksisterende kommentar-funktioner). */
+  window.__vfCommentsPush = function(msg){ postPanel("comments", msg); };
+  window.vfComments = function(payload){ nativeCommentsAction(payload); };
   let lastTabKey = "", lastKredsKey = "";
   const syncNative = function(){
     const mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed;

@@ -81,6 +81,10 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
         case "photolib":
             // The native Instagram-style in-app photo/video gallery composer for memories.
             Task { @MainActor in PhotoLibModel.shared.apply(dict) }
+        case "comments":
+            // The native Instagram-style comment bottom sheet for memory posts — real Liquid Glass,
+            // web-driven. Native renders the thread + emoji bar + input; the web runs all the logic.
+            Task { @MainActor in CommentsModel.shared.apply(dict) }
         case "logout":
             UserDefaults.standard.removeObject(forKey: secretKey)
             UserDefaults.standard.removeObject(forKey: lastCheckKey)

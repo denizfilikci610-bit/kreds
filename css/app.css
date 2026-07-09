@@ -374,63 +374,55 @@
     78%{opacity:.95;transform:scale(1)}
     100%{opacity:0;transform:scale(.9) translateY(-10px)}
   }
-  /* ---------- Minde (fuld-bleed immersivt: medie ud til kortets kant, identitet + dato +
-     billedtekst lagt oven på en blød bund-gradient — stories-agtigt) ---------- */
+  /* ---------- Minde (Instagram-agtigt: header ØVERST, fuld-bleed medie, handlinger, så
+     billedtekst UNDER klippet til 2 linjer med "Se mere", derefter kommentarer) ---------- */
   .post.memory{display:block;padding:0;gap:0}
+  /* Header: avatar + navn/dato + ⋯ (fuld bredde over billedet, egen side-margin) */
+  .post.memory .mhead{display:flex;align-items:center;gap:10px;padding:11px 14px 10px}
+  .post.memory .mhead .mava{flex:0 0 auto;padding:0;border-radius:50%}
+  .post.memory .mhcol{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px}
+  .post.memory .mhrow{display:flex;align-items:center;gap:5px;min-width:0}
+  .post.memory .mhrow .nm{
+    font-weight:700;font-size:15px;color:var(--ink);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0;
+  }
+  .post.memory .mhrow .badge{flex:0 0 auto;display:flex}
+  .post.memory .mhrow .badge svg{width:15px;height:15px}
+  .post.memory .mdate{
+    font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gray);
+  }
+  .post.memory .mhead .newchip{margin-left:auto;flex:0 0 auto}
+  .post.memory .mhead .dots{margin-left:auto;color:var(--gray);padding:2px 0 2px 8px;flex:0 0 auto}
+  .post.memory .mhead .newchip+.dots{margin-left:8px}
+  .post.memory .mhead .dots svg{width:19px;height:19px}
+  /* Fuld-bleed medie ud til kortets kant — HELE billedet uden beskæring (ejerens valg) */
   .post.memory .mmedia{
-    position:relative;
-    margin:0;border:0;border-radius:0;
+    position:relative;margin:0;border:0;border-radius:0;
     overflow:hidden;background:#000;
   }
-  /* HELE billedet uden beskæring (ejerens valg), men nu ud til kortets kant */
   .post.memory .mmedia img,.post.memory .mmedia video{
     display:block;width:100%;height:auto;max-height:none;object-fit:contain;
     -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
   }
-  /* Blød bund-gradient bag identitet + billedtekst — vokser med teksten så den altid er læsbar */
-  .post.memory .mover{
-    position:absolute;left:0;right:0;bottom:0;z-index:1;
-    padding:38px 16px 15px;
-    pointer-events:none;
-    background:linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,.42) 46%, rgba(0,0,0,0));
-  }
-  .post.memory .mdate{
-    display:block;margin-bottom:8px;
-    font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
-    color:rgba(255,255,255,.85);text-shadow:0 1px 3px rgba(0,0,0,.5);
-  }
-  .post.memory .mid{display:flex;align-items:center;gap:8px;min-width:0}
-  .post.memory .mid .mava{flex:0 0 auto;padding:0;pointer-events:auto;border-radius:50%}
-  .post.memory .mid .av{border:1.5px solid rgba(255,255,255,.92);box-shadow:0 1px 4px rgba(0,0,0,.4)}
-  .post.memory .mid .nm{
-    font-weight:800;font-size:15px;color:#fff;
-    text-shadow:0 1px 3px rgba(0,0,0,.5);
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0;
-  }
-  .post.memory .mid .badge{flex:0 0 auto;display:flex}
-  .post.memory .mid .badge svg{width:15px;height:15px}
-  .post.memory .mover .ptext.cap{
-    margin:9px 0 0;padding:0;
+  /* Handlinger + billedtekst + kommentarer under mediet, med normal side-margin */
+  .post.memory .mbelow{padding:8px 16px 12px}
+  /* Billedtekst i serif-kursiv (keepsake), klippet til 2 linjer indtil "Se mere" */
+  .post.memory .mcap{margin-top:2px}
+  .post.memory .mcap .ptext.cap{
+    display:block;padding:0;margin:0;
     font-family:Georgia,"Times New Roman",serif;font-style:italic;
-    font-size:16px;line-height:1.42;color:#fff;
-    text-shadow:0 1px 4px rgba(0,0,0,.55);
+    font-size:15.5px;line-height:1.45;color:var(--ink);
+    white-space:pre-wrap;overflow-wrap:break-word;
   }
-  /* ⋯-menu oven på mediet (øverste højre) */
-  .post.memory .mdots{
-    position:absolute;top:8px;right:6px;z-index:2;
-    padding:6px;color:#fff;pointer-events:auto;
-    filter:drop-shadow(0 1px 3px rgba(0,0,0,.55));
+  .post.memory .mcap:not(.open) .ptext.cap{
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
   }
-  .post.memory .mdots svg{width:20px;height:20px}
-  /* NY-mærke på et nyt minde (øverste venstre) */
-  .post.memory .mnew{
-    position:absolute;top:12px;left:12px;z-index:2;
-    font-size:10px;font-weight:800;letter-spacing:.05em;line-height:1;
-    color:#fff;background:var(--red);border-radius:999px;padding:4px 8px;
-    box-shadow:0 1px 5px rgba(0,0,0,.4);
+  .post.memory .cap-more{
+    display:none;margin-top:3px;
+    font-size:13px;font-weight:600;color:var(--gray);
   }
-  /* Handlinger + kommentarer sidder under mediet med normal side-margin */
-  .post.memory .mbelow{padding:2px 16px 12px}
+  .post.memory .mcap.has-more .cap-more{display:block}
+  .post.memory .cap-more:active{opacity:.5}
   /* Minde-compose: ingen afstemning */
   .compose.memory #pollbtn{display:none}
   /* Profil: toggle (Alt/Minder) + 3-kolonne minde-grid */

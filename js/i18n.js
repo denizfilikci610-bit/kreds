@@ -246,6 +246,8 @@ const DA = {
   "chooser.memory": "Post et minde",
   "memories.empty": "Ingen minder endnu.",
   "memory.next": "Videre",
+  "memory.more": "Se mere",
+  "memory.less": "Se mindre",
   "photolib.limited": "Du har givet adgang til et begrænset antal billeder.",
   "photolib.manage": "Administrer",
   "photolib.denied": "VibeFeed har ikke adgang til dine billeder. Giv adgang i Indstillinger for at vælge et minde.",
@@ -306,6 +308,8 @@ const DA = {
   "cmt.add_img": "Tilføj billede",
   "cmt.send": "Send",
   "cmt.send_failed": "Kunne ikke sende kommentaren. Prøv igen.",
+  "cmt.title": "Kommentarer",
+  "cmt.empty": "Ingen kommentarer endnu",
 
   /* Rediger opslag / menuer */
   "ed.title": "Rediger opslag",
@@ -643,6 +647,8 @@ const EN = {
   "chooser.memory": "Post a memory",
   "memories.empty": "No memories yet.",
   "memory.next": "Next",
+  "memory.more": "See more",
+  "memory.less": "See less",
   "photolib.limited": "You've given access to a limited number of photos.",
   "photolib.manage": "Manage",
   "photolib.denied": "VibeFeed doesn't have access to your photos. Allow access in Settings to pick a memory.",
@@ -703,6 +709,8 @@ const EN = {
   "cmt.add_img": "Add image",
   "cmt.send": "Send",
   "cmt.send_failed": "Couldn't send the comment. Try again.",
+  "cmt.title": "Comments",
+  "cmt.empty": "No comments yet",
 
   /* Edit post / menus */
   "ed.title": "Edit post",

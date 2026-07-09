@@ -1,6 +1,6 @@
 import { sb } from "./config.js";
 import { me, expandedCmts, composers, cstate, cfilePid } from "./store.js";
-import { el, esc, avaHTML, toast, uuid, HEART_SVG } from "./helpers.js";
+import { el, esc, avaHTML, toast, uuid, HEART_SVG, user, ini, grad, imgUrl } from "./helpers.js";
 import { t, likesLabel } from "./i18n.js";
 import { findPost, findPostAll, allPostArrays, mapComment } from "./feed.js";
 
@@ -150,6 +150,7 @@ export async function toggleCmtLike(cid){
   const on = !cs[0].liked;
   cs.forEach(function(c){ c.liked = on; c.likeCount = Math.max(0, (c.likeCount||0) + (on ? 1 : -1)); });
   applyCmtLikeUI(cid);
+  pushNativeComments(); // hold det native sheet i sync (optimistisk)
   let error = null;
   if(on){
     const r = await sb.from("comment_likes").insert({ comment_id:Number(cid), user_id:me.id });
@@ -162,6 +163,7 @@ export async function toggleCmtLike(cid){
     console.error(error);
     cs.forEach(function(c){ c.liked = !on; c.likeCount = Math.max(0, c.likeCount + (on ? -1 : 1)); });
     applyCmtLikeUI(cid);
+    pushNativeComments(); // rul like tilbage i det native sheet
     toast(t("err.generic"));
   }
 }
@@ -205,6 +207,7 @@ export async function deleteComment(cid){
     });
   });
   affected.forEach(function(pid){ rerenderPostCmts(pid); });
+  pushNativeComments(); // opdatér det native sheet efter sletning
   toast(t("cmt.deleted"));
 }
 
@@ -265,6 +268,7 @@ export async function sendComment(pid){
     updateSendState(pid);
   }finally{
     s.busy = false;
+    pushNativeComments(); // opdatér det native sheet (ny kommentar vist, eller input frigivet ved fejl)
   }
 }
 export function cInput(e){
@@ -277,6 +281,90 @@ export function cKey(e){
   const f = e.target.closest(".cfield");
   if(!f) return;
   if(e.key === "Enter" && !e.isComposing) sendComment(f.dataset.id);
+}
+
+/* ================= Native kommentar-sheet (KUN i app'en; kun minder) =================
+   Web bygger en fuld snapshot af tråden (navn/avatar resolveret) og poster den til Swift via
+   window.__vfCommentsPush; Swift tegner det native Liquid Glass-sheet og melder handlinger tilbage
+   via window.vfComments → nativeCommentsAction. Web forbliver kilden til sandhed: handlingerne kører
+   de EKSISTERENDE kommentar-funktioner (sendComment/toggleCmtLike/deleteComment) og et friskt
+   snapshot skubbes tilbage (pushNativeComments), så sheet'et holdes i sync — også ved realtime. */
+const CMT_EMOJI = ["❤️","🙌","🔥","👏","🤍","😍","😭","🥹"];
+let nativeCmtPid = null; // hvilket opslag det native sheet viser lige nu (null = lukket)
+
+function cmtSnapshot(pid){
+  const p = findPost(pid);
+  if(!p) return null;
+  const comments = buildThread(p).map(function(item){
+    const c = item.c, u = user(c.u);
+    return {
+      id: String(c.id),
+      handle: c.u,
+      name: u.name || c.u,
+      avatarUrl: u.avatar_path ? imgUrl(u.avatar_path) : "",
+      initials: ini(c.u),
+      gradient: grad(c.u),
+      text: c.text || "",
+      img: c.img || "",
+      replyTo: item.parentU || "",   // handle svaret er rettet til ("" = top-niveau)
+      indent: item.lvl > 0 ? 1 : 0,
+      time: c.t,
+      liked: !!c.liked,
+      likeCount: c.likeCount || 0,
+      mine: !!(me && c.u === me.handle)
+    };
+  });
+  return {
+    open: true,
+    postId: String(pid),
+    title: t("cmt.title"),
+    canPost: !!me,
+    emoji: CMT_EMOJI,
+    comments: comments,
+    labels: {
+      empty: t("cmt.empty"),
+      placeholder: t("cmt.ph"),
+      send: t("cmt.send"),
+      reply: t("cmt.reply"),
+      cancelReply: t("cmt.cancel_reply"),
+      replyingTo: t("cmt.replying", { u: "{u}" }), // Swift indsætter {u} → handle
+      del: t("cmt.delete"),
+      delConfirm: t("cmt.delete_confirm")
+    }
+  };
+}
+export function openNativeComments(pid){
+  pid = Number(pid);
+  const snap = cmtSnapshot(pid);
+  if(!snap) return;
+  nativeCmtPid = pid;
+  if(window.__vfCommentsPush) window.__vfCommentsPush(snap);
+}
+export function pushNativeComments(){
+  if(nativeCmtPid == null) return;
+  const snap = cmtSnapshot(nativeCmtPid);
+  if(snap && window.__vfCommentsPush) window.__vfCommentsPush(snap);
+}
+export function nativeCommentsAction(payload){
+  if(!payload) return;
+  const kind = payload.kind;
+  if(kind === "dismiss"){
+    nativeCmtPid = null;
+    if(window.__vfCommentsPush) window.__vfCommentsPush({ close: true }); // nulstil native-bar-tilstand
+    return;
+  }
+  const pid = Number(payload.postId != null ? payload.postId : nativeCmtPid);
+  if(!pid) return;
+  if(kind === "send"){
+    const s = cstate(pid);
+    s.text = payload.text || "";
+    s.replyTo = payload.replyTo ? { id: Number(payload.replyTo), u: payload.replyToU || "" } : null;
+    s.img = null;
+    sendComment(pid); // upload/insert + rerender + pushNativeComments til sidst
+    return;
+  }
+  if(kind === "like"){ toggleCmtLike(payload.commentId); return; }
+  if(kind === "delete"){ deleteComment(payload.commentId); return; }
 }
 
 export function initComments(){

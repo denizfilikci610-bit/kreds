@@ -35,7 +35,7 @@ struct WebView: UIViewRepresentable {
         config.userContentController.addUserScript(
             WKUserScript(source: "window.__vfNative = true; window.__vfGlassCard = true;"
                          + " window.__vfFsheet = true; window.__vfMemberSheet = true; window.__vfEsheet = true;"
-                         + " window.__vfPhotoLib = true;",
+                         + " window.__vfPhotoLib = true; window.__vfComments = true;",
                          injectionTime: .atDocumentStart, forMainFrameOnly: true)
         )
 
