@@ -174,6 +174,9 @@ export function resetApp(){
   Object.keys(FRIEND_SINCE).forEach(function(k){ delete FRIEND_SINCE[k]; });
   state.friends = [];
   state.humanFriends = [];
+  state.sentRequests = [];
+  state.blockedIds = [];   // review-fund: må ikke lække til næste konto på samme enhed
+  state.blockReady = false;
   state.posts = [];
   state.wholePosts = [];
   state.teasers = [];

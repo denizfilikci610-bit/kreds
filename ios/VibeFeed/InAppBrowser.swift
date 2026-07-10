@@ -60,6 +60,12 @@ final class InAppBrowserVC: UIViewController, WKNavigationDelegate {
         guard let url = navigationAction.request.url else { decisionHandler(.allow); return }
         // Selve indlæsningen (og evt. redirects) skal igennem
         if navigationAction.navigationType != .linkActivated { decisionHandler(.allow); return }
+        // Ikke-web-links (mailto: osv.) → systemet (Mail), arket bliver stående
+        guard url.scheme == "https" || url.scheme == "http" else {
+            decisionHandler(.cancel)
+            UIApplication.shared.open(url)
+            return
+        }
         let host = (url.host ?? "").lowercased().replacingOccurrences(of: "www.", with: "")
         let isPolicyPage = url.path.hasSuffix("/privatliv.html") || url.path.hasSuffix("/privacy.html")
             || url.path.hasSuffix("/vilkaar.html") || url.path.hasSuffix("/terms.html")

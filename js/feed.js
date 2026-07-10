@@ -545,7 +545,7 @@ export async function loadBlocks(){
   const { data, error } = await sb.from("blocked_users")
     .select("blocked, blocked_profile:profiles!blocked(*)")
     .eq("blocker", me.id);
-  if(error){ state.blockReady = false; return; }
+  if(error){ state.blockedIds = []; state.blockReady = false; return; } // aldrig stale tilstand
   state.blockReady = true;
   state.blockedIds = (data || []).map(function(r){
     if(r.blocked_profile) registerProfile(r.blocked_profile);

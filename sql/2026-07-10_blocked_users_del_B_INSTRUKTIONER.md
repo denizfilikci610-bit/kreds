@@ -27,6 +27,12 @@ Tilføj i funktionens visibility-udtryk:
 Dækker alle stier der bruger can_see_post uden om posts-RLS (bl.a.
 mentions-RLS/`mention_can_see`). OBS: tjek parameternavne/rækkefølge i den
 faktiske signatur.
+**OBS (review-fund F3):** direkte INSERT af likes/kommentarer på tværs af en
+blokering afvises formentlig allerede af de EKSISTERENDE insert-policies, hvis
+de kræver can_see_post på opslaget — så lukker B1-patchen også skrivevejen.
+VERIFICÉR med policy-listen (`select * from pg_policies where tablename in
+('likes','comments','comment_likes')`); bruger insert-policierne IKKE
+can_see_post, så tilføj restrictive WITH CHECK-gates mod opslagets forfatter.
 
 ## B2. Push-triggers (`app_hidden.tg_push_*`) — ingen pushes på tværs af blokering
 `notify_push` får actor som NAVN (text), ikke uid — patch derfor HVER triggers

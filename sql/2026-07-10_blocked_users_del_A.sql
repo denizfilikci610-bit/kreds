@@ -67,8 +67,10 @@ $$;
 
 revoke all on function app_hidden.has_blocked(uuid, uuid) from public;
 revoke all on function app_hidden.is_blocked_between(uuid, uuid) from public;
-grant execute on function app_hidden.has_blocked(uuid, uuid) to authenticated, service_role;
-grant execute on function app_hidden.is_blocked_between(uuid, uuid) to authenticated, service_role;
+-- anon er med som værn: skulle en fremtidig policy give anon læseadgang til en
+-- gated tabel, skal gaten filtrere (false) — ikke smide 42501.
+grant execute on function app_hidden.has_blocked(uuid, uuid) to authenticated, anon, service_role;
+grant execute on function app_hidden.is_blocked_between(uuid, uuid) to authenticated, anon, service_role;
 
 -- ---------- RPC'er ----------
 create or replace function public.block_user(target uuid)
@@ -86,6 +88,10 @@ begin
   if not exists (select 1 from public.profiles where id = target) then
     raise exception 'not_found';
   end if;
+  -- Den officielle profil kan ikke blokeres (klienten skjuler valget; dette er server-værnet)
+  if exists (select 1 from public.profiles where id = target and handle = 'vibefeed') then
+    raise exception 'bad_target';
+  end if;
 
   insert into public.blocked_users (blocker, blocked)
   values (auth.uid(), target)
@@ -101,6 +107,13 @@ begin
   delete from public.kreds_invites
    where (user_id = auth.uid() and invited_by = target)
       or (user_id = target      and invited_by = auth.uid());
+  -- Pending kreds-join-anmodninger mellem parterne (ansøger <-> kreds-EJER) fjernes,
+  -- så en netop blokeret ansøger ikke kan admittes ved et enkelt tap i akt-listen
+  delete from public.kreds_requests kr
+   using public.feeds f
+   where kr.feed_id = f.id
+     and ((kr.user_id = auth.uid() and f.owner = target)
+       or (kr.user_id = target      and f.owner = auth.uid()));
 end;
 $$;
 
@@ -125,6 +138,11 @@ grant execute on function public.unblock_user(uuid) to authenticated;
 
 -- ---------- RESTRICTIVE policies (AND'es med eksisterende PERMISSIVE) ----------
 -- Egne rækker friholdes (kortslutter også definer-kaldet for de fleste rækker).
+-- YDELSE (accepteret v. nuværende skala, review-fund F10): definer-helperne kan
+-- ikke inlines af planneren => ét fn-kald pr. kandidat-række. Feed-queries er
+-- limit 100 og blocked_users er PK-indekseret, så det er mikrosekunder i dag.
+-- Revisit hvis brugertallet vokser markant (fx materialisér blokerede uuids i
+-- en per-request-array via en initplan, eller flyt gaten ind i basispolicies).
 
 drop policy if exists posts_block_gate on public.posts;
 create policy posts_block_gate on public.posts
@@ -163,10 +181,15 @@ create policy friend_requests_block_gate on public.friend_requests
 
 -- Profiler: ÉN vej — skjul P for V, hvis P har blokeret V.
 -- (Blokereren beholder udsynet til den blokerede => unblock-UI.)
+-- Den TREDJE arm er bærende (review-fund): er V SELV blokerer af P, skal V altid
+-- kunne se P — ellers giver GENSIDIG blokering en permanent unblock-deadlock
+-- (ingen af parterne kan nå profilen, og profilen ER unblock-administrationen).
 drop policy if exists profiles_block_gate on public.profiles;
 create policy profiles_block_gate on public.profiles
   as restrictive for select
-  using (id = auth.uid() or not app_hidden.has_blocked(id, auth.uid()));
+  using (id = auth.uid()
+      or app_hidden.has_blocked(auth.uid(), id)
+      or not app_hidden.has_blocked(id, auth.uid()));
 
 commit;
 
