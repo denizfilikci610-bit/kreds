@@ -1,4 +1,8 @@
 -- ============================================================================
+-- STATUS: KØRT i produktion 2026-07-10 (migration 'blocked_users_del_a' via
+-- Supabase MCP) og verificeret med 15 end-to-end-assertions (rollback-test med
+-- simulerede JWT-claims). Filen er nu DOKUMENTATION af den anvendte migration.
+-- ============================================================================
 -- BLOKÉR BRUGER (Apple guideline 1.2) — DEL A: selvstændig migration
 -- Kan køres uden at røre eksisterende funktioner. Kør i ÉN transaktion.
 -- Design (Instagram-stil):

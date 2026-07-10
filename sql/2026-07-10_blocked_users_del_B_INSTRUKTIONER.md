@@ -1,5 +1,14 @@
 # BLOKÉR BRUGER — Del B: patches der KRÆVER live DB-adgang (Supabase MCP)
 
+> **STATUS: UDFØRT 2026-07-10.** Alle punkter er anvendt i produktion:
+> B1+B3 (migration `blocked_users_del_b1_b3_can_see_post_mentions`),
+> B2 (`blocked_users_del_b2_push_fanout`), B4+B5+B6
+> (`blocked_users_del_b4_b6_rpc_guards`), B7 = notif-poll **v31**.
+> B1-noten om insert-vejene BEKRÆFTET: likes/comments/comment_likes'
+> insert-policies kalder can_see_post (verificeret i pg_policies), så
+> blokerede kan hverken se ELLER skrive. tg_push_like/comment/comment_like
+> behøvede derfor ingen patch. Dokumentet bevares som reference.
+
 Del A (`2026-07-10_blocked_users_del_A.sql`) er selvstændig og dækker al
 klient-synlighed via RESTRICTIVE RLS. Del B lukker hullerne i de stier der
 **bypasser RLS** (SECURITY DEFINER-funktioner og service_role). Rækkefølge:
