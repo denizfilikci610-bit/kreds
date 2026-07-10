@@ -4,7 +4,7 @@ import { el, esc, richText, avaHTML, user, grad, toast, fmtTime, fmtDate, imgUrl
 import { t, likesLabel } from "./i18n.js";
 import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, deleteComment, cInput, cKey, clearReply, clearCImg, openNativeComments, pushNativeComments } from "./comments.js";
 import { openFeedSheet, openMemberSheet } from "./kredse.js";
-import { openProfile, closeProfile, closeMemView, renderMyPosts, renderStories, refreshPv } from "./profile.js";
+import { openProfile, closeProfile, closeMemView, renderMyPosts, renderStories, refreshPv, doBlockUser } from "./profile.js";
 import { renderSearch } from "./search.js";
 import { loadNotifs, setNotifDot } from "./notifications.js";
 import { scheduleRefetch } from "./realtime.js";
@@ -534,6 +534,23 @@ export async function loadFriends(){
   state.humanFriends = hs.filter(function(h){ return h !== OFFICIAL_HANDLE; });
   el("stat-friends").textContent = state.humanFriends.length;
   await loadSentRequests();
+  await loadBlocks();
+}
+/* Mine blokerede brugere → state.blockedIds (uuids). RLS skjuler selve indholdet
+   server-side; listen bruges kun til UI-tilstande (profil/søgning/@-kandidater).
+   Fejler kaldet (tabellen ikke migreret endnu), forbliver blockReady=false og alt
+   blokerings-UI holdes skjult — web kan altså deployes FØR databasen. */
+export async function loadBlocks(){
+  if(!me){ state.blockedIds = []; state.blockReady = false; return; }
+  const { data, error } = await sb.from("blocked_users")
+    .select("blocked, blocked_profile:profiles!blocked(*)")
+    .eq("blocker", me.id);
+  if(error){ state.blockReady = false; return; }
+  state.blockReady = true;
+  state.blockedIds = (data || []).map(function(r){
+    if(r.blocked_profile) registerProfile(r.blocked_profile);
+    return r.blocked;
+  });
 }
 /* Mine udgående (endnu ikke accepterede) ven-anmodninger → state.sentRequests (handles).
    Bruges til at vise "Anmodning sendt" på profiler/søgeresultater. */
@@ -991,7 +1008,7 @@ export function closePostMenu(){
 }
 
 /* ================= Andres opslag: anmeld (⋯-menu) ================= */
-let reportPid = null;
+let reportPid = null, reportBlockH = null;
 
 // Preview-data om et opslag (til det native glas-kort — rå tekst, ingen HTML).
 function reportPreview(p){
@@ -1005,15 +1022,30 @@ function reportPreview(p){
 export function openReportMenu(id){
   reportPid = Number(id);
   const p = findPost(reportPid);
+  // Blokér-valget vises kun når DB'en er migreret (blockReady) og aldrig for den officielle profil
+  reportBlockH = (state.blockReady && p && p.u !== OFFICIAL_HANDLE) ? p.u : null;
   // App'en: ægte native Liquid Glass-kort, samme 2-trins-flow som web-modalen.
   if(window.__vfGlassCard && window.__vfSheetPost){
+    const btns = [{ label: t("rm.report"), action: "toconfirm", role: "destructive" }];
+    if(reportBlockH) btns.push({ label: t("rm.block"), action: "toblock", role: "destructive" });
+    btns.push({ label: t("common.cancel"), action: "__cancel", role: "cancel" });
     window.__vfSheetPost({
       preview: p ? reportPreview(p) : null,
-      buttons: [
-        { label: t("rm.report"), action: "toconfirm", role: "destructive" },
-        { label: t("common.cancel"), action: "__cancel", role: "cancel" }
-      ]
+      buttons: btns
     }, function(a){
+      if(a === "toblock" && reportBlockH){
+        const bh = reportBlockH;
+        // Trin 2: bekræft blokering (samme flow som web-modalens rmenu-block).
+        window.__vfSheetPost({
+          title: t("block.confirm", { name: user(bh).name }),
+          message: t("block.note"),
+          buttons: [
+            { label: t("block.do"), action: "block", role: "destructive" },
+            { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+          ]
+        }, function(b){ if(b === "block") doBlockUser(bh); });
+        return;
+      }
       if(a !== "toconfirm") return;
       // Trin 2: bekræft (som web-flowets rmenu-confirm).
       window.__vfSheetPost({
@@ -1040,13 +1072,16 @@ export function openReportMenu(id){
       prev.innerHTML = "";
     }
   }
+  el("rm-block").style.display = reportBlockH ? "" : "none";
   el("rmenu-main").style.display = "";
   el("rmenu-confirm").style.display = "none";
+  el("rmenu-block").style.display = "none";
   el("rmenu").classList.add("on");
 }
 export function closeReportMenu(){
   el("rmenu").classList.remove("on");
   reportPid = null;
+  reportBlockH = null;
 }
 let reportUndo = null; // { pid, timer } — 5-sek fortryd-vindue efter en anmeldelse
 function hideReportUndo(){
@@ -1391,11 +1426,23 @@ el("rmenu").addEventListener("click", function(e){
 });
 el("rm-cancel").addEventListener("click", closeReportMenu);
 el("rm-cancel2").addEventListener("click", closeReportMenu);
+el("rm-cancel3").addEventListener("click", closeReportMenu);
 el("rm-report").addEventListener("click", function(){
   el("rmenu-main").style.display = "none";
   el("rmenu-confirm").style.display = "";
 });
 el("rm-report2").addEventListener("click", reportPost);
+el("rm-block").addEventListener("click", function(){
+  if(!reportBlockH) return;
+  el("rm-block-title").textContent = t("block.confirm", { name: user(reportBlockH).name });
+  el("rmenu-main").style.display = "none";
+  el("rmenu-block").style.display = "";
+});
+el("rm-block2").addEventListener("click", function(){
+  const h = reportBlockH;
+  closeReportMenu();
+  if(h) doBlockUser(h);
+});
 el("undobar-btn").addEventListener("click", undoReport);
 /* ---- Kreds-medlemmer: sheet åbnes fra kredshead ---- */
 el("kredshead").addEventListener("click", function(){ openMemberSheet(); });

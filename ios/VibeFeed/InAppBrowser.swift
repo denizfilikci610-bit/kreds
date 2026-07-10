@@ -3,8 +3,8 @@ import WebKit
 
 /// I-app-fremviser til privatlivspolitikken (og andre _blank-links fra webviewet):
 /// egen WKWebView i et ark med "Færdig"-knap. Al navigation opsnappes — politik-
-/// siderne (privatliv.html/privacy.html) må vises, men ethvert link VÆK fra dem på
-/// vibefeed.dk (logoet → "/", "Tilbage til vibefeed.dk") LUKKER arket, så brugeren
+/// siderne (privatliv.html/privacy.html/vilkaar.html/terms.html) må vises, men ethvert
+/// link VÆK fra dem på vibefeed.dk (logoet → "/", "Tilbage til vibefeed.dk") LUKKER arket, så brugeren
 /// lander i APPEN igen — aldrig på hjemmesiden inde i arket. (SFSafariViewController
 /// kunne ikke dét: en rigtig browser navigerer bare videre.)
 enum InAppBrowser {
@@ -62,6 +62,7 @@ final class InAppBrowserVC: UIViewController, WKNavigationDelegate {
         if navigationAction.navigationType != .linkActivated { decisionHandler(.allow); return }
         let host = (url.host ?? "").lowercased().replacingOccurrences(of: "www.", with: "")
         let isPolicyPage = url.path.hasSuffix("/privatliv.html") || url.path.hasSuffix("/privacy.html")
+            || url.path.hasSuffix("/vilkaar.html") || url.path.hasSuffix("/terms.html")
         if host == "vibefeed.dk" && isPolicyPage { decisionHandler(.allow); return } // sprogskifte-links
         decisionHandler(.cancel)
         if host == "vibefeed.dk" || host.isEmpty {

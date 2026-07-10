@@ -143,7 +143,9 @@ final class AdsManager: NSObject, ObservableObject {
         Appodeal.setRewardedVideoDelegate(self)
         Appodeal.initialize(withApiKey: appKey, types: [.MREC, .rewardedVideo])
 
+        #if DEBUG
         if useTestAds { loadGoogleRewarded() } // DEBUG: preload a real Google test rewarded
+        #endif
     }
 
     // MARK: - Rewarded video (earns +20 like-capacity; web asks, native shows)

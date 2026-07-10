@@ -24,13 +24,18 @@ export function renderSearch(){
   }).join("");
   if(q && q === globalQ && globalResults.length){
     globalResults.forEach(function(p){
+      // Blokeret: rækken kan stadig tappes (profil -> Fjern blokering), men ingen Tilføj-knap
+      const blocked = p.id && (state.blockedIds || []).indexOf(p.id) >= 0;
       const pending = state.sentRequests.indexOf(p.handle) >= 0;
       html += '<div class="listrow tap" data-open="'+esc(p.handle)+'">'+
                 avaHTML(p.handle, 44)+
                 '<div class="grow"><div class="l1">'+esc(p.name || p.handle)+'</div>'+
-                '<button class="addaction'+(pending ? " pending" : "")+'" data-add="'+esc(p.handle)+'">'+
-                  (pending ? t("search.requested") : t("search.add", { h: esc(p.handle) }))+
-                '</button></div>'+
+                (blocked
+                  ? '<div class="l2">'+t("pv.blocked")+'</div>'
+                  : '<button class="addaction'+(pending ? " pending" : "")+'" data-add="'+esc(p.handle)+'">'+
+                      (pending ? t("search.requested") : t("search.add", { h: esc(p.handle) }))+
+                    '</button>')+
+                '</div>'+
               '</div>';
     });
   }

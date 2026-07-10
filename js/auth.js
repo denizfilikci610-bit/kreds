@@ -1,10 +1,10 @@
 import { sb, recoveryMode, setRecoveryMode } from "./config.js";
-import { t, getLang, setLang, policyURL } from "./i18n.js";
+import { t, getLang, setLang, policyURL, termsURL } from "./i18n.js";
 import { me, setMe, state, FRIEND_SINCE, pv, expandedCmts, clearComposers, setCfilePid } from "./store.js";
 import { el, registerProfile, toast, getConsent, showConsentGate } from "./helpers.js";
 import { loadFriends, loadFeeds, loadPosts, feedById, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu, closeReportMenu, resetFeedbarSearch, resetTapState, resetBarHide, clearUnseenFeeds } from "./feed.js";
 import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPost, resetPoll } from "./compose.js";
-import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet, closeUnfriendMenu } from "./profile.js";
+import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet, closeUnfriendMenu, closeBlockMenu } from "./profile.js";
 import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
 import { closeLightbox } from "./lightbox.js";
 import { subscribeRealtime, unsubscribeRealtime } from "./realtime.js";
@@ -37,6 +37,7 @@ export function setAuthMode(mode){
   el("auth-toggle").textContent = mode === "login" ? t("auth.toggle_login") : t("auth.toggle_signup");
   /* Politik-linjen under opret-knappen (kun statiske i18n-tekster — ingen brugerdata) */
   el("su-policy").innerHTML = t("signup.accept", {
+    terms: '<a href="'+termsURL()+'" target="_blank" rel="noopener">'+t("signup.terms")+'</a>',
     link: '<a href="'+policyURL()+'" target="_blank" rel="noopener">'+t("signup.policy")+'</a>'
   });
   el("li-err").textContent = "";
@@ -196,6 +197,7 @@ export function resetApp(){
   closePostMenu();
   closeReportMenu();
   closeUnfriendMenu();
+  closeBlockMenu();
   closeCompose();
   closeProfile();
   closeLightbox();

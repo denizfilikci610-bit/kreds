@@ -49,6 +49,7 @@ function candidateHandles(feedId, extra){
   function add(h){
     if(!h || seen.has(h) || (me && h === me.handle)) return;
     if(!USERS[h] || !USERS[h].id) return; // kun rigtige, registrerede profiler
+    if((state.blockedIds || []).indexOf(USERS[h].id) >= 0) return; // aldrig blokerede
     seen.add(h);
     out.push(h);
   }

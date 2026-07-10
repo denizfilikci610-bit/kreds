@@ -294,13 +294,31 @@ function pvIsFriend(h){
 /* Relations-linjen: venner (og botten) ser "I din kreds siden …" + en lille grå
    "Fjern ven"-knap (aldrig på egen profil eller den officielle bot);
    ikke-venner ser en rød "Tilføj til din kreds"-chip i stedet */
+function pvIsBlocked(h){
+  const u = user(h);
+  return !!(u.id && (state.blockedIds || []).indexOf(u.id) >= 0);
+}
 function renderPvRelation(h){
-  const since = el("pv-since"), add = el("pv-add"), unf = el("pv-unfriend");
+  const since = el("pv-since"), add = el("pv-add"), unf = el("pv-unfriend"),
+        blk = el("pv-block"), unb = el("pv-unblock");
+  const other = !!(me && h !== me.handle && h !== OFFICIAL_HANDLE);
+  if(pvIsBlocked(h)){
+    // Blokeret: kun "Fjern blokering" (administrationen ER profilen — Instagram-stil)
+    since.style.display = "none";
+    add.style.display = "none";
+    unf.style.display = "none";
+    blk.style.display = "none";
+    unb.style.display = "";
+    unb.disabled = false;
+    return;
+  }
+  unb.style.display = "none";
+  blk.style.display = (other && state.blockReady) ? "" : "none";
   if(pvIsFriend(h)){
     since.style.display = "";
     since.textContent = t("pv.since", { year: FRIEND_SINCE[h] || user(h).since || t("pv.today") });
     add.style.display = "none";
-    unf.style.display = (me && h !== me.handle && h !== OFFICIAL_HANDLE) ? "" : "none";
+    unf.style.display = other ? "" : "none";
   } else {
     since.style.display = "none";
     add.style.display = "";
@@ -361,7 +379,76 @@ async function doRemoveFriend(){
   if(pv.u === h && el("profileview").classList.contains("on")) await openProfile(h);
   toast(t("friend.removed", { name: user(h).name }));
 }
+/* ---- Blokér bruger (Apple 1.2) — samme popup-mønster som Fjern ven ---- */
+let bmHandle = null;
+export function openBlockMenu(h){
+  bmHandle = h;
+  // App'en: ægte native Liquid Glass-kort i stedet for web-modalen.
+  if(window.__vfGlassCard && window.__vfSheetPost){
+    window.__vfSheetPost({
+      title: t("block.confirm", { name: user(h).name }),
+      message: t("block.note"),
+      buttons: [
+        { label: t("block.do"), action: "block", role: "destructive" },
+        { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+      ]
+    }, function(a){ if(a === "block") doBlockUser(h); });
+    return;
+  }
+  el("bm-title").textContent = t("block.confirm", { name: user(h).name });
+  el("bm-confirm").disabled = false;
+  el("bmenu").classList.add("on");
+}
+export function closeBlockMenu(){
+  el("bmenu").classList.remove("on");
+  bmHandle = null;
+}
+export async function doBlockUser(h){
+  if(!me || !h || !user(h).id || h === me.handle || h === OFFICIAL_HANDLE) return;
+  const btn = el("bm-confirm");
+  if(btn.disabled) return;
+  btn.disabled = true;
+  const { error } = await sb.rpc("block_user", { target: user(h).id });
+  btn.disabled = false;
+  closeBlockMenu();
+  if(error){
+    console.error(error);
+    toast(t("err.generic"));
+    return;
+  }
+  // Serveren har kappet venskab/anmodninger/invitationer — spejl det lokalt
+  delete FRIEND_SINCE[h];
+  const i = state.sentRequests.indexOf(h);
+  if(i >= 0) state.sentRequests.splice(i, 1);
+  if(el("memview").classList.contains("on")) closeMemView();
+  await loadFriends();   // henter også blocked-listen (loadBlocks)
+  await loadPosts();     // RLS fjerner indholdet begge veje
+  renderStories();
+  if(el("view-search").classList.contains("active")) renderSearch();
+  // Profilen gen-renderes til blokeret-tilstand (med Fjern blokering-chip)
+  if(pv.u === h && el("profileview").classList.contains("on")) await openProfile(h);
+  toast(t("block.done", { name: user(h).name }));
+}
+export async function doUnblockUser(h){
+  if(!me || !h || !user(h).id) return;
+  const btn = el("pv-unblock");
+  btn.disabled = true;
+  const { error } = await sb.rpc("unblock_user", { target: user(h).id });
+  btn.disabled = false;
+  if(error){
+    console.error(error);
+    toast(t("err.generic"));
+    return;
+  }
+  await loadFriends();
+  await loadPosts();
+  renderStories();
+  if(el("view-search").classList.contains("active")) renderSearch();
+  if(pv.u === h && el("profileview").classList.contains("on")) await openProfile(h);
+  toast(t("block.undone"));
+}
 function pvEmptyNote(h){
+  if(pvIsBlocked(h)) return '<div class="emptynote">'+t("pv.empty_blocked")+'</div>';
   return '<div class="emptynote">'+(pvIsFriend(h) ? t("pv.empty_friend") : t("pv.empty_stranger"))+'</div>';
 }
 export async function openProfile(h){
@@ -387,9 +474,9 @@ export async function openProfile(h){
   el("pv-stat-kredse").textContent = "–";
   el("pv-ava").innerHTML = avaHTML(h, 86);
   renderPvRelation(h);
-  /* "Se aktivitet" — skjules på egen profil og for den officielle bot */
+  /* "Se aktivitet" — skjules på egen profil, for den officielle bot og for blokerede */
   const act = el("pv-act");
-  act.style.display = (me && h !== me.handle && h !== OFFICIAL_HANDLE) ? "" : "none";
+  act.style.display = (me && h !== me.handle && h !== OFFICIAL_HANDLE && !pvIsBlocked(h)) ? "" : "none";
   act.disabled = false;
   el("pv-posts").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
   el("pv-body").scrollTop = 0;
@@ -631,6 +718,25 @@ el("ufmenu").addEventListener("click", function(e){
 });
 el("uf-cancel").addEventListener("click", closeUnfriendMenu);
 el("uf-confirm").addEventListener("click", doRemoveFriend);
+/* ---- Blokér/fjern blokering (profilvisningen) ---- */
+el("pv-block").addEventListener("click", function(){
+  const h = pv.u;
+  if(!me || !h || h === me.handle || h === OFFICIAL_HANDLE) return;
+  openBlockMenu(h);
+});
+el("pv-unblock").addEventListener("click", function(){
+  const h = pv.u;
+  if(!me || !h || this.disabled) return;
+  doUnblockUser(h);
+});
+el("bmenu").addEventListener("click", function(e){
+  if(e.target === el("bmenu")) closeBlockMenu();
+});
+el("bm-cancel").addEventListener("click", closeBlockMenu);
+el("bm-confirm").addEventListener("click", function(){
+  const h = bmHandle;
+  if(h) doBlockUser(h);
+});
 /* ---- Ikke-ven: "Tilføj til din kreds" sender en anmodning; tryk igen fortryder ---- */
 el("pv-add").addEventListener("click", async function(){
   const h = pv.u;

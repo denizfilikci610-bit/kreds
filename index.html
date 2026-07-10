@@ -235,8 +235,10 @@
         <div class="bio" id="pv-bio" style="display:none"></div>
         <div class="since" id="pv-since"></div>
         <button class="pv-add" id="pv-add" style="display:none">Tilføj til din kreds</button>
+        <button class="pv-add" id="pv-unblock" style="display:none" data-i18n="pv.unblock">Fjern blokering</button>
         <button class="pv-actbtn" id="pv-act" style="display:none" data-i18n="pv.act">Se aktivitet</button>
         <button class="pv-unfriend" id="pv-unfriend" style="display:none" data-i18n="pv.remove">Fjern ven</button>
+        <button class="pv-unfriend" id="pv-block" style="display:none" data-i18n="pv.block">Blokér</button>
       </div>
       <div class="ptl" data-i18n="stats.posts">Opslag</div>
       <div id="pv-posts"></div>
@@ -373,6 +375,7 @@
         <div class="mgroup">
           <div class="mprev" id="rm-prev"></div>
           <button class="mrow danger" id="rm-report" data-i18n="rm.report">Anmeld opslag</button>
+          <button class="mrow danger" id="rm-block" data-i18n="rm.block">Blokér brugeren</button>
         </div>
         <button class="mrow mcancel" id="rm-cancel" data-i18n="common.cancel">Annuller</button>
       </div>
@@ -383,6 +386,14 @@
           <button class="mrow danger" id="rm-report2" data-i18n="rm.do">Anmeld</button>
         </div>
         <button class="mrow mcancel" id="rm-cancel2" data-i18n="common.cancel">Annuller</button>
+      </div>
+      <div id="rmenu-block" class="mstep" style="display:none">
+        <div class="mgroup">
+          <div class="mtitle" id="rm-block-title"></div>
+          <p class="mtext" data-i18n="block.note">I ser ikke længere hinandens opslag, kommentarer og profiler, og jeres venskab og anmodninger fjernes. Personen får ikke besked.</p>
+          <button class="mrow danger" id="rm-block2" data-i18n="block.do">Blokér</button>
+        </div>
+        <button class="mrow mcancel" id="rm-cancel3" data-i18n="common.cancel">Annuller</button>
       </div>
     </div>
   </div>
@@ -395,6 +406,18 @@
         <button class="mrow danger" id="uf-confirm" data-i18n="pv.remove">Fjern ven</button>
       </div>
       <button class="mrow mcancel" id="uf-cancel" data-i18n="common.cancel">Annuller</button>
+    </div>
+  </div>
+
+  <!-- Blokér bruger (popup, åbnes fra profilen — rapport-menuen har sit eget trin) -->
+  <div class="modal sheet" id="bmenu" role="dialog" aria-label="Blokér bruger" data-i18n-aria="pv.block">
+    <div class="modal-card">
+      <div class="mgroup">
+        <div class="mtitle" id="bm-title"></div>
+        <p class="mtext" data-i18n="block.note">I ser ikke længere hinandens opslag, kommentarer og profiler, og jeres venskab og anmodninger fjernes. Personen får ikke besked.</p>
+        <button class="mrow danger" id="bm-confirm" data-i18n="block.do">Blokér</button>
+      </div>
+      <button class="mrow mcancel" id="bm-cancel" data-i18n="common.cancel">Annuller</button>
     </div>
   </div>
 

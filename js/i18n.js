@@ -328,6 +328,18 @@ const DA = {
   "rm.note": "Ved 10 anmeldelser skjules det for alle.",
   "rm.do": "Anmeld",
 
+  /* Blokering */
+  "rm.block": "Blokér brugeren",
+  "block.confirm": "Blokér {name}?",
+  "block.note": "I ser ikke længere hinandens opslag, kommentarer og profiler, og jeres venskab og anmodninger fjernes. Personen får ikke besked.",
+  "block.do": "Blokér",
+  "block.done": "{name} er blokeret",
+  "block.undone": "Blokeringen er fjernet",
+  "pv.block": "Blokér",
+  "pv.unblock": "Fjern blokering",
+  "pv.blocked": "Blokeret",
+  "pv.empty_blocked": "Du har blokeret denne bruger.",
+
   /* Slet konto */
   "del.title": "Slet konto",
   "del.sure": "Er du sikker?",
@@ -416,8 +428,9 @@ const DA = {
   "ep.ads_limited": "Kun ikke-personlige",
 
   /* Signup */
-  "signup.accept": "Ved at oprette en profil accepterer du vores {link}",
-  "signup.policy": "privatlivspolitik"
+  "signup.accept": "Ved at oprette en profil accepterer du vores {terms} og {link}",
+  "signup.policy": "privatlivspolitik",
+  "signup.terms": "vilkår"
 };
 
 const EN = {
@@ -738,6 +751,18 @@ const EN = {
   "rm.note": "After 10 reports it's hidden for everyone.",
   "rm.do": "Report",
 
+  /* Blocking */
+  "rm.block": "Block user",
+  "block.confirm": "Block {name}?",
+  "block.note": "You'll no longer see each other's posts, comments and profiles, and your friendship and requests are removed. They won't be notified.",
+  "block.do": "Block",
+  "block.done": "{name} is blocked",
+  "block.undone": "Block removed",
+  "pv.block": "Block",
+  "pv.unblock": "Unblock",
+  "pv.blocked": "Blocked",
+  "pv.empty_blocked": "You've blocked this user.",
+
   /* Delete account */
   "del.title": "Delete account",
   "del.sure": "Are you sure?",
@@ -826,8 +851,9 @@ const EN = {
   "ep.ads_limited": "Only non-personalized",
 
   /* Signup */
-  "signup.accept": "By creating a profile you accept our {link}",
-  "signup.policy": "privacy policy"
+  "signup.accept": "By creating a profile you accept our {terms} and {link}",
+  "signup.policy": "privacy policy",
+  "signup.terms": "terms of use"
 };
 
 const DICT = { da: DA, en: EN };
@@ -872,6 +898,9 @@ export function initI18n(cb){
 
 /* Sprogafhængig URL til privatlivspolitikken (statisk side pr. sprog) */
 export function policyURL(){ return lang === "da" ? "/privatliv.html" : "/privacy.html"; }
+
+/* Sprogafhængig URL til vilkårene (statisk side pr. sprog) */
+export function termsURL(){ return lang === "da" ? "/vilkaar.html" : "/terms.html"; }
 
 /* Statisk markup: data-i18n (textContent), data-i18n-ph (placeholder),
    data-i18n-aria (aria-label), data-i18n-title (title), data-i18n-alt (alt) */
