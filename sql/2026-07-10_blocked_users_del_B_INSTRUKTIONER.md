@@ -6,8 +6,20 @@
 > (`blocked_users_del_b4_b6_rpc_guards`), B7 = notif-poll **v31**.
 > B1-noten om insert-vejene BEKRÆFTET: likes/comments/comment_likes'
 > insert-policies kalder can_see_post (verificeret i pg_policies), så
-> blokerede kan hverken se ELLER skrive. tg_push_like/comment/comment_like
-> behøvede derfor ingen patch. Dokumentet bevares som reference.
+> blokerede kan hverken se ELLER skrive. Dokumentet bevares som reference.
+>
+> **POST-DEPLOY-AUDIT (4 read-only-revisorer, 41 checks) fandt 4 afvigelser —
+> alle lukket i migrationerne `blocked_users_audit_fixes` +
+> `fix_tg_push_comment_like_args`:** (1) kommentar-mentions gatede kun mod
+> OPSLAGETS forfatter → extract_mentions gater nu author↔mentioned direkte;
+> (2) reply-pushen var nåelig på tværs af blokering via direkte API
+> (parent_id valideres ikke af comments_insert) → tg_push_comment fik
+> modtager-guard i begge grene; (3) alle øvrige tg_push_* fik defensive
+> modtager-guards; (4) anon havde EXECUTE på block_user/unblock_user via
+> Supabases default privileges → revoked. OBS-LÆRING: notify_push SKAL
+> kaldes med alle 7 args — et manglende fid-null binder cid (bigint) til
+> fid (uuid) og fejler først ved RUNTIME (plpgsql validerer ikke ved CREATE).
+> Røgtestet: mention-gate begge veje + alle triggers kørt uden fejl.
 
 Del A (`2026-07-10_blocked_users_del_A.sql`) er selvstændig og dækker al
 klient-synlighed via RESTRICTIVE RLS. Del B lukker hullerne i de stier der
