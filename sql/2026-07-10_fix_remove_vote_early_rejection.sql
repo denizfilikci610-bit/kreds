@@ -1,0 +1,24 @@
+-- ============================================================================
+-- STATUS: KØRT i produktion 2026-07-10 (migration 'fix_remove_vote_early_rejection')
+-- og verificeret med 17 assertions (rollback-test: alle 3 afstemningstyper,
+-- vagter, stemme-ændringer, deadline). Filen er DOKUMENTATION.
+-- ============================================================================
+-- FEJL (ejer-rapporteret): 'remove'-afstemninger ("Skal X ud af kredsen?") havde
+-- en veto-regel — én enkelt Nej-stemme lukkede afstemningen ØJEBLIKKELIGT som
+-- Afvist, og Vedtaget krævede at ALLE stemmeberettigede stemte Ja:
+--
+--   if prop.kind = 'remove' then
+--     if nej > 0 then do_resolve := true; passed := false;
+--     elsif p_force or (ja + nej) >= eligible then
+--       do_resolve := true; passed := (eligible > 0 and ja >= eligible); end if;
+--
+-- FIX: 'remove' følger nu SAMME regel som 'add' — afstemningen slutter ved
+-- 10-min-deadlinen (p_force via close_due_votes, kaldes når en kreds åbnes)
+-- ELLER når alle stemmeberettigede har stemt, og FLERTALLET afgør:
+--
+--   if p_force or (ja + nej) >= eligible then
+--     do_resolve := true; passed := (ja > nej); end if;
+--
+-- Stemmeberettigede = kredsens medlemmer minus målet og forslagsstilleren
+-- (guard_proposal_vote afviser deres stemmer; uændret). 'owner'-grenen uændret.
+-- Den fulde nye funktionskrop ligger i migrationen i Supabase.
