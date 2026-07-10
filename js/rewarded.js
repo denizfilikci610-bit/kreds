@@ -10,6 +10,7 @@ import { me } from "./store.js";
 import { el, toast } from "./helpers.js";
 import { t, likesLabel } from "./i18n.js";
 import { loadQuota } from "./feed.js";
+import { ADS_LIVE } from "./ads.js";
 
 const OFFER_KEY = "vf_reward_offer";          // sidste gang pop-up'en blev vist (ms)
 const OFFER_COOLDOWN = 60 * 60 * 1000;        // 1 time
@@ -17,7 +18,10 @@ const OFFER_COOLDOWN = 60 * 60 * 1000;        // 1 time
 function bridge(){
   return (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed) || null;
 }
-function available(){ return !!bridge() && !!me; }
+/* Video-tilbuddet følger annonce-kill-switchen: uden fill ville "Se video"
+   bare give "ikke klar"-toasten hver gang. Chippen falder pænt tilbage til
+   saldo-toasten (samme som i browseren). */
+function available(){ return ADS_LIVE && !!bridge() && !!me; }
 
 let pending = false; // venter på belønnings-svar fra native
 

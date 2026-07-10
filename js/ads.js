@@ -13,6 +13,13 @@ import { el, getConsent } from "./helpers.js";
    Ét sted at ændre kadencen. */
 export const AD_EVERY = 3;
 
+/* KILL-SWITCH: Appodeal serverer først rigtige annoncer når appen ER live på
+   App Store og godkendt i deres dashboard. Indtil da ville Release-builds vise
+   TOMME "Promovering"-kort (gråt hul uden annonce) — grimt for både TestFlight-
+   brugere og Apple-review. false = ingen annonce-kort og ingen video-tilbud.
+   NÅR APPODEAL ER GODKENDT EFTER LAUNCH: sæt til true og deploy web. */
+export const ADS_LIVE = false;
+
 function bridge(){
   return (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed) || null;
 }
@@ -20,7 +27,7 @@ function bridge(){
 /* Reklamer kører kun i appen (bro til stede) og når samtykke er givet.
    Begge samtykke-valg viser reklamer — kun personaliseringen adskiller sig. */
 export function adsEnabled(){
-  return !!bridge() && !!getConsent();
+  return ADS_LIVE && !!bridge() && !!getConsent();
 }
 
 /* Slot-markup: et OPSLAGS-lignende kort — profil-header (avatar + "Promovering" +
