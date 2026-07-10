@@ -1226,8 +1226,27 @@
     display:flex;align-items:center;justify-content:center;
     transition:opacity .35s ease;
   }
-  .splash .wordmark{font-size:44px}
   .splash.gone{opacity:0;pointer-events:none}
+  /* Brand: "prikken afslører navnet" — den røde prik lander (pop) og skubber navnet frem.
+     Animeres KUN ved kold start (body.splash-anim); reloads får den statiske splash. */
+  .sp-brand{display:flex;align-items:flex-end;justify-content:center}
+  .sp-name{
+    font-family:Georgia,"Times New Roman",serif;font-weight:800;font-size:44px;color:var(--ink);
+    letter-spacing:-.5px;line-height:1;white-space:nowrap;overflow:hidden;max-width:300px;
+  }
+  .sp-dot{width:12px;height:12px;border-radius:50%;background:var(--red);margin:0 0 5px 3px;flex:0 0 auto}
+  body.splash-anim .sp-dot{animation:spdot .5s cubic-bezier(.34,1.56,.64,1) both}
+  body.splash-anim .sp-name{max-width:0;animation:spname .75s cubic-bezier(.22,.9,.24,1) .55s forwards}
+  @keyframes spdot{from{transform:scale(0)}60%{transform:scale(1.35)}to{transform:scale(1)}}
+  @keyframes spname{to{max-width:300px}}
+  /* Sprog-skift direkte på login-skærmen (gættes automatisk fra enheden ved første start) */
+  .auth-lang{
+    position:absolute;top:calc(14px + env(safe-area-inset-top));right:16px;z-index:1;
+    padding:7px 14px;border-radius:999px;
+    border:1px solid var(--line);color:var(--gray);
+    font-size:13px;font-weight:800;letter-spacing:.04em;
+  }
+  .auth-lang:active{opacity:.6}
 
   /* ---- Auth ---- */
   .authview{
@@ -1309,6 +1328,17 @@
   .consentview.on{display:flex}
   .consentview .consent-inner{margin:auto;width:100%;max-width:420px;display:flex;flex-direction:column}
   .consentview .wordmark{font-size:44px;text-align:center}
+  /* Reklame-valget som ARK over feedet (vises efter login/oprettelse — ikke en væg før appen) */
+  .consentview.as-sheet{background:rgba(0,0,0,.45);justify-content:flex-end;padding:0}
+  .consentview.as-sheet .consent-inner{
+    margin:0;width:100%;max-width:none;
+    background:var(--bg);border-radius:22px 22px 0 0;
+    padding:24px 24px calc(20px + env(safe-area-inset-bottom));
+  }
+  .consentview.as-sheet.on .consent-inner{animation:consentup .34s cubic-bezier(.2,.8,.25,1)}
+  .consentview.as-sheet .wordmark{display:none}
+  .consentview.as-sheet .consent-title{margin-top:0}
+  @keyframes consentup{from{transform:translateY(45%)}}
   .consent-title{text-align:center;font-weight:800;font-size:17px;color:var(--ink);margin-top:26px}
   .consent-text{text-align:center;color:var(--gray);font-size:14.5px;line-height:1.5;margin-top:8px}
   .consent-policy{

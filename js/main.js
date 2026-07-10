@@ -1,6 +1,6 @@
 import { sb, recoveryMode, recoveryLinkError } from "./config.js";
 import { me, curTab } from "./store.js";
-import { el, toast, getConsent, setConsent } from "./helpers.js";
+import { el, toast } from "./helpers.js";
 import { t, initI18n, setLang, hasStoredLang } from "./i18n.js";
 import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, loadQuota, setFeed, nativeKredsState } from "./feed.js";
 import { initComments, nativeCommentsAction } from "./comments.js";
@@ -172,50 +172,24 @@ if(window.__vfNative){
   syncNative();
 }
 
-/* ================= Fælles gate-hjælper (langview/consentview) =================
-   Modal for alvor: appen bag porten gøres inert (fokus + a11y-træ), og fokus
-   flyttes til portens primære knap. inert fjernes igen før resolve(). */
-function showGate(viewId, focusSel, pickSel, onPickBtn){
-  return new Promise(function(resolve){
-    const gv = el(viewId);
-    gv.classList.add("on");
-    el("app").inert = true;
-    const first = gv.querySelector(focusSel);
-    if(first) first.focus();
-    gv.addEventListener("click", function onPick(e){
-      const b = e.target.closest(pickSel);
-      if(!b) return;
-      onPickBtn(b);
-      gv.classList.remove("on");
-      gv.removeEventListener("click", onPick);
-      el("app").inert = false;
-      resolve();
-    });
-  });
-}
-
-/* ================= Sprogvalg (kun første start — vf_lang mangler) ================= */
-function showLangPicker(){
-  return showGate("langview", "[data-lang]", "[data-lang]", function(b){
-    setLang(b.dataset.lang);
-  });
-}
-
-/* ================= Reklame-samtykke (vises én gang — vf_consent mangler) ================= */
-function showConsentGate(){
-  return showGate("consentview", "#consent-personal", "#consent-personal, #consent-limited", function(b){
-    setConsent(b.id === "consent-personal" ? "personal" : "limited");
-  });
-}
-
 /* ================= Init ================= */
+/* Brand-animationen ("prikken afslører navnet") kører kun ved KOLD start (ny session) —
+   reloads (pull-to-refresh) får den statiske splash uden ventetid. */
+try{
+  if(!sessionStorage.getItem("vf_splashed")){
+    sessionStorage.setItem("vf_splashed", "1");
+    document.body.classList.add("splash-anim");
+  }
+}catch(_e){}
 window.addEventListener("hashchange", function(){
   if(/type=recovery|error_code=|access_token=/.test(location.hash)) location.reload();
 });
 setTabIcons("feed");
 (async function init(){
-  if(!hasStoredLang()) await showLangPicker(); // FØR auth/boot — intet skip
-  if(!getConsent()) await showConsentGate();   // efter sprogvalget — ingen lukning uden valg
+  // Sproget gættes fra enheden (dansk enhed → dansk, ellers engelsk) — ingen gate-side.
+  // Kan skiftes med DA/EN-knappen på login-skærmen og i Rediger profil.
+  // (Reklame-samtykket vises som ark ved FØRSTE feed-besøg efter login — se boot() i auth.js.)
+  if(!hasStoredLang()) setLang(/^da/i.test(navigator.language || "") ? "da" : "en");
   // Universal-link-landing: mail-links peger direkte på vibefeed.dk/?token_hash=…&type=…
   // (så iOS kan åbne APPEN i stedet for Safari). Tokenet veksles med verifyOtp — virker i
   // enhver browser/app-kontekst, uafhængigt af hvor mailen blev bestilt.

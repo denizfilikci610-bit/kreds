@@ -414,12 +414,17 @@
   </div>
 
   <!-- Boot-splash: dækker den tomme app-skal under (gen)indlæsning, fader væk når appen er klar -->
+  <!-- Boot-splash. Ved KOLD start (body.splash-anim) spiller brand-animationen:
+       den røde prik lander først og "skubber" navnet frem; reloads får statisk splash. -->
   <div class="splash" id="splash">
-    <div class="wordmark">VibeFeed<span class="prik">.</span></div>
+    <div class="sp-brand" role="img" aria-label="VibeFeed">
+      <span class="sp-name">VibeFeed</span><span class="sp-dot"></span>
+    </div>
   </div>
 
   <!-- Auth -->
   <div class="authview" id="authview">
+    <button type="button" class="auth-lang" id="auth-lang" aria-label="Sprog / Language">EN</button>
     <div class="auth-inner">
     <div class="wordmark">VibeFeed<span class="prik">.</span></div>
     <div class="auth-tag" data-i18n="auth.tag">Ingen algoritme. Bare din kreds.</div>
@@ -472,18 +477,9 @@
     </div>
   </div>
 
-  <!-- Sprogvalg (kun første start — før auth/boot) -->
-  <div class="langview" id="langview" role="dialog" aria-modal="true" aria-label="Vælg sprog · Choose language">
-    <div class="lang-inner">
-      <div class="wordmark">VibeFeed<span class="prik">.</span></div>
-      <div class="lang-tag" data-i18n="lang.title">Vælg sprog · Choose language</div>
-      <button class="lang-btn" type="button" data-lang="da">Dansk</button>
-      <button class="lang-btn" type="button" data-lang="en">English</button>
-    </div>
-  </div>
-
-  <!-- Reklame-samtykke (vises én gang — efter sprogvalget, før appen) -->
-  <div class="consentview" id="consentview" role="dialog" aria-modal="true" aria-label="Reklamer & privatliv" data-i18n-aria="consent.title">
+  <!-- Reklame-samtykke: vises som ARK over feedet ved FØRSTE besøg efter login/oprettelse
+       (sproget gættes automatisk fra enheden — DA/EN-knappen sidder på login-skærmen) -->
+  <div class="consentview as-sheet" id="consentview" role="dialog" aria-modal="true" aria-label="Reklamer & privatliv" data-i18n-aria="consent.title">
     <div class="consent-inner">
       <div class="wordmark">VibeFeed<span class="prik">.</span></div>
       <div class="consent-title" data-i18n="consent.title">Reklamer & privatliv</div>

@@ -1,7 +1,7 @@
 import { sb, recoveryMode, setRecoveryMode } from "./config.js";
-import { t, getLang, policyURL } from "./i18n.js";
+import { t, getLang, setLang, policyURL } from "./i18n.js";
 import { me, setMe, state, FRIEND_SINCE, pv, expandedCmts, clearComposers, setCfilePid } from "./store.js";
-import { el, registerProfile, toast, getConsent } from "./helpers.js";
+import { el, registerProfile, toast, getConsent, showConsentGate } from "./helpers.js";
 import { loadFriends, loadFeeds, loadPosts, feedById, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu, closeReportMenu, resetFeedbarSearch, resetTapState, resetBarHide, clearUnseenFeeds } from "./feed.js";
 import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPost, resetPoll } from "./compose.js";
 import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet, closeUnfriendMenu } from "./profile.js";
@@ -33,6 +33,7 @@ export function setAuthMode(mode){
   el("auth-confirm").style.display = mode === "confirm" ? "flex" : "none";
   el("auth-alt").style.display = (mode === "login" || mode === "signup") ? "" : "none";
   el("auth-alt-txt").textContent = mode === "login" ? t("auth.alt_login") : t("auth.alt_signup");
+  el("auth-lang").textContent = getLang() === "da" ? "EN" : "DA"; // chippen viser MÅL-sproget
   el("auth-toggle").textContent = mode === "login" ? t("auth.toggle_login") : t("auth.toggle_signup");
   /* Politik-linjen under opret-knappen (kun statiske i18n-tekster — ingen brugerdata) */
   el("su-policy").innerHTML = t("signup.accept", {
@@ -52,7 +53,13 @@ export function refreshAuthMode(){ setAuthMode(authMode); }
 // så et reload aldrig blotter den tomme app-skal mens data hentes.
 export function hideSplash(){
   const s = el("splash");
-  if(s) s.classList.add("gone");
+  if(!s) return;
+  // Brand-animationen (kold start, body.splash-anim) skal nå at spille færdig, før
+  // splashen fader — reloads (statisk splash) har ingen ventetid.
+  const wait = document.body.classList.contains("splash-anim")
+    ? Math.max(0, 1600 - performance.now())
+    : 0;
+  setTimeout(function(){ s.classList.add("gone"); }, wait);
 }
 export function showAuth(msg){
   hideSplash();
@@ -156,6 +163,10 @@ export async function boot(session){
   hideAuth();
   hideSplash(); // appen står nu færdig på rette fane + kreds → fad splashen væk
   pushNativeCreds(); // fire-and-forget — kun i WKWebView'en
+  // Reklame-valget (flyttet fra førstegangs-gaten): ark over feedet ved FØRSTE besøg
+  // efter login/oprettelse. Ingen await — arket er modalt (inert) og styrer sig selv;
+  // reklamerne starter først når valget er truffet.
+  if(!getConsent()) showConsentGate();
 }
 export function resetApp(){
   nativeLogout(); // no-op hvis allerede kaldt før signOut (nøglen er fjernet)
@@ -229,6 +240,11 @@ el("auth-toggle").addEventListener("click", function(){
 el("li-forgot").addEventListener("click", function(){
   setAuthMode("reset");
   el("fp-email").value = el("li-email").value.trim();
+});
+el("auth-lang").addEventListener("click", function(){
+  // initI18n-callback'en (main.js) gen-render'er auth-teksterne, og setAuthMode
+  // (via refreshAuthMode) opdaterer chippen til det nye mål-sprog
+  setLang(getLang() === "da" ? "en" : "da");
 });
 el("fp-back").addEventListener("click", function(){
   setAuthMode("login");
