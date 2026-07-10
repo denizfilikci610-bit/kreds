@@ -546,19 +546,25 @@
   /* @-mention i opslag/captions/kommentarer: klikbart handle i brand-farven */
   .mention{display:inline;padding:0;font:inherit;color:var(--red);font-weight:700}
   .mention:active{opacity:.6}
-  /* @-autocomplete-dropdown (mentions.js — ét delt, fixed-positioneret) */
+  /* @-autocomplete: VANDRET chip-strip (matcher det native minde-sheets tag-vælger) —
+     store touch-venlige piller m. avatar + @navn der scroller side til side, OVER feltet */
   .mdrop{
     display:none;position:fixed;z-index:260;
-    max-height:216px;overflow-y:auto;
-    background:var(--bg);border:1px solid var(--line);border-radius:12px;
+    overflow-x:auto;overflow-y:hidden;white-space:nowrap;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none;
+    padding:6px;border-radius:999px;
+    background:var(--bg);border:1px solid var(--line);
     box-shadow:0 8px 28px rgba(0,0,0,.16);
   }
-  .mitem{display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;text-align:left}
-  .mitem:active{background:var(--chip)}
+  .mdrop::-webkit-scrollbar{display:none;width:0;height:0}
+  .mitem{
+    display:inline-flex;align-items:center;gap:7px;vertical-align:top;
+    padding:5px 13px 5px 6px;margin-right:6px;border-radius:999px;
+    background:var(--chip);font-size:13.5px;font-weight:700;color:var(--ink);
+  }
+  .mitem:last-child{margin-right:0}
+  .mitem:active{opacity:.6}
   .mitem .av{flex:0 0 auto;display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:700;object-fit:cover}
-  .mitem .mi-col{display:flex;flex-direction:column;min-width:0}
-  .mitem .mi-col b{font-size:13.5px;color:var(--ink)}
-  .mitem .mi-col span{font-size:12px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .cimg{display:block;margin-top:5px;max-height:180px;max-width:70%;border-radius:8px;object-fit:cover;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
   .cmeta{display:flex;align-items:center;gap:12px;margin-top:3px;font-size:12px;color:var(--gray)}
   .cmeta .csvar{font-size:12px;font-weight:700;color:var(--gray);padding:0}
@@ -1227,18 +1233,13 @@
     transition:opacity .35s ease;
   }
   .splash.gone{opacity:0;pointer-events:none}
-  /* Brand: "prikken afslører navnet" — den røde prik lander (pop) og skubber navnet frem.
-     Animeres KUN ved kold start (body.splash-anim); reloads får den statiske splash. */
+  /* Statisk brand på splashen (ejeren fravalgte animationen) */
   .sp-brand{display:flex;align-items:flex-end;justify-content:center}
   .sp-name{
     font-family:Georgia,"Times New Roman",serif;font-weight:800;font-size:44px;color:var(--ink);
-    letter-spacing:-.5px;line-height:1;white-space:nowrap;overflow:hidden;max-width:300px;
+    letter-spacing:-.5px;line-height:1;white-space:nowrap;
   }
   .sp-dot{width:12px;height:12px;border-radius:50%;background:var(--red);margin:0 0 5px 3px;flex:0 0 auto}
-  body.splash-anim .sp-dot{animation:spdot .5s cubic-bezier(.34,1.56,.64,1) both}
-  body.splash-anim .sp-name{max-width:0;animation:spname .75s cubic-bezier(.22,.9,.24,1) .55s forwards}
-  @keyframes spdot{from{transform:scale(0)}60%{transform:scale(1.35)}to{transform:scale(1)}}
-  @keyframes spname{to{max-width:300px}}
   /* Sprog-skift direkte på login-skærmen (gættes automatisk fra enheden ved første start) */
   .auth-lang{
     position:absolute;top:calc(14px + env(safe-area-inset-top));right:16px;z-index:1;

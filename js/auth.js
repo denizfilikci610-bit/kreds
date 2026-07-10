@@ -53,13 +53,7 @@ export function refreshAuthMode(){ setAuthMode(authMode); }
 // så et reload aldrig blotter den tomme app-skal mens data hentes.
 export function hideSplash(){
   const s = el("splash");
-  if(!s) return;
-  // Brand-animationen (kold start, body.splash-anim) skal nå at spille færdig, før
-  // splashen fader — reloads (statisk splash) har ingen ventetid.
-  const wait = document.body.classList.contains("splash-anim")
-    ? Math.max(0, 1600 - performance.now())
-    : 0;
-  setTimeout(function(){ s.classList.add("gone"); }, wait);
+  if(s) s.classList.add("gone");
 }
 export function showAuth(msg){
   hideSplash();

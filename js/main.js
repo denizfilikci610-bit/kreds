@@ -173,14 +173,6 @@ if(window.__vfNative){
 }
 
 /* ================= Init ================= */
-/* Brand-animationen ("prikken afslører navnet") kører kun ved KOLD start (ny session) —
-   reloads (pull-to-refresh) får den statiske splash uden ventetid. */
-try{
-  if(!sessionStorage.getItem("vf_splashed")){
-    sessionStorage.setItem("vf_splashed", "1");
-    document.body.classList.add("splash-anim");
-  }
-}catch(_e){}
 window.addEventListener("hashchange", function(){
   if(/type=recovery|error_code=|access_token=/.test(location.hash)) location.reload();
 });

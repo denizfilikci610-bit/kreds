@@ -111,29 +111,28 @@ function maybeShow(field){
   const q = typed.toLowerCase();
   const hits = candidatesFor(field).filter(function(h){
     return !q || h.indexOf(q) === 0 || (user(h).name || "").toLowerCase().indexOf(q) === 0;
-  }).slice(0, 6);
+  }).slice(0, 10);
   if(!hits.length) return hide();
   curField = field;
   const b = ensureBox();
+  // Vandrette chips (avatar + @navn) — samme udtryk som det native minde-sheets tag-strip
   b.innerHTML = hits.map(function(h){
-    return '<button class="mitem" data-u="'+esc(h)+'">'+avaHTML(h, 28)+
-      '<span class="mi-col"><b>@'+esc(h)+'</b><span>'+esc(user(h).name)+'</span></span></button>';
+    return '<button class="mitem" data-u="'+esc(h)+'">'+avaHTML(h, 24)+
+      '<span>@'+esc(h)+'</span></button>';
   }).join("");
+  b.scrollLeft = 0;
   const r = field.getBoundingClientRect();
   b.style.display = "block";
-  b.style.left = r.left + "px";
-  b.style.width = Math.max(220, r.width) + "px";
-  // Over feltet hvis der er mere plads dér. Pladsen SYNLIGT under feltet måles med
-  // visualViewport (iOS-tastaturet skrumper IKKE window.innerHeight — kun visual viewport),
-  // så et kommentar-felt lige over tastaturet får dropdownen OVER sig, ikke bag tastaturet.
-  const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
-  const below = vh - r.bottom;
-  if(below < 180 && r.top > below){
+  b.style.left = Math.max(8, r.left) + "px";
+  b.style.width = Math.min(r.width, window.innerWidth - 16) + "px";
+  // Strippen ligger OVER feltet (som i minde-sheetet) — dér er tastaturet aldrig i vejen;
+  // under feltet kun når feltet står helt i toppen af skærmen
+  if(r.top > 56){
     b.style.top = "";
-    b.style.bottom = (window.innerHeight - r.top + 4) + "px";
+    b.style.bottom = (window.innerHeight - r.top + 6) + "px";
   } else {
     b.style.bottom = "";
-    b.style.top = (r.bottom + 4) + "px";
+    b.style.top = (r.bottom + 6) + "px";
   }
 }
 
