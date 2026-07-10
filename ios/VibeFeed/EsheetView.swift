@@ -111,13 +111,12 @@ final class EsheetModel: ObservableObject {
     func dismiss() { send(["kind": "dismiss"]) }
     func chooseLang(_ v: String) { lang = v }
     func chooseConsent(_ v: String) { consent = v }
-    /// Åbner privatlivspolitikken i Safari OVENPÅ appen — sheetet (og de stagede ændringer)
-    /// bliver stående. Den gamle vej ({kind:"policy"} → web window.open) var dobbelt defekt:
-    /// WKWebView blokerer window.open uden side-gestus, og en navigation væk fra index.html
-    /// ville dræbe SPA'en under sheetet (frosne native barer, fastlåst scrim).
+    /// Åbner privatlivspolitikken i i-app-browseren OVENPÅ sheetet — brugeren bliver i
+    /// appen, og de stagede ændringer består. (window.open over broen blokeres af WKWebView,
+    /// og en navigation væk fra index.html ville dræbe SPA'en under sheetet.)
     func openPolicy() {
         let s = policyUrl.isEmpty ? "https://vibefeed.dk/privatliv.html" : policyUrl
-        if let url = URL(string: s) { UIApplication.shared.open(url) }
+        if let url = URL(string: s) { InAppBrowser.present(url) }
     }
     func confirmDelete() { guard !deleting else { return }; deleting = true; send(["kind": "delete"]) }
 

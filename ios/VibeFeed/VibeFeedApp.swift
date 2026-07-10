@@ -58,6 +58,8 @@ struct VibeFeedApp: App {
             case .active:
                 // Ads only start once the app is active and consent is known.
                 AdsManager.shared.appDidBecomeActive()
+                // Åbning = notifikationer "set": nulstil app-ikonets badge (lokalt + server)
+                NotifManager.shared.appDidBecomeActive()
             case .background:
                 NotifManager.shared.scheduleRefresh()
             default:

@@ -203,6 +203,13 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
         sendPushRegistration()
     }
 
+    /// App åbnet/foregroundet: notifikationerne er "set" — nulstil ikonets badge lokalt
+    /// og server-tælleren (store_push_token nulstiller badge-kolonnen ved registrering).
+    func appDidBecomeActive() {
+        UNUserNotificationCenter.current().setBadgeCount(0)
+        sendPushRegistration()
+    }
+
     /// Send {device secret, APNs token} to the backend so it can push to this device.
     /// No-op until BOTH the login secret and the APNs token are known.
     private func sendPushRegistration() {

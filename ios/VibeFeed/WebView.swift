@@ -122,14 +122,15 @@ struct WebView: UIViewRepresentable {
         }
 
         // target=_blank links (fx privatlivspolitikken fra samtykke-gaten/signup) åbner i
-        // Safari. At loade dem i SAMME webview navigerede væk fra index.html og dræbte
-        // SPA'en under de native overlays (frosne barer, fastlåst esheet-scrim).
+        // I-APP-BROWSEREN (SFSafariViewController) — brugeren bliver i appen. At loade dem
+        // i SAMME webview navigerede væk fra index.html og dræbte SPA'en under de native
+        // overlays (frosne barer, fastlåst esheet-scrim).
         func webView(_ webView: WKWebView,
                      createWebViewWith configuration: WKWebViewConfiguration,
                      for navigationAction: WKNavigationAction,
                      windowFeatures: WKWindowFeatures) -> WKWebView? {
             if navigationAction.targetFrame == nil, let url = navigationAction.request.url {
-                UIApplication.shared.open(url)
+                InAppBrowser.present(url)
             }
             return nil
         }

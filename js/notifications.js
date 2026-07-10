@@ -3,7 +3,7 @@ import { me, expandedCmts, curTab } from "./store.js";
 import { el, esc, avaHTML, user, fmtTime, toast, registerProfile } from "./helpers.js";
 import { t } from "./i18n.js";
 import { scheduleRefetch } from "./realtime.js";
-import { switchTab, setFeed, resetBarHide, findPost } from "./feed.js";
+import { switchTab, setFeed, resetBarHide, findPost, feedById } from "./feed.js";
 import { rerenderPostCmts, openNativeComments } from "./comments.js";
 import { openProfile } from "./profile.js";
 
@@ -168,11 +168,13 @@ async function hasUnseenNotifs(){
   const probes = [
     sb.from("friend_requests").select("*", head).eq("to_id", me.id).gt("created_at", sinceIso),
     sb.from("kreds_invites").select("*", head).eq("user_id", me.id).gt("created_at", sinceIso),
-    // Kreds-opslag fra andre (RLS viser kun mine kredse) → prikken følger listen (kun i dag)
-    sb.from("posts").select("*", head).not("feed_id", "is", null).neq("author", me.id).gt("created_at", reactIso),
     // @-mentions af mig (samme dags-grænse som listen)
     sb.from("mentions").select("*", head).eq("mentioned", me.id).gt("created_at", reactIso)
   ];
+  // Kreds-opslag: letvægts-rækker (ikke head-count) så opslag fra FØR min indmeldelse kan
+  // frasorteres pr. kreds — prikken må ikke lyse for det, der lå der, da jeg kom med.
+  const kpostProbe = sb.from("posts").select("feed_id, created_at")
+    .not("feed_id", "is", null).neq("author", me.id).gt("created_at", reactIso).limit(30);
   if(ids.length){
     probes.push(sb.from("likes").select("*", head).in("post_id", ids).neq("user_id", me.id).gt("created_at", reactIso));
     probes.push(sb.from("comments").select("*", head).in("post_id", ids).neq("author", me.id).gt("created_at", reactIso));
@@ -181,12 +183,17 @@ async function hasUnseenNotifs(){
     probes.push(sb.from("comments").select("*", head).in("parent_id", cids).neq("author", me.id).gt("created_at", reactIso));
     probes.push(sb.from("comment_likes").select("*", head).in("comment_id", cids).neq("user_id", me.id).gt("created_at", reactIso));
   }
-  const [res, admR] = await Promise.all([
+  const [res, admR, kpostR] = await Promise.all([
     Promise.all(probes),
     // Afgjort optagelses-afstemning (Tillykke/gik ikke igennem) tænder også prikken
-    sb.rpc("my_admission_results", { since: reactIso })
+    sb.rpc("my_admission_results", { since: reactIso }),
+    kpostProbe
   ]);
   if(!admR.error && (admR.data || []).length > 0) return true;
+  if(!kpostR.error && (kpostR.data || []).some(function(row){
+    const jf = feedById(row.feed_id);
+    return jf && (!jf.joinedAt || new Date(row.created_at) >= new Date(jf.joinedAt));
+  })) return true;
   return res.some(function(r){ return !r.error && (r.count || 0) > 0; });
 }
 
@@ -366,8 +373,12 @@ export async function loadNotifs(){
     (res[3].data || []).forEach(function(r){
       if(r.from_profile){ registerProfile(r.from_profile); items.push({ type:"freq", u:r.from_profile.handle, at:r.created_at }); }
     });
-    // Kreds-opslag: "postede i {kreds}" + selve teksten, klikbar → åbner opslaget
+    // Kreds-opslag: "postede i {kreds}" + selve teksten, klikbar → åbner opslaget.
+    // KUN opslag fra EFTER min indmeldelse — man skal ikke have notifikationer for
+    // alt det, der allerede lå i kredsen, da man kom med.
     (res[4].data || []).forEach(function(r){
+      const jf = feedById(r.feed_id);
+      if(jf && jf.joinedAt && new Date(r.created_at) < new Date(jf.joinedAt)) return;
       if(r.author_profile){
         registerProfile(r.author_profile);
         // Governance-afstemning? Udled HVEM (sub) og HVAD (rm=fjernelse) af server-teksten

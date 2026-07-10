@@ -549,10 +549,14 @@ export async function loadSentRequests(){
 }
 export async function loadFeeds(){
   if(!me) return;
-  const { data, error } = await sb.from("feeds").select("*, feed_members(user_id)");
+  const { data, error } = await sb.from("feeds").select("*, feed_members(user_id, created_at)");
   if(error){ console.error(error); toast(t("err.generic")); return; }
   const feeds = (data || []).map(function(f){
-    return { id:f.id, name:f.name, owner:f.owner, governance:f.governance || "vote", created:f.created_at, memberIds:(f.feed_members||[]).map(function(m){ return m.user_id; }) };
+    // joinedAt = MIT medlemskabs starttidspunkt — notifikationer viser kun opslag NYERE end det
+    const mine = (f.feed_members||[]).find(function(m){ return me && m.user_id === me.id; });
+    return { id:f.id, name:f.name, owner:f.owner, governance:f.governance || "vote", created:f.created_at,
+             joinedAt: mine ? mine.created_at : null,
+             memberIds:(f.feed_members||[]).map(function(m){ return m.user_id; }) };
   });
   feeds.sort(function(a,b){ return new Date(a.created) - new Date(b.created); });
   const unknown = [];
