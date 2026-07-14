@@ -17,8 +17,11 @@ export const AD_EVERY = 3;
    App Store og godkendt i deres dashboard. Indtil da ville Release-builds vise
    TOMME "Promovering"-kort (gråt hul uden annonce) — grimt for både TestFlight-
    brugere og Apple-review. false = ingen annonce-kort og ingen video-tilbud.
-   NÅR APPODEAL ER GODKENDT EFTER LAUNCH: sæt til true og deploy web. */
-export const ADS_LIVE = false;
+   TÆNDT 2026-07-14 EFTER LIVE i App Store: genererer annonce-anmodninger så
+   AdMob/Appodeal kan gennemføre godkendelse (høne-og-æg). Nul rigtige brugere
+   endnu, så tomme kort generer ingen. SLUK igen (false + deploy) hvis feedet
+   viser tomme huller for de første venner, indtil fill kommer. */
+export const ADS_LIVE = true;
 
 function bridge(){
   return (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed) || null;
