@@ -364,18 +364,10 @@ export function renderFeed(){
   if(state.currentFeed === "all" && me && !state.humanFriends.length){
     html += '<div class="emptynote" style="padding:24px 20px;text-align:center">'+t("feed.empty_friends")+'</div>';
   }
-  /* Fastgjorte opslag fra den officielle profil hejses op FØR teaser-flet (kun 'Hele kredsen') */
-  let rest = state.posts, pinned = [];
-  if(state.currentFeed === "all"){
-    pinned = state.posts.filter(function(p){ return p.u === OFFICIAL_HANDLE; });
-    rest = state.posts.filter(function(p){ return p.u !== OFFICIAL_HANDLE; });
-  }
+  /* Ingen fastgøring: alle opslag (inkl. den officielle profil) flyder kronologisk */
   const items = (state.currentFeed === "all" && state.teasers.length)
-    ? rest.concat(state.teasers).sort(function(a,b){ return new Date(b.created) - new Date(a.created); })
-    : rest;
-  pinned.forEach(function(p){
-    html += '<div class="pinlabel">'+t("feed.pinned")+'</div>' + postHTML(p);
-  });
+    ? state.posts.concat(state.teasers).sort(function(a,b){ return new Date(b.created) - new Date(a.created); })
+    : state.posts;
   if(items.length){
     /* Flet reklame-kort ind efter hver AD_EVERY opslag (kun i appen + med samtykke).
        Ikke efter det allersidste opslag, så feedet ikke slutter på en reklame. */
@@ -388,7 +380,7 @@ export function renderFeed(){
       }
       return card;
     }).join("");
-  } else if(!pinned.length && !(state.currentFeed === "all" && me && !state.humanFriends.length)){
+  } else if(!(state.currentFeed === "all" && me && !state.humanFriends.length)){
     html += '<div class="emptynote" style="padding:36px 20px;text-align:center">'+t("feed.empty_kreds")+'</div>';
   }
   const f = document.activeElement && document.activeElement.closest ? document.activeElement.closest("#feed .cfield") : null;
