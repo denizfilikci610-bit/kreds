@@ -17,11 +17,12 @@ export const AD_EVERY = 3;
    App Store og godkendt i deres dashboard. Indtil da ville Release-builds vise
    TOMME "Promovering"-kort (gråt hul uden annonce) — grimt for både TestFlight-
    brugere og Apple-review. false = ingen annonce-kort og ingen video-tilbud.
-   TÆNDT 2026-07-14 EFTER LIVE i App Store: genererer annonce-anmodninger så
-   AdMob/Appodeal kan gennemføre godkendelse (høne-og-æg). Nul rigtige brugere
-   endnu, så tomme kort generer ingen. SLUK igen (false + deploy) hvis feedet
-   viser tomme huller for de første venner, indtil fill kommer. */
-export const ADS_LIVE = true;
+   Kort TÆNDT 2026-07-14 for at teste: bekræftede at appen requester annoncer,
+   MEN der er ZERO fill endnu (feed-annoncer flimrede/foldede sammen, rewarded
+   video sagde "Ingen video lige nu") fordi Appodeal/AdMob ikke er godkendt endnu.
+   SLUKKET IGEN for ren oplevelse til de første brugere. TÆND (true + deploy) igen
+   når Appodeal/AdMob ER godkendt og der kommer rigtig fill. */
+export const ADS_LIVE = false;
 
 function bridge(){
   return (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed) || null;
