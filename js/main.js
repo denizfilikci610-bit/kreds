@@ -5,7 +5,7 @@ import { t, initI18n, setLang, hasStoredLang } from "./i18n.js";
 import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, loadQuota, setFeed, nativeKredsState } from "./feed.js";
 import { initComments, nativeCommentsAction } from "./comments.js";
 import { initKredse, closeFeedSheet, closeMemberSheet, openFeedSheet, nativeFsheetAction, nativeMemberAction } from "./kredse.js";
-import { initCompose, renderComposeDest, openCompose, nativeMemoryPost, openMemoryFallback, nativeMemoryUploaded, nativeMemoryUploadFailed } from "./compose.js";
+import { initCompose, renderComposeDest, openCompose, openThought, openMemory, nativeMemoryPost, openMemoryFallback, nativeMemoryUploaded, nativeMemoryUploadFailed } from "./compose.js";
 import { initSearch, renderSearch } from "./search.js";
 import { initProfile, closeEditSheet, closeActivitySheet, renderStories, renderMyPosts, refreshPv, nativeEsheetAction, avatarStage } from "./profile.js";
 import { initNotifs, loadNotifs, openFromPush } from "./notifications.js";
@@ -67,7 +67,9 @@ el("nosparkle").addEventListener("click", function(){
 if(window.__vfNative){
   document.body.classList.add("native"); // CSS skjuler web-tabbaren + kreds-baren
   window.vfTab = function(name){
-    if(name === "compose"){ openCompose(); return; }
+    if(name === "compose"){ openCompose(); return; }              // (bevaret; browser-fallback)
+    if(name === "compose-thought"){ openThought(); return; }      // flydende tanke-knap
+    if(name === "compose-memory"){ openMemory(); return; }        // flydende minde-knap
     switchTab(name);
   };
   window.vfKreds = function(id){

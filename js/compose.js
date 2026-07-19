@@ -116,6 +116,13 @@ function openChooser(){
 }
 export function openCompose(){ openChooser(); }
 
+/* Direkte indgange fra de native flydende knapper — ingen vælger imellem. */
+export function openThought(){ openComposeWith("thought"); }
+export function openMemory(){
+  if(window.__vfPhotoLib){ postMemoryGallery(); return; } // native Instagram-galleri
+  openComposeWith("memory");                               // web-fallback (nægtet/ingen bro)
+}
+
 /* ---- Minde: native Instagram-galleri (app'en) ---- */
 function vfmh(){ return window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed; }
 function postMemoryGallery(){
