@@ -128,6 +128,18 @@ struct ContentView: View {
                     .padding(.bottom, -6)
             }
             .ignoresSafeArea(.keyboard, edges: .bottom)
+
+            // Native flydende opret-knapper (minde + tanke), nederst til højre, over bjælken.
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    NativeComposeButtons()
+                        .padding(.trailing, 18)
+                        .padding(.bottom, 60)   // tæt på bjælken når den er fremme (glider ned ved scroll)
+                }
+            }
+            .ignoresSafeArea(.keyboard, edges: .bottom)
         }
         // Real iOS 26 Liquid Glass action sheets (report / post menu / unfriend),
         // presented on top of everything and driven by the web over the JS bridge.

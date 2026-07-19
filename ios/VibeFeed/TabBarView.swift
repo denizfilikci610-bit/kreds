@@ -43,10 +43,10 @@ struct NativeTabBar: View {
     @ObservedObject private var model = TabBarModel.shared
     @Namespace private var ns
 
+    // "compose" er flyttet ud til de flydende knapper (NativeComposeButtons) → 4 faner.
     private let items: [TabItem] = [
         .init(id: "feed",    symbol: "house.fill",              isView: true),
         .init(id: "search",  symbol: "magnifyingglass",        isView: true),
-        .init(id: "compose", symbol: "plus.app",               isView: false),
         .init(id: "akt",     symbol: "bell.fill",              isView: true),
         .init(id: "profil",  symbol: "person.crop.circle.fill", isView: true),
     ]
@@ -87,11 +87,51 @@ struct NativeTabBar: View {
         .frame(height: 58)
         .modifier(GlassPill())
         .padding(.horizontal, 16)
-        .scaleEffect(model.compact ? 0.86 : 1.0, anchor: .bottom)
-        .opacity(model.visible ? 1 : 0)
-        .allowsHitTesting(model.visible)
+        // Scroll ned (compact) → bjælken glider helt væk; scroll op → den kommer tilbage.
+        .offset(y: (model.compact ? 130 : 0))
+        .opacity((model.visible && !model.compact) ? 1 : 0)
+        .allowsHitTesting(model.visible && !model.compact)
         .animation(.spring(response: 0.4, dampingFraction: 0.72), value: model.active)
-        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: model.compact)
+        .animation(.spring(response: 0.34, dampingFraction: 0.86), value: model.compact)
         .animation(.easeInOut(duration: 0.2), value: model.visible)
+    }
+}
+
+/// To flydende opret-knapper (minde + tanke), nederst til højre. Altid synlige mens vi er
+/// på feed-fanen (de gemmer sig IKKE ved scroll som bjælken), men skjules når et ark/overlay
+/// ligger ovenpå (model.visible). Trykker direkte til web uden om vælgeren via window.vfTab.
+struct NativeComposeButtons: View {
+    @ObservedObject private var model = TabBarModel.shared
+    private let accent = Color(red: 0xE0 / 255, green: 0x40 / 255, blue: 0x2F / 255)
+
+    private var shown: Bool { model.visible && model.active == "feed" }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            composeButton(symbol: "photo.fill", action: "compose-memory") // minde — øverst
+            composeButton(symbol: "plus",       action: "compose-thought") // tanke — nederst (nemmest at nå)
+        }
+        // Scroll ned (bjælken forsvinder) → knapperne glider med ned i den frigjorte plads.
+        // Scroll op (bjælken fremme) → de rykker op og hugger sig tæt til bjælken igen.
+        // Fed, let bouncende spring på bevægelsen.
+        .offset(y: model.compact ? 44 : 0)
+        .opacity(shown ? 1 : 0)
+        .allowsHitTesting(shown)
+        .animation(.spring(response: 0.42, dampingFraction: 0.58), value: model.compact)
+        .animation(.easeInOut(duration: 0.2), value: shown)
+    }
+
+    private func composeButton(symbol: String, action: String) -> some View {
+        Button {
+            model.onTap?(action)
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 56, height: 56)
+                .background(accent, in: Circle())
+                .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
+        }
+        .buttonStyle(.plain)
     }
 }
