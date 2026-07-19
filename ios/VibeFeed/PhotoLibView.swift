@@ -820,8 +820,9 @@ struct CameraPreview: UIViewRepresentable {
     }
 }
 
-/// Loopende, lydløs video-afspiller (til at forhåndsvise en optaget video i billedtekst-trinet).
-/// resizeAspectFill i en 4:5-ramme → viser samme udsnit som den endelige 4:5-beskæring.
+/// Loopende video-afspiller MED lyd (til at forhåndsvise en optaget video i billedtekst-trinet).
+/// Spiller hele klippet, genstarter ved slut (loop), og tvinger lyd-sessionen til playback så
+/// lyden høres selv med lydløs-kontakten. resizeAspectFill i 4:5 → samme udsnit som den endelige beskæring.
 struct LoopingVideoView: UIViewRepresentable {
     let url: URL
     func makeUIView(context: Context) -> PlayerBox {
@@ -832,21 +833,29 @@ struct LoopingVideoView: UIViewRepresentable {
 
     final class PlayerBox: UIView {
         override class var layerClass: AnyClass { AVPlayerLayer.self }
-        private var player: AVQueuePlayer?
-        private var looper: AVPlayerLooper?
+        private var player: AVPlayer?
+        private var item: AVPlayerItem?
         private var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
 
         func configure(url: URL) {
-            let item = AVPlayerItem(url: url)
-            let qp = AVQueuePlayer()
-            qp.isMuted = true
-            looper = AVPlayerLooper(player: qp, templateItem: item)
-            playerLayer.player = qp
+            let it = AVPlayerItem(url: url)
+            let p = AVPlayer(playerItem: it)
+            p.isMuted = false
+            p.actionAtItemEnd = .none
+            playerLayer.player = p
             playerLayer.videoGravity = .resizeAspectFill
-            player = qp
-            qp.play()
+            player = p; item = it
+            NotificationCenter.default.addObserver(self, selector: #selector(loopBack),
+                                                   name: .AVPlayerItemDidPlayToEndTime, object: it)
+            try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+            try? AVAudioSession.sharedInstance().setActive(true)
+            p.play()
         }
-        func teardown() { player?.pause(); player = nil; looper = nil; playerLayer.player = nil }
+        @objc private func loopBack() { player?.seek(to: .zero); player?.play() }
+        func teardown() {
+            NotificationCenter.default.removeObserver(self)
+            player?.pause(); player = nil; item = nil; playerLayer.player = nil
+        }
     }
 }
 
