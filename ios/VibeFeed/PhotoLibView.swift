@@ -17,6 +17,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
 
     enum Step { case camera, gallery, trim, caption }
     @Published var open = false
+    @Published var forCompose = false   // åbnet fra en TANKE (Tag med kamera) → hæft medie, opret ikke minde
     @Published var step: Step = .camera
     @Published var status: PHAuthorizationStatus = .notDetermined
     @Published var assets: [PHAsset] = []
@@ -77,6 +78,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
             return
         }
         guard (dict["open"] as? Bool) == true else { return }
+        forCompose = (dict["purpose"] as? String) == "compose"
         dest = dict["dest"] as? String ?? "all"
         if let raw = dict["feeds"] as? [[String: Any]] {
             feeds = raw.compactMap { d in
@@ -228,20 +230,20 @@ final class PhotoLibModel: NSObject, ObservableObject {
         }
     }
 
-    /// Et foto taget med kameraet → beskær til præcis 4:5 (1080x1350) og gå til billedtekst.
+    /// Et foto taget med kameraet → beskær til præcis 4:5 (1080x1350). Tanke: upload straks; minde: billedtekst.
     func useCaptured(_ image: UIImage) {
         capturedImage = cropTo45(image)
         capturedVideoURL = nil
         selected = nil; videoAsset = nil; showTrimStep = false
-        step = .caption
+        if forCompose { share() } else { step = .caption }
     }
 
-    /// En video optaget med kameraet → gem URL + poster-frame og gå til billedtekst (beskæres ved Del).
+    /// En video optaget med kameraet → gem URL + poster-frame. Tanke: upload straks; minde: billedtekst.
     func useCapturedVideo(_ url: URL) {
         capturedVideoURL = url
-        capturedImage = posterFrame(url)   // vises i billedtekst-trinet
+        capturedImage = posterFrame(url)   // vises i billedtekst-trinet (minde)
         selected = nil; videoAsset = nil; showTrimStep = false
-        step = .caption
+        if forCompose { share() } else { step = .caption }
     }
 
     /// Center-beskær + skalér til præcis 1080x1350 (4:5). draw(in:) respekterer orienteringen.
@@ -372,7 +374,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
 
     private func send(isVideo: Bool, ext: String, mime: String) {
         pendingMime = mime
-        let obj: [String: Any] = ["isVideo": isVideo, "caption": caption, "dest": dest, "ext": ext, "mime": mime]
+        let obj: [String: Any] = ["isVideo": isVideo, "caption": caption, "dest": dest, "ext": ext, "mime": mime, "forCompose": forCompose]
         guard let d = try? JSONSerialization.data(withJSONObject: obj), let s = String(data: d, encoding: .utf8) else {
             sharing = false; pendingData = nil; onUploadFailed?(); return
         }
@@ -1008,7 +1010,11 @@ struct MemoryCameraScreen: View {
                     }
 
                     HStack(alignment: .center) {
-                        Button { model.step = .gallery } label: { thumbView }
+                        if model.forCompose {
+                            Color.clear.frame(width: 48, height: 48)   // tanke: ingen galleri-genvej (bruger web-biblioteket)
+                        } else {
+                            Button { model.step = .gallery } label: { thumbView }
+                        }
                         Spacer()
                         captureButton
                         Spacer()
@@ -1016,6 +1022,12 @@ struct MemoryCameraScreen: View {
                             .frame(width: 48, height: 48)
                     }
                     .padding(.horizontal, 26).padding(.bottom, 28)
+                }
+
+                // Tanke-tilstand: kort upload-spinner mens det tagne medie uploades og hæftes på.
+                if model.sharing {
+                    Color.black.opacity(0.55).ignoresSafeArea()
+                    ProgressView().tint(.white).scaleEffect(1.4)
                 }
             }
         }
