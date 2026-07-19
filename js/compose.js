@@ -9,6 +9,7 @@ import { mentionCards } from "./mentions.js";
 /* ================= Skriv ================= */
 let pendingImg = null; // { blob, url }
 let pendingVid = null; // { file, url }
+let pendingUploaded = null; // { path, isVideo } — allerede uploadet native medie (Tag med kamera)
 export const ta = el("compose-field");
 const MAXC = 280, CIRC = 56.55;
 const MAX_VID_SEC = 6.4, MAX_VID_BYTES = 25 * 1024 * 1024;
@@ -29,10 +30,10 @@ export function updateRing(){
 }
 export function canPost(){
   const t = ta.value.trim();
-  if(composeKind === "memory"){ el("compose-post").disabled = !(pendingImg || pendingVid); return; } // minde kræver medie
+  if(composeKind === "memory"){ el("compose-post").disabled = !(pendingImg || pendingVid || pendingUploaded); return; } // minde kræver medie
   el("compose-post").disabled = pollOn
     ? !(t && pollReady())
-    : !(pendingImg || pendingVid || t.length > 0);
+    : !(pendingImg || pendingVid || pendingUploaded || t.length > 0);
 }
 let composeDest = "all";
 /* @-autocompleten (mentions.js) skal kende destinationen for at foreslå de rigtige folk */
@@ -123,17 +124,18 @@ export function openMemory(){
   openComposeWith("memory");                               // web-fallback (nægtet/ingen bro)
 }
 
-/* ---- Minde: native Instagram-galleri (app'en) ---- */
+/* ---- Native kamera/galleri (app'en) ---- */
 function vfmh(){ return window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed; }
-function postMemoryGallery(){
+/* Åbn den native komposer. purpose="memory" → minde-flow (galleri + caption); "compose" →
+   kun kamera, det tagne medie hæftes på den åbne tanke i stedet for at blive et minde.
+   Returnerer false hvis der ingen native bro er (så kalderen kan falde tilbage). */
+function openPhotoLib(purpose){
   const mh = vfmh();
-  if(!mh){ openComposeWith("memory"); return; } // ingen bro → web-fallback
-  // @-autocomplete i den native caption: kandidat-kort pr. destination ("all" = venner;
-  // pr. kreds = venner + medlemmer) — native filtrerer lokalt når dest-pillen skiftes.
+  if(!mh) return false;
   const mentionables = { all: mentionCards("all") };
   state.feeds.forEach(function(f){ mentionables[f.id] = mentionCards(f.id); });
   mh.postMessage({
-    type: "photolib", open: true, dest: state.currentFeed || "all",
+    type: "photolib", open: true, purpose: purpose, dest: state.currentFeed || "all",
     feeds: state.feeds.map(function(f){ return { id: f.id, name: f.name }; }),
     mentionables: mentionables,
     labels: {
@@ -143,7 +145,11 @@ function postMemoryGallery(){
       trimHint: t("memory.trim_hint")
     }
   });
+  return true;
 }
+function postMemoryGallery(){ if(!openPhotoLib("memory")) openComposeWith("memory"); }
+/* Tanke: åbn det native kamera. Uden bro (browser) → systemkameraets billed-input. */
+function openNativeCameraForCompose(){ if(!openPhotoLib("compose")) el("cam-photo").click(); }
 function ackMemory(result){ const mh = vfmh(); if(mh) mh.postMessage({ type: "photolib", result: result }); }
 /* Native → web: window.vfMemoryFallback() — brug web-compose (nægtet fotoadgang). */
 export function openMemoryFallback(){ openComposeWith("memory"); }
@@ -162,7 +168,7 @@ export async function nativeMemoryPost(obj){
     const dest = obj.dest || "all";
     const ext = obj.ext || (obj.isVideo ? "mp4" : "jpg");
     const path = me.id + "/" + uuid() + "." + ext;
-    pendingMemory = { path: path, isVideo: !!obj.isVideo, caption: obj.caption || "", dest: dest };
+    pendingMemory = { path: path, isVideo: !!obj.isVideo, caption: obj.caption || "", dest: dest, forCompose: !!obj.forCompose };
     const mh = vfmh();
     if(!mh) throw new Error("no_bridge");
     mh.postMessage({ type: "photolib", upload: {
@@ -175,6 +181,9 @@ export async function nativeMemoryPost(obj){
 export async function nativeMemoryUploaded(){
   const m = pendingMemory; pendingMemory = null;
   if(!m || !me){ ackMemory("err"); return; }
+  // "Tag med kamera" fra en tanke: hæft det uploadede medie på komposeren i stedet for at
+  // oprette et minde. Tanken postes først når brugeren trykker Del.
+  if(m.forCompose){ attachUploaded(m.path, m.isVideo); ackMemory("ok"); return; }
   try{
     const ins = await sb.from("posts").insert({
       author: me.id,
@@ -207,21 +216,33 @@ export function closeCompose(){
 
 /* ---- Vedhæftning (billede/video, gensidigt udelukkende) ---- */
 function syncAttach(){
-  el("attach").classList.toggle("on", !!(pendingImg || pendingVid));
+  el("attach").classList.toggle("on", !!(pendingImg || pendingVid || pendingUploaded));
 }
 function clearImg(){
   if(pendingImg && pendingImg.url) URL.revokeObjectURL(pendingImg.url);
   pendingImg = null;
+  pendingUploaded = null;
   el("attach-img").removeAttribute("src");
   el("attach-img").style.display = "none";
 }
 function clearVid(){
   if(pendingVid && pendingVid.url) URL.revokeObjectURL(pendingVid.url);
   pendingVid = null;
+  pendingUploaded = null;
   const v = el("attach-vid");
   v.pause();
   v.removeAttribute("src");
   v.style.display = "none";
+}
+/* Hæft et allerede-uploadet native medie (Tag med kamera) på den åbne tanke. */
+function attachUploaded(path, isVideo){
+  clearImg(); clearVid();
+  pendingUploaded = { path: path, isVideo: !!isVideo };
+  const url = SB_URL + "/storage/v1/object/public/post-images/" + path;
+  if(isVideo){ const v = el("attach-vid"); v.src = url; v.muted = true; v.style.display = "block"; v.play().catch(function(){}); }
+  else { el("attach-img").src = url; el("attach-img").style.display = "block"; }
+  syncAttach();
+  canPost();
 }
 export function clearPendingImg(){ // rydder AL ventende medie (bruges også af resetApp)
   clearImg();
@@ -317,7 +338,15 @@ function handleVideoFile(file){
 }
 
 /* ---- Medie-menu (popup) ---- */
-function openMediaMenu(){ el("mediamenu").classList.add("on"); }
+function openMediaMenu(){
+  // Vis "Tag et billede eller video" (native kamera) KUN på builds der kan compose-kameraet
+  // (__vfComposeCamera). Så påvirkes ældre installerede apps ikke; de beholder systemkameraet.
+  const native = !!window.__vfComposeCamera;
+  el("mm-native").style.display = native ? "block" : "none";
+  el("mm-photo").style.display = native ? "none" : "block";
+  el("mm-video").style.display = native ? "none" : "block";
+  el("mediamenu").classList.add("on");
+}
 function closeMediaMenu(){ el("mediamenu").classList.remove("on"); }
 
 export function initCompose(){
@@ -339,6 +368,7 @@ el("mediamenu").addEventListener("click", function(e){
   if(e.target === el("mediamenu")) closeMediaMenu();
 });
 el("mm-cancel").addEventListener("click", closeMediaMenu);
+el("mm-native").addEventListener("click", function(){ closeMediaMenu(); openNativeCameraForCompose(); });
 el("mm-photo").addEventListener("click", function(){ closeMediaMenu(); el("cam-photo").click(); });
 el("mm-video").addEventListener("click", function(){ closeMediaMenu(); el("cam-video").click(); });
 el("mm-lib").addEventListener("click", function(){ closeMediaMenu(); el("file-input").click(); });
@@ -450,12 +480,16 @@ el("compose-post").addEventListener("click", async function(){
     }
     return;
   }
-  if(!pendingImg && !pendingVid && !text) return;
+  if(!pendingImg && !pendingVid && !pendingUploaded && !text) return;
   btn.disabled = true;
   let path = null;
   try{
     let imgPath = null, vidPath = null;
-    if(pendingImg){
+    if(pendingUploaded){
+      // Allerede uploadet af det native kamera (Tag med kamera) → brug stien direkte, ingen ny upload.
+      path = pendingUploaded.path;
+      if(pendingUploaded.isVideo) vidPath = path; else imgPath = path;
+    } else if(pendingImg){
       path = me.id + "/" + uuid() + ".jpg";
       const up = await sb.storage.from("post-images").upload(path, pendingImg.blob, { contentType:"image/jpeg" });
       if(up.error) throw up.error;
