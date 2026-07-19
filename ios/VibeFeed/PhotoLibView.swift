@@ -534,9 +534,9 @@ struct MemoryGalleryScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 if let shot = model.capturedImage {
-                    Image(uiImage: shot).resizable().scaledToFill()
-                        .frame(height: UIScreen.main.bounds.height * 0.34)
-                        .frame(maxWidth: .infinity).clipped().padding(.bottom, 6)
+                    Image(uiImage: shot).resizable().scaledToFit()   // hele 4:5, ikke beskåret
+                        .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.5)
+                        .padding(.bottom, 6)
                 } else if let sel = model.selected {
                     PreviewPane(asset: sel).frame(height: UIScreen.main.bounds.height * 0.34).padding(.bottom, 6)
                 }
@@ -672,7 +672,9 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
     @Published var authorized = false
     @Published var flashOn = false
     @Published var recording = false
+    @Published var secondsLeft = 0                    // nedtælling under optagelse (6 → 0)
     @Published var position: AVCaptureDevice.Position = .back
+    private var countdownTimer: Timer?
 
     /// Bed om kamera- (og mikrofon-) adgang og start sessionen. Callbacks kaldes på main-tråden.
     func start(onCapture: @escaping (UIImage) -> Void, onVideo: @escaping (URL) -> Void) {
@@ -750,19 +752,30 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
         }
     }
 
-    /// Hold optage-knappen → start video (auto-stop efter 6 sekunder).
+    /// Hold optage-knappen → start video (nedtælling fra 6 s, auto-stop ved 0).
     func startRecording() {
         queue.async { [weak self] in
             guard let self, self.session.isRunning, !self.movieOutput.isRecording else { return }
             let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
             try? FileManager.default.removeItem(at: url)
-            DispatchQueue.main.async { self.recording = true }
             self.movieOutput.startRecording(to: url, recordingDelegate: self)
-            DispatchQueue.main.asyncAfter(deadline: .now() + VF_MAX_VID) { [weak self] in self?.stopRecording() }
+            DispatchQueue.main.async { self.beginCountdown() }
+        }
+    }
+
+    private func beginCountdown() {
+        recording = true
+        secondsLeft = Int(VF_MAX_VID)
+        countdownTimer?.invalidate()
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] t in
+            guard let self else { t.invalidate(); return }
+            self.secondsLeft -= 1
+            if self.secondsLeft <= 0 { self.stopRecording() }
         }
     }
 
     func stopRecording() {
+        countdownTimer?.invalidate(); countdownTimer = nil
         queue.async { [weak self] in
             guard let self, self.movieOutput.isRecording else { return }
             self.movieOutput.stopRecording()
@@ -776,7 +789,9 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
 
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
         DispatchQueue.main.async { [weak self] in
+            self?.countdownTimer?.invalidate(); self?.countdownTimer = nil
             self?.recording = false
+            self?.secondsLeft = 0
             guard error == nil else { return }
             self?.onVideo?(outputFileURL)
         }
@@ -805,7 +820,8 @@ struct MemoryCameraScreen: View {
     @ObservedObject private var model = PhotoLibModel.shared
     @StateObject private var cam = MemoryCamera()
     @State private var thumb: UIImage?
-    @State private var didStartVideo = false
+    @State private var holdWork: DispatchWorkItem?   // udløser video-start hvis knappen holdes
+    @State private var didRecord = false             // dette tryk startede en optagelse
 
     var body: some View {
         GeometryReader { geo in
@@ -838,11 +854,11 @@ struct MemoryCameraScreen: View {
                         iconButton("xmark") { model.dismiss() }
                         Spacer()
                         if cam.recording {
-                            HStack(spacing: 5) {
-                                Circle().fill(Color.white).frame(width: 7, height: 7)
-                                Text("REC").font(.system(size: 12, weight: .heavy)).foregroundStyle(.white)
+                            HStack(spacing: 6) {
+                                Circle().fill(Color.white).frame(width: 8, height: 8)
+                                Text("0:0\(max(0, cam.secondsLeft))").font(.system(size: 14, weight: .heavy)).monospacedDigit().foregroundStyle(.white)
                             }
-                            .padding(.horizontal, 9).padding(.vertical, 4)
+                            .padding(.horizontal, 11).padding(.vertical, 5)
                             .background(Capsule().fill(Color.red))
                         }
                         Spacer()
@@ -852,10 +868,14 @@ struct MemoryCameraScreen: View {
 
                     Spacer()
 
-                    // Hint: tryk = foto, hold = video (op til 6 sek)
-                    Text(cam.recording ? "" : "Tryk for foto · hold for video")
-                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
-                        .padding(.bottom, 10)
+                    // Hint tæt over knappen, på en mørk pille så den ikke flyder ud over billedet
+                    if !cam.recording {
+                        Text("Tryk for foto · hold for video")
+                            .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+                            .padding(.horizontal, 12).padding(.vertical, 5)
+                            .background(Capsule().fill(Color.black.opacity(0.4)))
+                            .padding(.bottom, 8)
+                    }
 
                     HStack(alignment: .center) {
                         Button { model.step = .gallery } label: { thumbView }
@@ -888,17 +908,25 @@ struct MemoryCameraScreen: View {
         }
         .contentShape(Circle())
         .opacity(cam.authorized ? 1 : 0.4)
-        .onLongPressGesture(minimumDuration: 0.3, maximumDistance: 60,
-            pressing: { pressing in
-                if !pressing {
-                    if didStartVideo { cam.stopRecording(); didStartVideo = false }
-                    else { cam.capture() }   // hurtigt tryk → foto
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    // Første berøring: planlæg video-start hvis knappen holdes ≥ 0,32 s
+                    if holdWork == nil && !didRecord {
+                        let work = DispatchWorkItem { didRecord = true; cam.startRecording() }
+                        holdWork = work
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.32, execute: work)
+                    }
                 }
-            },
-            perform: {
-                didStartVideo = true
-                cam.startRecording()          // hold → video (auto-stop efter 6 s)
-            }
+                .onEnded { _ in
+                    holdWork?.cancel(); holdWork = nil
+                    if didRecord {
+                        if cam.recording { cam.stopRecording() }   // slip → stop video
+                    } else {
+                        cam.capture()                              // hurtigt tryk → foto
+                    }
+                    didRecord = false
+                }
         )
         .disabled(!cam.authorized)
     }
