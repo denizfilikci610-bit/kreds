@@ -533,7 +533,13 @@ struct MemoryGalleryScreen: View {
     private var caption: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                if let shot = model.capturedImage {
+                if let vurl = model.capturedVideoURL {
+                    LoopingVideoView(url: vurl)                       // videoen spiller i loop, 4:5
+                        .aspectRatio(4.0 / 5.0, contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.5)
+                        .clipped()
+                        .padding(.bottom, 6)
+                } else if let shot = model.capturedImage {
                     Image(uiImage: shot).resizable().scaledToFit()   // hele 4:5, ikke beskåret
                         .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.5)
                         .padding(.bottom, 6)
@@ -811,6 +817,36 @@ struct CameraPreview: UIViewRepresentable {
     final class PreviewView: UIView {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
         var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+    }
+}
+
+/// Loopende, lydløs video-afspiller (til at forhåndsvise en optaget video i billedtekst-trinet).
+/// resizeAspectFill i en 4:5-ramme → viser samme udsnit som den endelige 4:5-beskæring.
+struct LoopingVideoView: UIViewRepresentable {
+    let url: URL
+    func makeUIView(context: Context) -> PlayerBox {
+        let v = PlayerBox(); v.configure(url: url); return v
+    }
+    func updateUIView(_ uiView: PlayerBox, context: Context) {}
+    static func dismantleUIView(_ uiView: PlayerBox, coordinator: ()) { uiView.teardown() }
+
+    final class PlayerBox: UIView {
+        override class var layerClass: AnyClass { AVPlayerLayer.self }
+        private var player: AVQueuePlayer?
+        private var looper: AVPlayerLooper?
+        private var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+
+        func configure(url: URL) {
+            let item = AVPlayerItem(url: url)
+            let qp = AVQueuePlayer()
+            qp.isMuted = true
+            looper = AVPlayerLooper(player: qp, templateItem: item)
+            playerLayer.player = qp
+            playerLayer.videoGravity = .resizeAspectFill
+            player = qp
+            qp.play()
+        }
+        func teardown() { player?.pause(); player = nil; looper = nil; playerLayer.player = nil }
     }
 }
 
