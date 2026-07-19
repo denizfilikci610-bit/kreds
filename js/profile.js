@@ -4,23 +4,28 @@ import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConse
 import { t, setLang, getLang, policyURL } from "./i18n.js";
 import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps } from "./feed.js";
 import { openCompose, openStoryCamera } from "./compose.js";
+import { openStoryViewer } from "./stories.js";
 import { renderSearch, refreshSearchAfterFriendAdd } from "./search.js";
 import { resetApp, showAuth, nativeLogout } from "./auth.js";
 
 /* ================= Bobler-række ================= */
 export function renderStories(){
   if(!me){ el("stories").innerHTML = ""; return; }
+  const groups = state.storyGroups || [];
+  const mine = groups.find(function(g){ return g.isMe; });
+  const meRing = mine ? (mine.allSeen ? " seen" : " unseen") : "";
   let html =
-    '<button class="story" data-u="'+esc(me.handle)+'" data-me="1">'+
+    '<button class="story'+meRing+'" data-u="'+esc(me.handle)+'" data-me="1">'+
       '<div class="ringwrap"><div class="bub">'+avaHTML(me.handle, 56)+'</div>'+
       '<span class="plusb">+</span></div>'+
       '<span class="lbl">'+t("profile.you")+'</span>'+
     '</button>';
-  state.friends.forEach(function(h){
+  groups.forEach(function(g){
+    if(g.isMe) return;
     html +=
-      '<button class="story" data-u="'+esc(h)+'">'+
-        '<div class="bub">'+avaHTML(h, 56)+'</div>'+
-        '<span class="lbl">'+esc(user(h).name.split(" ")[0])+'</span>'+
+      '<button class="story '+(g.allSeen ? "seen" : "unseen")+'" data-u="'+esc(g.author.handle)+'">'+
+        '<div class="ringwrap"><div class="bub">'+avaHTML(g.author.handle, 56)+'</div></div>'+
+        '<span class="lbl">'+esc((g.author.name || g.author.handle).split(" ")[0])+'</span>'+
       '</button>';
   });
   el("stories").innerHTML = html;
@@ -801,7 +806,13 @@ el("pv-add").addEventListener("click", async function(){
 el("stories").addEventListener("click", function(e){
   const s = e.target.closest(".story");
   if(!s) return;
-  if(s.dataset.me){ if(window.__vfComposeCamera) openStoryCamera(); else openCompose(); return; }
-  openProfile(s.dataset.u);
+  if(s.dataset.me){
+    // + → tilføj en story; ellers (hvis jeg har en aktiv story) → se min egen
+    const mine = (state.storyGroups || []).find(function(g){ return g.isMe; });
+    if(!e.target.closest(".plusb") && mine){ openStoryViewer(me.handle); return; }
+    if(window.__vfComposeCamera) openStoryCamera(); else openCompose();
+    return;
+  }
+  openStoryViewer(s.dataset.u);   // se en vens story
 });
 }

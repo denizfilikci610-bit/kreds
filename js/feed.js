@@ -5,6 +5,7 @@ import { t, likesLabel } from "./i18n.js";
 import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, deleteComment, cInput, cKey, clearReply, clearCImg, openNativeComments, pushNativeComments } from "./comments.js";
 import { openFeedSheet, openMemberSheet } from "./kredse.js";
 import { openProfile, closeProfile, closeMemView, renderMyPosts, renderStories, refreshPv, doBlockUser } from "./profile.js";
+import { loadStories } from "./stories.js";
 import { renderSearch } from "./search.js";
 import { loadNotifs, setNotifDot } from "./notifications.js";
 import { scheduleRefetch } from "./realtime.js";
@@ -497,6 +498,7 @@ export async function loadPosts(advanceSeen){
       lastFeedSig = sig;
       renderFeed();
       renderStories();
+      loadStories();   // henter friske stories + set-status, gentegner rækken når klar
       if(el("view-profil").classList.contains("active")) renderMyPosts();
     }
     // NY-mærker rykkes kun "set" ved bruger-handlinger — IKKE ved baggrunds-refetch,

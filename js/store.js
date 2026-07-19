@@ -19,7 +19,8 @@ export const state = {
   wholePosts: [],         // whole-kreds posts (feed_id null)
   teasers: [],            // blurred teasers fra private kredse (kreds_teasers-RPC)
   feeds: [],              // { id, name, memberIds:[uuid], members:[handle] }
-  currentFeed: "all"
+  currentFeed: "all",
+  storyGroups: []         // [{ author:{id,handle,name,avatar_path}, items:[{id,url,isVideo,seen}], allSeen, isMe }]
 };
 
 export const expandedCmts = new Set();   // post ids med fuldt udfoldet kommentartråd

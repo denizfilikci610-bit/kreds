@@ -166,6 +166,40 @@
     display:flex;align-items:center;justify-content:center;
     font-size:14px;font-weight:700;line-height:1;
   }
+  /* Story-ringe: farvet = uset, grå = set */
+  .story{width:70px}
+  .story .ringwrap{
+    width:66px;height:66px;border-radius:50%;padding:3px;box-sizing:border-box;
+    display:flex;align-items:center;justify-content:center;margin:0 auto;position:relative;
+  }
+  .story.unseen .ringwrap{background:linear-gradient(45deg,#F58529,#DD2A7B,#8134AF)}
+  .story.seen .ringwrap{background:#c7c7cc}
+  .story .ringwrap .bub{width:100%;height:100%;border:2.5px solid var(--bg);box-sizing:border-box}
+
+  /* ================= Story-viewer (fuldskærm) ================= */
+  .storyview{display:none;position:fixed;inset:0;z-index:200;background:#000}
+  .storyview.on{display:block}
+  .storyview .sv-media{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .storyview .sv-media img,.storyview .sv-media video{width:100%;height:100%;object-fit:contain}
+  .storyview .sv-bars{
+    position:absolute;top:calc(8px + env(safe-area-inset-top));left:8px;right:8px;
+    display:flex;gap:4px;z-index:3;
+  }
+  .storyview .sv-bar{flex:1;height:2.5px;border-radius:2px;background:rgba(255,255,255,.35);overflow:hidden}
+  .storyview .sv-bar i{display:block;height:100%;width:0;background:#fff;border-radius:2px}
+  .storyview .sv-bar.done i{width:100%}
+  .storyview .sv-bar.active i{animation:svfill 6s linear forwards}
+  @keyframes svfill{from{width:0}to{width:100%}}
+  .storyview .sv-head{
+    position:absolute;top:calc(20px + env(safe-area-inset-top));left:12px;right:12px;
+    display:flex;align-items:center;gap:9px;z-index:3;color:#fff;
+  }
+  .storyview .sv-head .sv-ava img,.storyview .sv-head .sv-ava > div{width:30px;height:30px;border-radius:50%}
+  .storyview .sv-name{flex:1;font-size:14px;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+  .storyview .sv-close{color:#fff;font-size:22px;line-height:1;padding:4px 10px}
+  .storyview .sv-tap{position:absolute;top:0;bottom:0;z-index:2;background:transparent}
+  .storyview .sv-left{left:0;width:35%}
+  .storyview .sv-right{right:0;width:65%}
 
   /* ================= Kreds-vælger ================= */
   .feedbar{
