@@ -835,6 +835,7 @@ struct LoopingVideoView: UIViewRepresentable {
         override class var layerClass: AnyClass { AVPlayerLayer.self }
         private var player: AVPlayer?
         private var item: AVPlayerItem?
+        private var keepAlive: Timer?
         private var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
 
         func configure(url: URL) {
@@ -842,17 +843,31 @@ struct LoopingVideoView: UIViewRepresentable {
             let p = AVPlayer(playerItem: it)
             p.isMuted = false
             p.actionAtItemEnd = .none
+            p.automaticallyWaitsToMinimizeStalling = false
             playerLayer.player = p
             playerLayer.videoGravity = .resizeAspectFill
             player = p; item = it
             NotificationCenter.default.addObserver(self, selector: #selector(loopBack),
                                                    name: .AVPlayerItemDidPlayToEndTime, object: it)
+            activateAudio()
+            p.play()
+            // Vagt: hvis noget pauser afspilningen før tid (fx kamera-sessionen der lukker og
+            // afbryder lyd-sessionen), så genaktiver lyden og spil videre. Sikrer fuldt loop.
+            keepAlive = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in
+                guard let self, let p = self.player else { return }
+                if p.timeControlStatus != .playing {
+                    self.activateAudio()
+                    p.play()
+                }
+            }
+        }
+        private func activateAudio() {
             try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
             try? AVAudioSession.sharedInstance().setActive(true)
-            p.play()
         }
         @objc private func loopBack() { player?.seek(to: .zero); player?.play() }
         func teardown() {
+            keepAlive?.invalidate(); keepAlive = nil
             NotificationCenter.default.removeObserver(self)
             player?.pause(); player = nil; item = nil; playerLayer.player = nil
         }
