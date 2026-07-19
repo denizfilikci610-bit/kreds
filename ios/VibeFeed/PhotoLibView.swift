@@ -18,6 +18,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
     enum Step { case camera, gallery, trim, caption }
     @Published var open = false
     @Published var forCompose = false   // åbnet fra en TANKE (Tag med kamera) → hæft medie, opret ikke minde
+    @Published var isStory = false      // åbnet som STORY → indsæt i stories (24t), ingen billedtekst
     @Published var step: Step = .camera
     @Published var status: PHAuthorizationStatus = .notDetermined
     @Published var assets: [PHAsset] = []
@@ -79,6 +80,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
         }
         guard (dict["open"] as? Bool) == true else { return }
         forCompose = (dict["purpose"] as? String) == "compose"
+        isStory = (dict["purpose"] as? String) == "story"
         dest = dict["dest"] as? String ?? "all"
         if let raw = dict["feeds"] as? [[String: Any]] {
             feeds = raw.compactMap { d in
@@ -377,7 +379,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
 
     private func send(isVideo: Bool, ext: String, mime: String) {
         pendingMime = mime
-        let obj: [String: Any] = ["isVideo": isVideo, "caption": caption, "dest": dest, "ext": ext, "mime": mime, "forCompose": forCompose]
+        let obj: [String: Any] = ["isVideo": isVideo, "caption": caption, "dest": dest, "ext": ext, "mime": mime, "forCompose": forCompose, "isStory": isStory]
         guard let d = try? JSONSerialization.data(withJSONObject: obj), let s = String(data: d, encoding: .utf8) else {
             sharing = false; pendingData = nil; onUploadFailed?(); return
         }
@@ -551,6 +553,7 @@ struct MemoryGalleryScreen: View {
                 } else if let sel = model.selected {
                     PreviewPane(asset: sel).frame(height: UIScreen.main.bounds.height * 0.34).padding(.bottom, 6)
                 }
+                if !model.isStory {   // en story har ingen billedtekst
                 TextField(model.captionPlaceholder, text: $model.caption, axis: .vertical)
                     .font(.system(size: 16)).lineLimit(1...5)
                     .padding(.horizontal, 16).padding(.vertical, 12)
@@ -574,6 +577,7 @@ struct MemoryGalleryScreen: View {
                         .padding(.horizontal, 16)
                     }
                     .padding(.bottom, 8)
+                }
                 }
                 Divider().opacity(0.4)
                 Text(model.destLabel.uppercased()).font(.system(size: 12, weight: .bold))
