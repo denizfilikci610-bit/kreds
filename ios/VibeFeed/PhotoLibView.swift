@@ -99,7 +99,8 @@ final class PhotoLibModel: NSObject, ObservableObject {
         } else {
             mentionables = [:]
         }
-        caption = ""; selected = nil; capturedImage = nil; capturedVideoURL = nil; sharing = false; loadingOriginal = false; step = .camera
+        caption = ""; selected = nil; capturedImage = nil; capturedVideoURL = nil; sharing = false; loadingOriginal = false
+        step = (forCompose && (dict["start"] as? String) == "gallery") ? .gallery : .camera
         videoAsset = nil; videoDuration = 0; trimStart = 0; trimDuration = VF_MAX_VID; showTrimStep = false; preparingTrim = false
         pendingData = nil; exportSession = nil; trimReqSeq += 1
         open = true
@@ -168,7 +169,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
     /// step; otherwise straight to caption (the whole short clip is used). For an IMAGE, go to caption.
     func prepareAndAdvance() {
         guard let asset = selected else { return }
-        if asset.mediaType != .video { showTrimStep = false; step = .caption; return }
+        if asset.mediaType != .video { showTrimStep = false; if forCompose { share() } else { step = .caption }; return }
         trimReqSeq += 1
         let seq = trimReqSeq   // the grid is frozen while preparingTrim, so `selected` == `asset` in the callback
         preparingTrim = true
@@ -180,14 +181,16 @@ final class PhotoLibModel: NSObject, ObservableObject {
             DispatchQueue.main.async {
                 guard seq == self.trimReqSeq else { return } // superseded by a newer request / reopen
                 self.preparingTrim = false
-                guard let avAsset else { self.showTrimStep = false; self.step = .caption; return }
+                guard let avAsset else { self.showTrimStep = false; if self.forCompose { self.share() } else { self.step = .caption }; return }
                 self.videoAsset = avAsset
                 let dur = CMTimeGetSeconds(avAsset.duration)
                 self.videoDuration = (dur.isFinite && dur > 0) ? dur : 0
                 self.trimDuration = min(VF_MAX_VID, max(0.1, self.videoDuration))
                 self.trimStart = 0
                 self.showTrimStep = self.videoDuration > VF_MAX_VID + 0.05
-                self.step = self.showTrimStep ? .trim : .caption
+                if self.showTrimStep { self.step = .trim }
+                else if self.forCompose { self.share() }
+                else { self.step = .caption }
             }
         }
         // Safety: never leave the "Videre" spinner stuck if the callback is dropped (rare iCloud edge).
@@ -441,7 +444,7 @@ struct MemoryGalleryScreen: View {
             Button(model.cancelLabel) {
                 switch model.step {
                 case .camera: model.dismiss()
-                case .gallery: model.step = .camera            // tilbage til kameraet
+                case .gallery: if model.forCompose { model.dismiss() } else { model.step = .camera }  // tanke: annuller lukker; minde: tilbage til kameraet
                 case .trim: model.step = .gallery
                 case .caption:
                     if model.capturedImage != nil { model.step = .camera }
@@ -457,15 +460,15 @@ struct MemoryGalleryScreen: View {
                 EmptyView()
             case .gallery:
                 Button { model.prepareAndAdvance() } label: {
-                    if model.preparingTrim { ProgressView() }
+                    if model.preparingTrim || model.sharing { ProgressView() }
                     else {
                         Text(model.nextLabel).font(.system(size: 16, weight: .bold))
                             .foregroundStyle(model.selected == nil ? Color.secondary : vfRed)
                     }
                 }
-                .disabled(model.selected == nil || model.preparingTrim)
+                .disabled(model.selected == nil || model.preparingTrim || model.sharing)
             case .trim:
-                Button(model.nextLabel) { model.step = .caption }
+                Button(model.nextLabel) { if model.forCompose { model.share() } else { model.step = .caption } }
                     .font(.system(size: 16, weight: .bold)).foregroundStyle(vfRed)
             case .caption:
                 Button { model.share() } label: {
