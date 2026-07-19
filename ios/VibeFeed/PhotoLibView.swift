@@ -679,6 +679,7 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
     @Published var flashOn = false
     @Published var recording = false
     @Published var secondsLeft = 0                    // nedtælling under optagelse (6 → 0)
+    @Published var zoomFactor: CGFloat = 1.0          // aktuel zoom (1x → maks)
     @Published var position: AVCaptureDevice.Position = .back
     private var countdownTimer: Timer?
 
@@ -742,9 +743,36 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
 
     func flip() {
         position = (position == .back) ? .front : .back
+        zoomFactor = 1.0
         queue.async { [weak self] in
             guard let self else { return }
             self.session.beginConfiguration(); self.setVideoInput(self.position); self.session.commitConfiguration()
+        }
+    }
+
+    /// Knib for at zoome (1x → maks 8x). Sætter enhedens videoZoomFactor.
+    func setZoom(_ factor: CGFloat) {
+        queue.async { [weak self] in
+            guard let self, let device = self.videoInput?.device else { return }
+            let maxF = min(device.activeFormat.videoMaxZoomFactor, 8.0)
+            let clamped = max(1.0, min(factor, maxF))
+            do { try device.lockForConfiguration() } catch { return }
+            device.videoZoomFactor = clamped
+            device.unlockForConfiguration()
+            DispatchQueue.main.async { self.zoomFactor = clamped }
+        }
+    }
+
+    /// Tryk for at fokusere + justere lys på et punkt (enheds-koordinater 0-1).
+    func focus(at point: CGPoint) {
+        queue.async { [weak self] in
+            guard let self, let device = self.videoInput?.device else { return }
+            do { try device.lockForConfiguration() } catch { return }
+            if device.isFocusPointOfInterestSupported { device.focusPointOfInterest = point }
+            if device.isFocusModeSupported(.autoFocus) { device.focusMode = .autoFocus }
+            if device.isExposurePointOfInterestSupported { device.exposurePointOfInterest = point }
+            if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+            device.unlockForConfiguration()
         }
     }
 
@@ -805,18 +833,29 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
 }
 
 /// SwiftUI-wrapper om AVCaptureVideoPreviewLayer (den live kamera-forhåndsvisning).
+/// Tryk konverteres til enheds-koordinater og meldes tilbage (device-punkt 0-1, view-punkt).
 struct CameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
+    var onFocus: ((CGPoint, CGPoint) -> Void)? = nil
     func makeUIView(context: Context) -> PreviewView {
         let v = PreviewView()
         v.previewLayer.session = session
         v.previewLayer.videoGravity = .resizeAspectFill
+        v.onFocus = onFocus
+        let tap = UITapGestureRecognizer(target: v, action: #selector(PreviewView.handleTap(_:)))
+        v.addGestureRecognizer(tap)
         return v
     }
-    func updateUIView(_ uiView: PreviewView, context: Context) {}
+    func updateUIView(_ uiView: PreviewView, context: Context) { uiView.onFocus = onFocus }
     final class PreviewView: UIView {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
         var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+        var onFocus: ((CGPoint, CGPoint) -> Void)?
+        @objc func handleTap(_ g: UITapGestureRecognizer) {
+            let vp = g.location(in: self)
+            let dp = previewLayer.captureDevicePointConverted(fromLayerPoint: vp)
+            onFocus?(dp, vp)
+        }
     }
 }
 
@@ -882,6 +921,9 @@ struct MemoryCameraScreen: View {
     @State private var thumb: UIImage?
     @State private var holdWork: DispatchWorkItem?   // udløser video-start hvis knappen holdes
     @State private var didRecord = false             // dette tryk startede en optagelse
+    @State private var baseZoom: CGFloat = 1.0       // zoom ved knib-start
+    @State private var focusPt: CGPoint?             // seneste fokus-tryk (view-koordinat)
+    @State private var focusSeq = 0                  // fader fokus-firkanten ud igen
 
     var body: some View {
         GeometryReader { geo in
@@ -893,13 +935,33 @@ struct MemoryCameraScreen: View {
                 // Live-preview begrænset til 4:5, centreret. Alt uden for rammen er mørkt (fade).
                 Group {
                     if cam.authorized {
-                        CameraPreview(session: cam.session).frame(width: w, height: fh).clipped()
+                        CameraPreview(session: cam.session, onFocus: { dp, vp in
+                            cam.focus(at: dp)
+                            focusPt = vp
+                            focusSeq += 1
+                            let s = focusSeq
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { if focusSeq == s { focusPt = nil } }
+                        })
+                        .frame(width: w, height: fh).clipped()
+                        .overlay {
+                            if let fp = focusPt {
+                                RoundedRectangle(cornerRadius: 4).strokeBorder(Color.yellow, lineWidth: 1.5)
+                                    .frame(width: 74, height: 74)
+                                    .position(x: fp.x, y: fp.y)
+                                    .allowsHitTesting(false)
+                            }
+                        }
                     } else {
                         deniedPanel.frame(width: w, height: fh)
                     }
                 }
                 .overlay(Rectangle().strokeBorder(Color.white.opacity(0.22), lineWidth: 1).frame(width: w, height: fh))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { scale in cam.setZoom(baseZoom * scale) }
+                        .onEnded { _ in baseZoom = cam.zoomFactor }
+                )
 
                 // Fade øverst + nederst (så kontrollerne kan læses og 4:5-rammen popper)
                 VStack(spacing: 0) {
@@ -927,6 +989,14 @@ struct MemoryCameraScreen: View {
                     .padding(.horizontal, 20).padding(.top, 6)
 
                     Spacer()
+
+                    if cam.zoomFactor > 1.02 {
+                        Text(String(format: "%.1fx", cam.zoomFactor))
+                            .font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(Capsule().fill(Color.black.opacity(0.4)))
+                            .padding(.bottom, 6)
+                    }
 
                     // Hint tæt over knappen, på en mørk pille så den ikke flyder ud over billedet
                     if !cam.recording {
