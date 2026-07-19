@@ -1,6 +1,7 @@
 import SwiftUI
 import Photos
 import AVFoundation
+import UIKit
 
 /// Instagram-style IN-APP photo/video gallery composer for MEMORIES (the owner sent the IG screenshot).
 /// A WKWebView can't read the photo library, so this is native PhotoKit: a grid of the user's own
@@ -14,12 +15,14 @@ struct PLFeed: Identifiable, Equatable { let id: String; let name: String }
 final class PhotoLibModel: NSObject, ObservableObject {
     static let shared = PhotoLibModel()
 
-    enum Step { case gallery, trim, caption }
+    enum Step { case camera, gallery, trim, caption }
     @Published var open = false
-    @Published var step: Step = .gallery
+    @Published var step: Step = .camera
     @Published var status: PHAuthorizationStatus = .notDetermined
     @Published var assets: [PHAsset] = []
     @Published var selected: PHAsset?
+    @Published var capturedImage: UIImage?   // et foto taget med kameraet, ELLER poster-frame for en optaget video
+    @Published var capturedVideoURL: URL?    // en video optaget med det indbyggede kamera (≤6 s)
     @Published var caption = ""
     @Published var dest = "all"
     @Published var mentionables: [String: [MentionCard]] = [:] // @-kandidater pr. destination (fra web)
@@ -94,7 +97,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
         } else {
             mentionables = [:]
         }
-        caption = ""; selected = nil; sharing = false; loadingOriginal = false; step = .gallery
+        caption = ""; selected = nil; capturedImage = nil; capturedVideoURL = nil; sharing = false; loadingOriginal = false; step = .camera
         videoAsset = nil; videoDuration = 0; trimStart = 0; trimDuration = VF_MAX_VID; showTrimStep = false; preparingTrim = false
         pendingData = nil; exportSession = nil; trimReqSeq += 1
         open = true
@@ -194,7 +197,22 @@ final class PhotoLibModel: NSObject, ObservableObject {
 
     /// "Del": export the picked media, then ask the web for a Storage upload URL.
     func share() {
-        guard let asset = selected, !sharing else { return }
+        guard !sharing else { return }
+        // Video optaget med kameraet: beskær til 4:5 og upload som mp4.
+        if let vurl = capturedVideoURL {
+            sharing = true
+            export45Video(vurl)
+            return
+        }
+        // Foto taget med kameraet (allerede beskåret til 4:5): upload direkte.
+        if let shot = capturedImage {
+            sharing = true
+            guard let data = shot.jpegData(compressionQuality: 0.9) else { sharing = false; return }
+            pendingData = data
+            send(isVideo: false, ext: "jpg", mime: "image/jpeg")
+            return
+        }
+        guard let asset = selected else { return }
         sharing = true
         if asset.mediaType == .video {
             exportTrimmedVideo()
@@ -208,6 +226,93 @@ final class PhotoLibModel: NSObject, ObservableObject {
                 self.send(isVideo: false, ext: "jpg", mime: "image/jpeg")
             }
         }
+    }
+
+    /// Et foto taget med kameraet → beskær til præcis 4:5 (1080x1350) og gå til billedtekst.
+    func useCaptured(_ image: UIImage) {
+        capturedImage = cropTo45(image)
+        capturedVideoURL = nil
+        selected = nil; videoAsset = nil; showTrimStep = false
+        step = .caption
+    }
+
+    /// En video optaget med kameraet → gem URL + poster-frame og gå til billedtekst (beskæres ved Del).
+    func useCapturedVideo(_ url: URL) {
+        capturedVideoURL = url
+        capturedImage = posterFrame(url)   // vises i billedtekst-trinet
+        selected = nil; videoAsset = nil; showTrimStep = false
+        step = .caption
+    }
+
+    /// Center-beskær + skalér til præcis 1080x1350 (4:5). draw(in:) respekterer orienteringen.
+    private func cropTo45(_ image: UIImage) -> UIImage {
+        let out = CGSize(width: 1080, height: 1350)
+        let fmt = UIGraphicsImageRendererFormat.default(); fmt.scale = 1; fmt.opaque = true
+        return UIGraphicsImageRenderer(size: out, format: fmt).image { _ in
+            let iw = image.size.width, ih = image.size.height
+            guard iw > 0, ih > 0 else { return }
+            let scale = max(out.width / iw, out.height / ih)   // aspectFill
+            let dw = iw * scale, dh = ih * scale
+            image.draw(in: CGRect(x: (out.width - dw) / 2, y: (out.height - dh) / 2, width: dw, height: dh))
+        }
+    }
+
+    /// Første frame af en video som poster (til billedtekst-forhåndsvisningen).
+    private func posterFrame(_ url: URL) -> UIImage? {
+        let gen = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+        gen.appliesPreferredTrackTransform = true
+        gen.maximumSize = CGSize(width: 1080, height: 1350)
+        guard let cg = try? gen.copyCGImage(at: CMTime(seconds: 0.1, preferredTimescale: 600), actualTime: nil) else { return nil }
+        return cropTo45(UIImage(cgImage: cg))
+    }
+
+    /// Beskær den optagne video til 4:5 (1080x1350) via en video-composition og upload som mp4.
+    private func export45Video(_ url: URL) {
+        let asset = AVURLAsset(url: url)
+        guard let track = asset.tracks(withMediaType: .video).first else { sharing = false; onUploadFailed?(); return }
+        let render = CGSize(width: 1080, height: 1350)
+        let comp = AVMutableVideoComposition()
+        comp.renderSize = render
+        comp.frameDuration = CMTime(value: 1, timescale: 30)
+        let instruction = AVMutableVideoCompositionInstruction()
+        instruction.timeRange = CMTimeRange(start: .zero, duration: asset.duration)
+        let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: track)
+        layer.setTransform(aspectFill45(track: track, render: render), at: .zero)
+        instruction.layerInstructions = [layer]
+        comp.instructions = [instruction]
+
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mp4")
+        try? FileManager.default.removeItem(at: out)
+        guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPreset1280x720) else {
+            sharing = false; onUploadFailed?(); return
+        }
+        export.videoComposition = comp
+        export.outputURL = out
+        export.outputFileType = .mp4
+        export.shouldOptimizeForNetworkUse = true
+        export.exportAsynchronously { [weak self] in
+            guard let self else { return }
+            let ok = export.status == .completed
+            let data = ok ? try? Data(contentsOf: out) : nil
+            DispatchQueue.main.async {
+                try? FileManager.default.removeItem(at: out)
+                if let data { self.pendingData = data; self.send(isVideo: true, ext: "mp4", mime: "video/mp4") }
+                else { self.sharing = false; self.onUploadFailed?() }
+            }
+        }
+    }
+
+    /// Transform: orientér kildesporet og aspect-fill-beskær det ind i 4:5-render-størrelsen.
+    private func aspectFill45(track: AVAssetTrack, render: CGSize) -> CGAffineTransform {
+        let pt = track.preferredTransform
+        let oriented = track.naturalSize.applying(pt)
+        let ow = abs(oriented.width), oh = abs(oriented.height)
+        guard ow > 0, oh > 0 else { return pt }
+        let scale = max(render.width / ow, render.height / oh)
+        let tx = (render.width - ow * scale) / 2, ty = (render.height - oh * scale) / 2
+        return pt
+            .concatenating(CGAffineTransform(scaleX: scale, y: scale))
+            .concatenating(CGAffineTransform(translationX: tx, y: ty))
     }
 
     /// Export the chosen ≤6 s window (or the whole clip if it was already short) to a small H.264 mp4.
@@ -311,14 +416,19 @@ struct MemoryGalleryScreen: View {
     var body: some View {
         ZStack {
             Color(.systemBackground).ignoresSafeArea()
-            VStack(spacing: 0) {
-                navBar
-                Divider().opacity(0.4)
-                switch model.step {
-                case .gallery: gallery
-                case .trim:
-                    if let a = model.videoAsset { VideoTrimView(asset: a) } else { gallery }
-                case .caption: caption
+            if model.step == .camera {
+                MemoryCameraScreen()   // fuldskærm, eget kamera-chrome
+            } else {
+                VStack(spacing: 0) {
+                    navBar
+                    Divider().opacity(0.4)
+                    switch model.step {
+                    case .camera: EmptyView()   // håndteres fuldskærm ovenfor
+                    case .gallery: gallery
+                    case .trim:
+                        if let a = model.videoAsset { VideoTrimView(asset: a) } else { gallery }
+                    case .caption: caption
+                    }
                 }
             }
         }
@@ -328,9 +438,12 @@ struct MemoryGalleryScreen: View {
         HStack {
             Button(model.cancelLabel) {
                 switch model.step {
-                case .gallery: model.dismiss()
+                case .camera: model.dismiss()
+                case .gallery: model.step = .camera            // tilbage til kameraet
                 case .trim: model.step = .gallery
-                case .caption: model.step = model.showTrimStep ? .trim : .gallery
+                case .caption:
+                    if model.capturedImage != nil { model.step = .camera }
+                    else { model.step = model.showTrimStep ? .trim : .gallery }
                 }
             }
             .foregroundStyle(Color.primary)
@@ -338,6 +451,8 @@ struct MemoryGalleryScreen: View {
             Text(model.title).font(.system(size: 16, weight: .bold))
             Spacer()
             switch model.step {
+            case .camera:
+                EmptyView()
             case .gallery:
                 Button { model.prepareAndAdvance() } label: {
                     if model.preparingTrim { ProgressView() }
@@ -418,7 +533,11 @@ struct MemoryGalleryScreen: View {
     private var caption: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                if let sel = model.selected {
+                if let shot = model.capturedImage {
+                    Image(uiImage: shot).resizable().scaledToFill()
+                        .frame(height: UIScreen.main.bounds.height * 0.34)
+                        .frame(maxWidth: .infinity).clipped().padding(.bottom, 6)
+                } else if let sel = model.selected {
                     PreviewPane(asset: sel).frame(height: UIScreen.main.bounds.height * 0.34).padding(.bottom, 6)
                 }
                 TextField(model.captionPlaceholder, text: $model.caption, axis: .vertical)
@@ -532,6 +651,290 @@ struct PhotoLibHost: ViewModifier {
     func body(content: Content) -> some View {
         content.fullScreenCover(isPresented: Binding(get: { model.open }, set: { if !$0 { model.open = false } })) {
             MemoryGalleryScreen()
+        }
+    }
+}
+
+// MARK: - Native kamera (skræddersyet, som Instagram-kameraet men uden mode-faner)
+
+/// Ejer AVCaptureSession'en for minde-kameraet: live-preview, foto-optagelse, blitz og vend-kamera.
+final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutputRecordingDelegate {
+    let session = AVCaptureSession()
+    private let photoOutput = AVCapturePhotoOutput()
+    private let movieOutput = AVCaptureMovieFileOutput()
+    private var videoInput: AVCaptureDeviceInput?
+    private var audioInput: AVCaptureDeviceInput?
+    private let queue = DispatchQueue(label: "vf.memory.camera")
+    private var onCapture: ((UIImage) -> Void)?
+    private var onVideo: ((URL) -> Void)?
+    private var configured = false
+
+    @Published var authorized = false
+    @Published var flashOn = false
+    @Published var recording = false
+    @Published var position: AVCaptureDevice.Position = .back
+
+    /// Bed om kamera- (og mikrofon-) adgang og start sessionen. Callbacks kaldes på main-tråden.
+    func start(onCapture: @escaping (UIImage) -> Void, onVideo: @escaping (URL) -> Void) {
+        self.onCapture = onCapture
+        self.onVideo = onVideo
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            authorized = true; configureAndRun()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] ok in
+                DispatchQueue.main.async {
+                    self?.authorized = ok
+                    if ok { self?.configureAndRun() }
+                }
+            }
+        default:
+            authorized = false
+        }
+        AVCaptureDevice.requestAccess(for: .audio) { _ in }   // mikrofon til video-lyd
+    }
+
+    func stop() {
+        queue.async { [weak self] in
+            if self?.movieOutput.isRecording == true { self?.movieOutput.stopRecording() }
+            if self?.session.isRunning == true { self?.session.stopRunning() }
+        }
+    }
+
+    private func configureAndRun() {
+        queue.async { [weak self] in
+            guard let self else { return }
+            if !self.configured {
+                self.configured = true
+                self.session.beginConfiguration()
+                self.session.sessionPreset = .high   // understøtter både foto og video
+                self.setVideoInput(self.position)
+                self.setAudioInput()
+                if self.session.canAddOutput(self.photoOutput) { self.session.addOutput(self.photoOutput) }
+                if self.session.canAddOutput(self.movieOutput) { self.session.addOutput(self.movieOutput) }
+                self.session.commitConfiguration()
+            }
+            if !self.session.isRunning { self.session.startRunning() }
+        }
+    }
+
+    private func setVideoInput(_ pos: AVCaptureDevice.Position) {
+        if let cur = videoInput { session.removeInput(cur) }
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: pos),
+              let newInput = try? AVCaptureDeviceInput(device: device),
+              session.canAddInput(newInput) else { return }
+        session.addInput(newInput); videoInput = newInput
+    }
+
+    private func setAudioInput() {
+        guard audioInput == nil, let mic = AVCaptureDevice.default(for: .audio),
+              let ai = try? AVCaptureDeviceInput(device: mic), session.canAddInput(ai) else { return }
+        session.addInput(ai); audioInput = ai
+    }
+
+    func flip() {
+        position = (position == .back) ? .front : .back
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.session.beginConfiguration(); self.setVideoInput(self.position); self.session.commitConfiguration()
+        }
+    }
+
+    func capture() {
+        queue.async { [weak self] in
+            guard let self, self.session.isRunning, !self.movieOutput.isRecording else { return }
+            let settings = AVCapturePhotoSettings()
+            let mode: AVCaptureDevice.FlashMode = self.flashOn ? .on : .off
+            if self.photoOutput.supportedFlashModes.contains(mode) { settings.flashMode = mode }
+            self.photoOutput.capturePhoto(with: settings, delegate: self)
+        }
+    }
+
+    /// Hold optage-knappen → start video (auto-stop efter 6 sekunder).
+    func startRecording() {
+        queue.async { [weak self] in
+            guard let self, self.session.isRunning, !self.movieOutput.isRecording else { return }
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+            try? FileManager.default.removeItem(at: url)
+            DispatchQueue.main.async { self.recording = true }
+            self.movieOutput.startRecording(to: url, recordingDelegate: self)
+            DispatchQueue.main.asyncAfter(deadline: .now() + VF_MAX_VID) { [weak self] in self?.stopRecording() }
+        }
+    }
+
+    func stopRecording() {
+        queue.async { [weak self] in
+            guard let self, self.movieOutput.isRecording else { return }
+            self.movieOutput.stopRecording()
+        }
+    }
+
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        guard error == nil, let data = photo.fileDataRepresentation(), let image = UIImage(data: data) else { return }
+        DispatchQueue.main.async { [weak self] in self?.onCapture?(image) }
+    }
+
+    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
+        DispatchQueue.main.async { [weak self] in
+            self?.recording = false
+            guard error == nil else { return }
+            self?.onVideo?(outputFileURL)
+        }
+    }
+}
+
+/// SwiftUI-wrapper om AVCaptureVideoPreviewLayer (den live kamera-forhåndsvisning).
+struct CameraPreview: UIViewRepresentable {
+    let session: AVCaptureSession
+    func makeUIView(context: Context) -> PreviewView {
+        let v = PreviewView()
+        v.previewLayer.session = session
+        v.previewLayer.videoGravity = .resizeAspectFill
+        return v
+    }
+    func updateUIView(_ uiView: PreviewView, context: Context) {}
+    final class PreviewView: UIView {
+        override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
+        var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+    }
+}
+
+/// Kamera-trinet i minde-komposeren: fuldskærms preview + skræddersyet chrome
+/// (luk, blitz, optage-knap, vend-kamera, galleri-miniature). Ingen OPSLAG/STORY/REELS.
+struct MemoryCameraScreen: View {
+    @ObservedObject private var model = PhotoLibModel.shared
+    @StateObject private var cam = MemoryCamera()
+    @State private var thumb: UIImage?
+    @State private var didStartVideo = false
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let fh = w * 5.0 / 4.0   // 4:5-optageområdet (1080x1350)
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                // Live-preview begrænset til 4:5, centreret. Alt uden for rammen er mørkt (fade).
+                Group {
+                    if cam.authorized {
+                        CameraPreview(session: cam.session).frame(width: w, height: fh).clipped()
+                    } else {
+                        deniedPanel.frame(width: w, height: fh)
+                    }
+                }
+                .overlay(Rectangle().strokeBorder(Color.white.opacity(0.22), lineWidth: 1).frame(width: w, height: fh))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // Fade øverst + nederst (så kontrollerne kan læses og 4:5-rammen popper)
+                VStack(spacing: 0) {
+                    LinearGradient(colors: [.black.opacity(0.55), .clear], startPoint: .top, endPoint: .bottom).frame(height: 130)
+                    Spacer()
+                    LinearGradient(colors: [.clear, .black.opacity(0.62)], startPoint: .top, endPoint: .bottom).frame(height: 165)
+                }
+                .ignoresSafeArea().allowsHitTesting(false)
+
+                VStack {
+                    HStack {
+                        iconButton("xmark") { model.dismiss() }
+                        Spacer()
+                        if cam.recording {
+                            HStack(spacing: 5) {
+                                Circle().fill(Color.white).frame(width: 7, height: 7)
+                                Text("REC").font(.system(size: 12, weight: .heavy)).foregroundStyle(.white)
+                            }
+                            .padding(.horizontal, 9).padding(.vertical, 4)
+                            .background(Capsule().fill(Color.red))
+                        }
+                        Spacer()
+                        iconButton(cam.flashOn ? "bolt.fill" : "bolt.slash.fill") { cam.flashOn.toggle() }
+                    }
+                    .padding(.horizontal, 20).padding(.top, 6)
+
+                    Spacer()
+
+                    // Hint: tryk = foto, hold = video (op til 6 sek)
+                    Text(cam.recording ? "" : "Tryk for foto · hold for video")
+                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
+                        .padding(.bottom, 10)
+
+                    HStack(alignment: .center) {
+                        Button { model.step = .gallery } label: { thumbView }
+                        Spacer()
+                        captureButton
+                        Spacer()
+                        iconButton("arrow.triangle.2.circlepath.camera") { cam.flip() }
+                            .frame(width: 48, height: 48)
+                    }
+                    .padding(.horizontal, 26).padding(.bottom, 28)
+                }
+            }
+        }
+        .onAppear {
+            cam.start(onCapture: { img in model.useCaptured(img) },
+                      onVideo: { url in model.useCapturedVideo(url) })
+            if let a = model.assets.first { model.thumb(a, side: 48) { self.thumb = $0 } }
+        }
+        .onDisappear { cam.stop() }
+    }
+
+    // Optage-knap: tryk = foto, hold = video (rød firkant mens den optager).
+    private var captureButton: some View {
+        ZStack {
+            Circle().stroke(cam.recording ? Color.red : Color.white, lineWidth: 5).frame(width: 78, height: 78)
+            RoundedRectangle(cornerRadius: cam.recording ? 8 : 31, style: .continuous)
+                .fill(cam.recording ? Color.red : Color.white)
+                .frame(width: cam.recording ? 32 : 62, height: cam.recording ? 32 : 62)
+                .animation(.easeInOut(duration: 0.2), value: cam.recording)
+        }
+        .contentShape(Circle())
+        .opacity(cam.authorized ? 1 : 0.4)
+        .onLongPressGesture(minimumDuration: 0.3, maximumDistance: 60,
+            pressing: { pressing in
+                if !pressing {
+                    if didStartVideo { cam.stopRecording(); didStartVideo = false }
+                    else { cam.capture() }   // hurtigt tryk → foto
+                }
+            },
+            perform: {
+                didStartVideo = true
+                cam.startRecording()          // hold → video (auto-stop efter 6 s)
+            }
+        )
+        .disabled(!cam.authorized)
+    }
+
+    private var thumbView: some View {
+        Group {
+            if let thumb { Image(uiImage: thumb).resizable().scaledToFill() }
+            else { Image(systemName: "photo.on.rectangle").font(.system(size: 20)).foregroundStyle(.white) }
+        }
+        .frame(width: 48, height: 48)
+        .background(Color.white.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.white.opacity(0.7), lineWidth: 1.5))
+    }
+
+    private var deniedPanel: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "camera.fill").font(.system(size: 42)).foregroundStyle(.white.opacity(0.65))
+            Text(model.deniedNote.isEmpty ? "Giv adgang til kameraet i Indstillinger, eller vælg fra galleriet." : model.deniedNote)
+                .font(.system(size: 15)).foregroundStyle(.white.opacity(0.85))
+                .multilineTextAlignment(.center).padding(.horizontal, 36)
+            Button(model.settingsLabel.isEmpty ? "Åbn Indstillinger" : model.settingsLabel) { model.openSettings() }
+                .font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+                .padding(.horizontal, 22).padding(.vertical, 11)
+                .background(RoundedRectangle(cornerRadius: 12).fill(vfRed))
+        }
+    }
+
+    private func iconButton(_ symbol: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 42, height: 42)
+                .background(Color.black.opacity(0.28))
+                .clipShape(Circle())
         }
     }
 }
