@@ -129,13 +129,13 @@ function vfmh(){ return window.webkit && window.webkit.messageHandlers && window
 /* Åbn den native komposer. purpose="memory" → minde-flow (galleri + caption); "compose" →
    kun kamera, det tagne medie hæftes på den åbne tanke i stedet for at blive et minde.
    Returnerer false hvis der ingen native bro er (så kalderen kan falde tilbage). */
-function openPhotoLib(purpose){
+function openPhotoLib(purpose, start){
   const mh = vfmh();
   if(!mh) return false;
   const mentionables = { all: mentionCards("all") };
   state.feeds.forEach(function(f){ mentionables[f.id] = mentionCards(f.id); });
   mh.postMessage({
-    type: "photolib", open: true, purpose: purpose, dest: state.currentFeed || "all",
+    type: "photolib", open: true, purpose: purpose, start: start || "camera", dest: state.currentFeed || "all",
     feeds: state.feeds.map(function(f){ return { id: f.id, name: f.name }; }),
     mentionables: mentionables,
     labels: {
@@ -149,7 +149,9 @@ function openPhotoLib(purpose){
 }
 function postMemoryGallery(){ if(!openPhotoLib("memory")) openComposeWith("memory"); }
 /* Tanke: åbn det native kamera. Uden bro (browser) → systemkameraets billed-input. */
-function openNativeCameraForCompose(){ if(!openPhotoLib("compose")) el("cam-photo").click(); }
+function openNativeCameraForCompose(){ if(!openPhotoLib("compose", "camera")) el("cam-photo").click(); }
+/* Tanke: åbn det native galleri direkte. Uden bro (browser) → web-filvælgeren. */
+function openNativeLibraryForCompose(){ if(!openPhotoLib("compose", "gallery")) el("file-input").click(); }
 function ackMemory(result){ const mh = vfmh(); if(mh) mh.postMessage({ type: "photolib", result: result }); }
 /* Native → web: window.vfMemoryFallback() — brug web-compose (nægtet fotoadgang). */
 export function openMemoryFallback(){ openComposeWith("memory"); }
@@ -371,7 +373,11 @@ el("mm-cancel").addEventListener("click", closeMediaMenu);
 el("mm-native").addEventListener("click", function(){ closeMediaMenu(); openNativeCameraForCompose(); });
 el("mm-photo").addEventListener("click", function(){ closeMediaMenu(); el("cam-photo").click(); });
 el("mm-video").addEventListener("click", function(){ closeMediaMenu(); el("cam-video").click(); });
-el("mm-lib").addEventListener("click", function(){ closeMediaMenu(); el("file-input").click(); });
+el("mm-lib").addEventListener("click", function(){
+  closeMediaMenu();
+  if(window.__vfComposeCamera){ openNativeLibraryForCompose(); } // native galleri direkte
+  else { el("file-input").click(); }                             // browser/ældre app
+});
 /* Opslags-type-vælger (browser-fallback for det native glas-kort) */
 el("cm-thought").addEventListener("click", function(){ el("composemenu").classList.remove("on"); openComposeWith("thought"); });
 el("cm-memory").addEventListener("click", function(){ el("composemenu").classList.remove("on"); openComposeWith("memory"); });
