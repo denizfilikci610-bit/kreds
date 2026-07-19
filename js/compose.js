@@ -139,7 +139,7 @@ function openPhotoLib(purpose, start){
     feeds: state.feeds.map(function(f){ return { id: f.id, name: f.name }; }),
     mentionables: mentionables,
     labels: {
-      title: t("compose.title.memory"), next: t("memory.next"), cancel: t("common.cancel"), share: t("compose.post"),
+      title: purpose === "story" ? t("story.title") : t("compose.title.memory"), next: t("memory.next"), cancel: t("common.cancel"), share: purpose === "story" ? t("story.share") : t("compose.post"),
       captionPlaceholder: t("compose.ph.memory"), destLabel: t("compose.dest"), allLabel: t("feedbar.all"),
       limited: t("photolib.limited"), manage: t("photolib.manage"), denied: t("photolib.denied"), settings: t("photolib.settings"),
       trimHint: t("memory.trim_hint")
@@ -152,6 +152,8 @@ function postMemoryGallery(){ if(!openPhotoLib("memory")) openComposeWith("memor
 function openNativeCameraForCompose(){ if(!openPhotoLib("compose", "camera")) el("cam-photo").click(); }
 /* Tanke: åbn det native galleri direkte. Uden bro (browser) → web-filvælgeren. */
 function openNativeLibraryForCompose(){ if(!openPhotoLib("compose", "gallery")) el("file-input").click(); }
+/* Story: åbn det native kamera i story-tilstand. Uden bro (browser) → almindelig compose. */
+export function openStoryCamera(){ if(!openPhotoLib("story", "camera")) openCompose(); }
 function ackMemory(result){ const mh = vfmh(); if(mh) mh.postMessage({ type: "photolib", result: result }); }
 /* Native → web: window.vfMemoryFallback() — brug web-compose (nægtet fotoadgang). */
 export function openMemoryFallback(){ openComposeWith("memory"); }
@@ -170,7 +172,7 @@ export async function nativeMemoryPost(obj){
     const dest = obj.dest || "all";
     const ext = obj.ext || (obj.isVideo ? "mp4" : "jpg");
     const path = me.id + "/" + uuid() + "." + ext;
-    pendingMemory = { path: path, isVideo: !!obj.isVideo, caption: obj.caption || "", dest: dest, forCompose: !!obj.forCompose };
+    pendingMemory = { path: path, isVideo: !!obj.isVideo, caption: obj.caption || "", dest: dest, forCompose: !!obj.forCompose, isStory: !!obj.isStory };
     const mh = vfmh();
     if(!mh) throw new Error("no_bridge");
     mh.postMessage({ type: "photolib", upload: {
@@ -183,6 +185,8 @@ export async function nativeMemoryPost(obj){
 export async function nativeMemoryUploaded(){
   const m = pendingMemory; pendingMemory = null;
   if(!m || !me){ ackMemory("err"); return; }
+  // Story: indsæt i stories-tabellen (24t udløb via DB-default) i stedet for et opslag.
+  if(m.isStory){ await insertStory(m); return; }
   // "Tag med kamera" fra en tanke: hæft det uploadede medie på komposeren i stedet for at
   // oprette et minde. Tanken postes først når brugeren trykker Del.
   if(m.forCompose){ attachUploaded(m.path, m.isVideo); ackMemory("ok"); return; }
@@ -209,6 +213,28 @@ export async function nativeMemoryUploaded(){
 }
 /* Native → web: window.vfMemoryUploadFailed() — upload fejlede. */
 export function nativeMemoryUploadFailed(){ pendingMemory = null; toast(t("compose.share_failed")); ackMemory("err"); }
+
+/* Story: opret story-rækken (24t udløb via DB-default). dest 'all' → alle venner (feed_id null);
+   en kreds → kun medlemmer (RLS). Mediet er allerede uploadet til post-images. */
+async function insertStory(m){
+  try{
+    const ins = await sb.from("stories").insert({
+      author: me.id,
+      feed_id: m.dest === "all" ? null : m.dest,
+      image_path: m.isVideo ? null : m.path,
+      video_path: m.isVideo ? m.path : null
+    });
+    if(ins.error){ sb.storage.from("post-images").remove([m.path]).catch(function(){}); throw ins.error; }
+    ackMemory("ok");
+    const df = feedById(m.dest);
+    toast(df ? t("compose.shared_in", { name: df.name }) : t("compose.shared_all"));
+  }catch(err){
+    console.error(err);
+    toast(t("compose.share_failed"));
+    ackMemory("err");
+  }
+}
+
 export function closeCompose(){
   closeMediaMenu();
   el("compose").classList.remove("on");

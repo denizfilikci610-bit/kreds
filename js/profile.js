@@ -3,7 +3,7 @@ import { me, state, FRIEND_SINCE, pv, curTab } from "./store.js";
 import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConsent, setConsent, imgUrl, ini } from "./helpers.js";
 import { t, setLang, getLang, policyURL } from "./i18n.js";
 import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps } from "./feed.js";
-import { openCompose } from "./compose.js";
+import { openCompose, openStoryCamera } from "./compose.js";
 import { renderSearch, refreshSearchAfterFriendAdd } from "./search.js";
 import { resetApp, showAuth, nativeLogout } from "./auth.js";
 
@@ -801,7 +801,7 @@ el("pv-add").addEventListener("click", async function(){
 el("stories").addEventListener("click", function(e){
   const s = e.target.closest(".story");
   if(!s) return;
-  if(s.dataset.me){ openCompose(); return; }
+  if(s.dataset.me){ if(window.__vfComposeCamera) openStoryCamera(); else openCompose(); return; }
   openProfile(s.dataset.u);
 });
 }

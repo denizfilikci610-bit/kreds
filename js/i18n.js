@@ -241,6 +241,8 @@ const DA = {
   /* Skriv (compose) */
   "compose.title": "Nyt opslag",
   "compose.title.memory": "Nyt minde",
+  "story.title": "Ny story",
+  "story.share": "Del",
   "compose.ph.memory": "Skriv en billedtekst …",
   "chooser.title": "Hvad vil du dele?",
   "chooser.thought": "Post en tanke",
@@ -665,6 +667,8 @@ const EN = {
   /* Compose */
   "compose.title": "New post",
   "compose.title.memory": "New memory",
+  "story.title": "New story",
+  "story.share": "Share",
   "compose.ph.memory": "Write a caption …",
   "chooser.title": "What do you want to share?",
   "chooser.thought": "Post a thought",
