@@ -61,22 +61,17 @@ function fsheetSnapshot(){
 export function openFeedSheet(){
   fsSelected = {};
   fsGov = "vote";
-  // App'en: ægte native Liquid Glass-sheet i stedet for web-sheet'et.
-  if(window.__vfFsheet){ window.__vfFsheetPush(fsheetSnapshot()); return; }
+  // Ny kreds er en HEL side (glider ind fra højre, tilbage-pil) — også i appen
   el("fs-name").value = "";
   renderFsList();
   renderFsAll();
   renderFsGov();
   fsCan();
-  el("scrim").classList.add("on");
   el("fsheet").classList.add("on");
   setTimeout(function(){ el("fs-name").focus(); }, 260);
 }
 export function closeFeedSheet(){
-  if(window.__vfFsheet){ window.__vfFsheetPush({ close: true }); return; }
   el("fsheet").classList.remove("on");
-  if(!el("esheet").classList.contains("on") && !el("edsheet").classList.contains("on") && !el("msheet").classList.contains("on") && !el("asheet").classList.contains("on"))
-    el("scrim").classList.remove("on");
 }
 /* Native "Ny kreds"-handlinger (Swift → window.vfFsheet → her). */
 export function nativeFsheetAction(obj){
@@ -149,32 +144,22 @@ async function loadMsInvites(fid){
   msInvited = new Map((data || []).map(function(r){ return [r.user_id, r.invited_by]; }));
 }
 
-export async function openMemberSheet(){
-  if(!me || state.currentFeed === "all" || !feedById(state.currentFeed)) return;
-  msFeedId = state.currentFeed;
-  const fid = msFeedId;
+export async function openMemberSheet(fid){
+  // Medlemmer er en HEL side; kan åbnes med eksplicit kreds (fx fra tråd-menuen)
+  const target = fid || state.currentFeed;
+  if(!me || target === "all" || !feedById(target)) return;
+  msFeedId = target;
   msInvited = new Map();
-  // App'en: ægte native Liquid Glass-sheet (renderMemberSheet poster snapshot'en).
-  if(window.__vfMemberSheet){
-    renderMemberSheet();
-    await loadMsInvites(fid);
-    if(msFeedId === fid) renderMemberSheet();
-    return;
-  }
   el("ms-leave").style.display = "";
   el("ms-leave-confirm").style.display = "none";
   renderMemberSheet();
-  el("scrim").classList.add("on");
   el("msheet").classList.add("on");
-  await loadMsInvites(fid);                     // afventende invitationer → "Invitation sendt"
-  if(msFeedId === fid) renderMemberSheet();
+  await loadMsInvites(target);                  // afventende invitationer → "Invitation sendt"
+  if(msFeedId === target) renderMemberSheet();
 }
 export function closeMemberSheet(){
-  if(window.__vfMemberSheet){ msFeedId = null; window.__vfMemberPush({ close: true }); return; }
   el("msheet").classList.remove("on");
   msFeedId = null;
-  if(!el("fsheet").classList.contains("on") && !el("esheet").classList.contains("on") && !el("edsheet").classList.contains("on") && !el("asheet").classList.contains("on"))
-    el("scrim").classList.remove("on");
 }
 /* Fuld snapshot til det native medlemmer-glas-sheet (samme data som DOM-render). */
 function memberSnapshot(f, canManage, ownerMode){
@@ -229,8 +214,6 @@ function renderMemberSheet(){
   if(!f){ closeMemberSheet(); return; }
   const ownerMode = f.governance === "owner";
   const canManage = !ownerMode || f.owner === me.id;   // owner-tilstand: kun ejeren administrerer
-  // App'en: post snapshot til det native glas-sheet i stedet for at skrive DOM.
-  if(window.__vfMemberSheet){ window.__vfMemberPush(memberSnapshot(f, canManage, ownerMode)); return; }
   el("ms-title").textContent = f.name;
   const govNote = ownerMode ? '<div class="ms-govnote">'+t("ms.owner_governed")+'</div>' : '';
   el("ms-members").innerHTML = govNote + f.memberIds.map(function(id){
@@ -275,8 +258,7 @@ function renderMemberSheet(){
 }
 /* Gen-render det åbne medlemmer-sheet (no-op hvis det er lukket) — kaldes også fra realtime */
 export function refreshMemberSheet(){
-  // Åben = msFeedId sat (native, hvor #msheet aldrig får .on) ELLER web-sheet'et er .on.
-  const open = msFeedId != null && (window.__vfMemberSheet || el("msheet").classList.contains("on"));
+  const open = msFeedId != null && el("msheet").classList.contains("on");
   if(open){
     const fid = msFeedId;
     renderMemberSheet();
@@ -415,6 +397,8 @@ el("fs-create").addEventListener("click", async function(){
   toast(t("fs.created", { name: name }));
 });
 /* ---- Medlemmer-sheet ---- */
+el("fs-back").addEventListener("click", closeFeedSheet);
+el("ms-back").addEventListener("click", closeMemberSheet);
 el("msheet").addEventListener("click", function(e){
   const rm = e.target.closest(".ms-btn[data-rm]");
   if(rm){ msRemove(rm); return; }

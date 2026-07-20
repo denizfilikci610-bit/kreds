@@ -126,9 +126,16 @@
   <div class="scrim" id="scrim"></div>
 
   <!-- Ny kreds -->
-  <div class="fsheet" id="fsheet" role="dialog" aria-label="Ny kreds" data-i18n-aria="fs.title">
-    <div class="cmt-grab"></div>
-    <div class="cmt-title" data-i18n="fs.title">Ny kreds</div>
+  <!-- Ny kreds: HEL side der glider ind fra højre (som profil/tråd) m. tilbage-pil -->
+  <div class="postview" id="fsheet" role="dialog" aria-label="Ny kreds" data-i18n-aria="fs.title">
+    <div class="pv-head">
+      <button class="back" id="fs-back" aria-label="Tilbage" data-i18n-aria="common.back">
+        <svg viewBox="0 0 24 24"><path class="stroke" d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div>
+        <div class="t1" data-i18n="fs.title">Ny kreds</div>
+      </div>
+    </div>
     <div class="fs-name">
       <input id="fs-name" placeholder="Hvad skal kredsen hedde?" data-i18n-ph="fs.name_ph" maxlength="30">
     </div>
@@ -370,9 +377,16 @@
   </div>
 
   <!-- Kredsens medlemmer (sheet) -->
-  <div class="fsheet" id="msheet" role="dialog" aria-label="Kredsens medlemmer" data-i18n-aria="kredshead.aria">
-    <div class="cmt-grab"></div>
-    <div class="cmt-title" id="ms-title"></div>
+  <!-- Kredsens medlemmer: HEL side der glider ind fra højre m. tilbage-pil -->
+  <div class="postview" id="msheet" role="dialog" aria-label="Kredsens medlemmer" data-i18n-aria="kredshead.aria">
+    <div class="pv-head">
+      <button class="back" id="ms-back" aria-label="Tilbage" data-i18n-aria="common.back">
+        <svg viewBox="0 0 24 24"><path class="stroke" d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div>
+        <div class="t1" id="ms-title"></div>
+      </div>
+    </div>
     <div class="ep-scroll" style="flex:1;overflow-y:auto;min-height:0">
       <div class="fs-label" data-i18n="ms.members">Medlemmer</div>
       <div id="ms-members"></div>

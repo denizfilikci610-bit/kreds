@@ -112,8 +112,8 @@ if(window.__vfNative){
      og melder handlinger tilbage via window.vfFsheet/vfMember (routes i kredse.js). nativeSheetOpen
      skjuler de native tab-/kreds-barer mens et ark er åbent (arket har sit eget native scrim, så vi
      rejser IKKE web-#scrim → ingen dobbelt-dæmpning). */
-  if(window.__vfFsheet) document.body.classList.add("nfs");     // CSS skjuler web-#fsheet i app'en
-  if(window.__vfMemberSheet) document.body.classList.add("nms"); // CSS skjuler web-#msheet i app'en
+  // (Ny kreds + Medlemmer er nu HELE web-sider overalt — de native bund-ark bruges ikke,
+  //  så nfs/nms-skjulningen er væk; flagene __vfFsheet/__vfMemberSheet ignoreres bevidst.)
   let nativeSheetOpen = false;
   const postPanel = function(type, msg){
     if(msg && msg.open) nativeSheetOpen = true;
