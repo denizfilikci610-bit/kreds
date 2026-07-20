@@ -1261,6 +1261,15 @@
   .chatava2 > :first-child{position:absolute;top:0;right:0}
   .chatava2 > :last-child{position:absolute;bottom:0;left:0;border-radius:50%;box-shadow:0 0 0 2px var(--bg)}
   .cv-hava{flex:0 0 auto;display:flex;margin-left:-6px}
+  /* ⋯-knappen (tråd-menu) yderst til højre i tråd-headeren */
+  .cv-hmenu{margin-left:auto;padding:8px 2px;color:var(--ink);display:flex}
+  .cv-hmenu svg{width:22px;height:22px}
+  .cv-hmenu:active{opacity:.6}
+  /* Pin/mute-mærker på en liste-række */
+  .cv-flag{flex:0 0 auto;display:flex;color:var(--gray)}
+  .cv-flag svg{width:15px;height:15px}
+  /* Søgefeltet øverst i Beskeder */
+  .chat-search{padding:0 16px 8px}
   /* Tråd-siden: under minde-siden (z-90), så et delt minde kan åbnes ovenpå */
   .chatview{z-index:85}
   .chatview .pv-body{padding:12px 12px 6px;display:flex;flex-direction:column}

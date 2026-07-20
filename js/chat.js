@@ -4,6 +4,7 @@ import { el, esc, avaHTML, user, toast, fmtTime, imgUrl, registerProfile, uuid }
 import { t } from "./i18n.js";
 import { feedById, findPost, postQuery, mapPost, switchTab, loadFeeds } from "./feed.js";
 import { openPostView, openProfile, closeProfile, doBlockUser } from "./profile.js";
+import { openMemberSheet } from "./kredse.js";
 
 /* ================= Kreds-chat (Messenger-agtig: hver kreds er en gruppetråd) =================
    Beskeder-fanen (#view-chat) viser en tråd pr. kreds med seneste besked som preview.
@@ -30,6 +31,9 @@ let pendingShare = null; // { feed, post }: minde der sendes med som kontekst p�
 let pendingReply = null; // { id, u, text, media }: besked der citeres i næste besked
 let editingMsg = null;   // besked-id under redigering (composeren sender da en UPDATE)
 let cvImg = null;        // { blob, url }: valgt billede klar til afsendelse
+let prefs = {};          // feed_id -> { pinned, muted, markedUnread, clearedAt } (kun MINE)
+let searchQ = "";        // aktiv søgning i Beskeder-listen
+let searchTimer = 0;
 
 function mapMsg(r){
   if(r.author_profile) registerProfile(r.author_profile);
@@ -72,7 +76,29 @@ function threadName(f){
   return other ? (user(other).name || other) : f.name;
 }
 
-/* ---- Beskeder-fanen: én række pr. tråd, nyeste aktivitet øverst ---- */
+function mapPref(r){
+  return { pinned: !!r.pinned, muted: !!r.muted, markedUnread: !!r.marked_unread,
+           clearedAt: r.cleared_at || null };
+}
+/* Skriv en tråd-præference (fastgør/mute/ulæst/ryd) — optimistisk + upsert */
+function setPref(feedId, patch){
+  const next = Object.assign({}, prefs[feedId] || {}, patch);
+  prefs[feedId] = next;
+  sb.from("kreds_chat_prefs").upsert({
+    feed_id: feedId, user_id: me.id,
+    pinned: !!next.pinned, muted: !!next.muted,
+    marked_unread: !!next.markedUnread, cleared_at: next.clearedAt || null
+  }).then(function(r){ if(r.error) console.error(r.error); }, function(){});
+}
+/* Trådens synlige "seneste besked" — ryddet historik (cleared_at) tæller ikke */
+function lastVisible(f){
+  const m = lastByFeed[f.id];
+  const pf = prefs[f.id] || {};
+  if(m && pf.clearedAt && new Date(m.created).getTime() <= new Date(pf.clearedAt).getTime()) return null;
+  return m || null;
+}
+
+/* ---- Beskeder-fanen: én række pr. tråd, fastgjorte øverst, så nyeste aktivitet ---- */
 export async function renderChatList(fetchLasts){
   if(!me) return;
   const box = el("chat-list");
@@ -82,13 +108,14 @@ export async function renderChatList(fetchLasts){
   }
   if(fetchLasts !== false){
     // Seneste beskeder på tværs (RLS = kun mine tråde; første række pr. tråd er nyeste)
-    // + mine egne læse-mærker, som driver ulæst-prikkerne
-    const [mres, rres] = await Promise.all([
+    // + mine læse-mærker (ulæst-prikker) + mine tråd-præferencer (pin/mute/ryd)
+    const [mres, rres, pres] = await Promise.all([
       sb.from("kreds_messages")
         .select(MSG_SELECT)
         .order("created_at", { ascending: false })
         .limit(120),
-      sb.from("kreds_chat_reads").select("feed_id, last_read_at").eq("user_id", me.id)
+      sb.from("kreds_chat_reads").select("feed_id, last_read_at").eq("user_id", me.id),
+      sb.from("kreds_chat_prefs").select("*").eq("user_id", me.id)
     ]);
     if(mres.error){ console.error(mres.error); }
     else {
@@ -100,10 +127,22 @@ export async function renderChatList(fetchLasts){
       myReads = {};
       (rres.data || []).forEach(function(r){ myReads[r.feed_id] = new Date(r.last_read_at).getTime(); });
     }
+    if(!pres.error){
+      prefs = {};
+      (pres.data || []).forEach(function(r){ prefs[r.feed_id] = mapPref(r); });
+    }
   }
-  const feeds = allThreads().slice().sort(function(a, b){
-    const ta = lastByFeed[a.id] ? new Date(lastByFeed[a.id].created).getTime() : 0;
-    const tb = lastByFeed[b.id] ? new Date(lastByFeed[b.id].created).getTime() : 0;
+  if(searchQ) return; // en aktiv søgning ejer listen
+  const feeds = allThreads().filter(function(f){
+    // En DM-tråd vises kun med indhold: tom eller ryddet ("Slet chatten") = ude af
+    // listen, indtil en ny besked lander. Kredse vises altid (tråden ER kredsen).
+    return !f.isDm || !!lastVisible(f);
+  }).sort(function(a, b){
+    const pa = (prefs[a.id] || {}).pinned ? 1 : 0, pb = (prefs[b.id] || {}).pinned ? 1 : 0;
+    if(pa !== pb) return pb - pa; // fastgjorte øverst
+    const ma = lastVisible(a), mb = lastVisible(b);
+    const ta = ma ? new Date(ma.created).getTime() : 0;
+    const tb = mb ? new Date(mb.created).getTime() : 0;
     if(ta !== tb) return tb - ta;
     return new Date(a.created) - new Date(b.created);
   });
@@ -122,15 +161,20 @@ function chatAvaHTML(f, size){
   return '<span class="chatava chatava2" style="width:'+size+'px;height:'+size+'px">'+
     avaHTML(others[0], s2)+avaHTML(others[1], s2)+'</span>';
 }
+const PIN_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><path d="M14.2 3.6 20.4 9.8M15.5 4.9 9.9 8.1 5.6 9.6l8.8 8.8 1.5-4.3 3.2-5.6"/><path d="M9.9 14.1 3.6 20.4"/></g></svg>';
+const MUTE_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><path d="M18 13.5V10a6 6 0 0 0-9.6-4.8M6 10v3.5L4 17h13.5M10 20a2.4 2.4 0 0 0 4 0"/><path d="M4 4l16 16"/></g></svg>';
 function chatRowHTML(f){
-  const m = lastByFeed[f.id];
+  const pf = prefs[f.id] || {};
+  const m = lastVisible(f);
   let sub = t("chat.say_hi");
   if(m){
     const who = (me && m.authorId === me.id) ? t("chat.you") : (user(m.u).name || m.u).split(/\s+/)[0];
-    sub = esc(who) + ": " + (m.postId ? "📷 " + t("chat.shared_memory") : esc(m.text)) + " · " + esc(m.t);
+    const what = m.postId ? "📷 " + t("chat.shared_memory") : (m.text ? esc(m.text) : "📷");
+    sub = esc(who) + ": " + what + " · " + esc(m.t);
   }
-  // Ulæst: nyeste besked er fra en anden og nyere end mit læse-mærke → fed + rød prik
-  const unread = !!(m && myReadsOk && me && m.authorId !== me.id &&
+  // Ulæst: nyeste besked er fra en anden og nyere end mit læse-mærke, eller tråden er
+  // markeret som ulæst manuelt → fed + rød prik
+  const unread = !!pf.markedUnread || !!(m && myReadsOk && me && m.authorId !== me.id &&
                     new Date(m.created).getTime() > (myReads[f.id] || 0));
   return '<button class="chatrow'+(unread ? " unread" : "")+'" data-feed="'+esc(f.id)+'">'+
     chatAvaHTML(f, 52)+
@@ -138,6 +182,8 @@ function chatRowHTML(f){
       '<span class="lnm">'+esc(threadName(f))+'</span>'+
       '<span class="lh">'+sub+'</span>'+
     '</span>'+
+    (pf.muted ? '<span class="cv-flag">'+MUTE_SVG+'</span>' : '')+
+    (pf.pinned ? '<span class="cv-flag">'+PIN_SVG+'</span>' : '')+
     (unread ? '<span class="cv-udot"></span>' : '')+
   '</button>';
 }
@@ -162,13 +208,14 @@ export async function openKredsChat(feedId){
   const seq = ++chatSeq;
   // Beskeder + set-kvitteringer hentes parallelt. Kvitteringerne er fail-soft: findes
   // tabellen ikke endnu (migrationen kreds_chat_reads), vises tråden bare uden dem.
-  const [mres, rr] = await Promise.all([
+  const [mres, rr, pres] = await Promise.all([
     sb.from("kreds_messages")
       .select(MSG_SELECT)
       .eq("feed_id", feedId)
       .order("created_at", { ascending: true })
       .limit(300),
-    sb.from("kreds_chat_reads").select("user_id, last_read_at").eq("feed_id", feedId)
+    sb.from("kreds_chat_reads").select("user_id, last_read_at").eq("feed_id", feedId),
+    sb.from("kreds_chat_prefs").select("*").eq("feed_id", feedId).eq("user_id", me.id).maybeSingle()
   ]);
   if(chatFeed !== feedId || seq !== chatSeq) return; // lukket/skiftet imens
   if(mres.error){
@@ -176,7 +223,16 @@ export async function openKredsChat(feedId){
     el("cv-body").innerHTML = '<div class="emptynote">'+t("err.generic")+'</div>';
     return;
   }
+  if(!pres.error && pres.data) prefs[feedId] = mapPref(pres.data);
+  const pf = prefs[feedId] || {};
   msgs = (mres.data || []).map(mapMsg);
+  // Ryddet historik ("Ryd/Slet chatten") gælder kun mig: skjul alt før mit mærke
+  if(pf.clearedAt){
+    const cl = new Date(pf.clearedAt).getTime();
+    msgs = msgs.filter(function(m){ return new Date(m.created).getTime() > cl; });
+  }
+  // Åbning nulstiller en manuel "Markér som ulæst"
+  if(pf.markedUnread) setPref(feedId, { markedUnread: false });
   reads = {}; readsOk = false; unreadAtId = null; myReadSent = 0;
   if(!rr.error){
     readsOk = true;
@@ -382,9 +438,11 @@ export function resetChat(){
   lastByFeed = {};
   reads = {}; readsOk = false; unreadAtId = null; myReadSent = 0;
   myReads = {}; myReadsOk = false; pendingShare = null; pendingReply = null; editingMsg = null;
+  prefs = {}; searchQ = "";
   clearImg();
   el("chat-list").innerHTML = "";
   el("cv-input").value = "";
+  el("cv-search").value = "";
 }
 
 function renderThread(scrollBottom){
@@ -487,6 +545,84 @@ function confirmStep(title, note, btnLabel, onDo){
     '<button class="mrow danger" data-act="__do">'+btnLabel+'</button></div>'+
     '<button class="mrow mcancel" data-act="cancel">'+t("common.cancel")+'</button>'+
   '</div>';
+}
+
+/* Søgeresultater i Beskeder-listen: tråde hvis navn matcher + beskeder der matcher */
+function renderSearchResults(q, msgRows){
+  const box = el("chat-list");
+  const ql = q.toLowerCase();
+  const threadRows = allThreads().filter(function(f){
+    return threadName(f).toLowerCase().indexOf(ql) >= 0;
+  }).map(chatRowHTML).join("");
+  const msgsHtml = (msgRows || []).map(function(r){
+    const f = threadById(r.feed_id);
+    if(!f) return "";
+    const mm = mapMsg(r);
+    return '<button class="chatrow" data-feed="'+esc(f.id)+'">'+
+      chatAvaHTML(f, 52)+
+      '<span class="lcol">'+
+        '<span class="lnm">'+esc(threadName(f))+'</span>'+
+        '<span class="lh">'+esc(snip(mm.text, 60))+' · '+esc(mm.t)+'</span>'+
+      '</span>'+
+    '</button>';
+  }).join("");
+  const html = threadRows +
+    (msgsHtml ? '<div class="sectionlabel">'+t("chat.search_msgs")+'</div>'+msgsHtml : "");
+  box.innerHTML = html || '<div class="emptynote">'+t("chat.search_none")+'</div>';
+}
+
+/* ---- Tråd-menuen (⋯ i headeren eller long-press på en liste-række):
+   medlemmer, fastgør, mute, markér som ulæst, ryd/slet, blokér (DM) ---- */
+let threadMenuFeed = null;
+function openThreadMenu(feedId){
+  const f = threadById(feedId);
+  if(!f || !me) return;
+  threadMenuFeed = feedId;
+  menuMsg = null; // menuen genbruger #cmenu-kortet
+  const pf = prefs[feedId] || {};
+  const other = f.isDm ? f.members.filter(function(h){ return h !== me.handle; })[0] : null;
+  el("cmenu-card").innerHTML = '<div class="mstep">'+
+    '<div class="mgroup">'+
+      (!f.isDm ? '<button class="mrow" data-tact="members">'+t("chat.members")+'</button>' : '')+
+      '<button class="mrow" data-tact="pin">'+t(pf.pinned ? "chat.unpin" : "chat.pin")+'</button>'+
+      '<button class="mrow" data-tact="mute">'+t(pf.muted ? "chat.unmute" : "chat.mute")+'</button>'+
+      '<button class="mrow" data-tact="unreadmark">'+t("chat.mark_unread")+'</button>'+
+      '<button class="mrow danger" data-tact="clear">'+t(f.isDm ? "chat.del_thread" : "chat.clear_thread")+'</button>'+
+      (other ? '<button class="mrow danger" data-tact="block">'+t("rm.block")+'</button>' : '')+
+    '</div>'+
+    '<button class="mrow mcancel" data-act="cancel">'+t("common.cancel")+'</button>'+
+  '</div>';
+  el("cmenu").classList.add("on");
+}
+function threadMenuAct(act){
+  const fid = threadMenuFeed;
+  const f = threadById(fid);
+  threadMenuFeed = null;
+  if(!f) { closeMsgMenu(); return; }
+  const pf = prefs[fid] || {};
+  if(act === "members"){ closeMsgMenu(); openMemberSheet(fid); return; }
+  if(act === "pin"){ closeMsgMenu(); setPref(fid, { pinned: !pf.pinned }); renderChatList(false); return; }
+  if(act === "mute"){ closeMsgMenu(); setPref(fid, { muted: !pf.muted }); renderChatList(false); return; }
+  if(act === "unreadmark"){ closeMsgMenu(); setPref(fid, { markedUnread: true }); renderChatList(false); return; }
+  if(act === "clear"){
+    confirmStep(t(f.isDm ? "chat.del_confirm" : "chat.clear_confirm"), t("chat.clear_note"),
+      t(f.isDm ? "chat.do_del" : "chat.do_clear"), function(){
+        setPref(fid, { clearedAt: new Date().toISOString(), markedUnread: false });
+        if(chatFeed === fid){
+          if(f.isDm) closeKredsChat();
+          else { msgs = []; renderThread(false); }
+        }
+        renderChatList(false);
+      });
+    return;
+  }
+  if(act === "block"){
+    const other = f.members.filter(function(h){ return h !== me.handle; })[0];
+    confirmStep(t("rm.block") + " @" + esc(other) + "?", t("block.note"), t("block.do"), function(){
+      closeKredsChat();
+      doBlockUser(other);
+    });
+  }
 }
 
 /* Reaktion: én pr. bruger — samme emoji fjerner, ny erstatter (optimistisk + realtime) */
@@ -817,9 +953,48 @@ export function initChat(){
   el("cv-input").addEventListener("keydown", function(e){
     if(e.key === "Enter" && !e.isComposing) sendChatMsg();
   });
+  // Tråd-menuen: ⋯ i headeren, long-press (eller højreklik) på en liste-række
+  el("cv-hmenu").addEventListener("click", function(){
+    if(chatFeed != null) openThreadMenu(chatFeed);
+  });
+  let rowLpTimer = 0, rowLpFired = false;
+  el("chat-list").addEventListener("touchstart", function(e){
+    const r = e.target.closest(".chatrow");
+    rowLpFired = false;
+    if(!r || e.touches.length !== 1) return;
+    const fid = r.dataset.feed;
+    rowLpTimer = setTimeout(function(){ rowLpFired = true; openThreadMenu(fid); }, 450);
+  }, { passive: true });
+  el("chat-list").addEventListener("touchmove", function(){ clearTimeout(rowLpTimer); }, { passive: true });
+  el("chat-list").addEventListener("touchend", function(){ clearTimeout(rowLpTimer); });
+  el("chat-list").addEventListener("contextmenu", function(e){
+    const r = e.target.closest(".chatrow");
+    if(!r) return;
+    e.preventDefault();
+    openThreadMenu(r.dataset.feed);
+  });
   el("chat-list").addEventListener("click", function(e){
+    if(rowLpFired){ rowLpFired = false; return; }
     const r = e.target.closest(".chatrow");
     if(r) openKredsChat(r.dataset.feed);
+  });
+  // Søgning: tråd-navne filtreres med det samme, besked-indhold søges i databasen
+  el("cv-search").addEventListener("input", function(){
+    searchQ = this.value.trim();
+    clearTimeout(searchTimer);
+    if(!searchQ){ renderChatList(false); return; }
+    renderSearchResults(searchQ, []);
+    const q = searchQ;
+    searchTimer = setTimeout(function(){
+      sb.from("kreds_messages").select(MSG_SELECT)
+        .ilike("text", "%" + q + "%")
+        .order("created_at", { ascending: false })
+        .limit(30)
+        .then(function(r){
+          if(searchQ !== q || r.error) return;
+          renderSearchResults(q, r.data || []);
+        }, function(){});
+    }, 350);
   });
   el("cv-body").addEventListener("click", function(e){
     if(lpFired){ lpFired = false; return; } // long-press må ikke også udløse et tap
@@ -903,6 +1078,8 @@ export function initChat(){
   el("cmenu").addEventListener("click", function(e){
     const em = e.target.closest(".cm-emoji");
     if(em){ const mid = menuMsg; closeMsgMenu(); setReaction(mid, em.dataset.e); return; }
+    const tr = e.target.closest("[data-tact]");
+    if(tr){ threadMenuAct(tr.dataset.tact); return; }
     const row = e.target.closest("[data-act]");
     if(!row){ if(e.target === el("cmenu")) closeMsgMenu(); return; }
     const act = row.dataset.act;
