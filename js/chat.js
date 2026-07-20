@@ -472,7 +472,7 @@ function renderThread(scrollBottom){
                      msgs[i + 1].id === unreadAtId;
         return (m.id === unreadAtId ? '<div class="cv-unread">'+t("chat.unread")+'</div>' : '')+
                msgHTML(m, first, last)+
-               (seenBy[m.id] ? readsHTML(seenBy[m.id]) : '')+
+               (seenBy[m.id] ? readsHTML(seenBy[m.id], m.id) : '')+
                (status && status.id === m.id
                  ? '<span class="cv-status">'+t(status.seen ? "chat.read" : "chat.notread")+'</span>'
                  : '');
@@ -500,10 +500,40 @@ function readReceipts(){
   });
   return out;
 }
-function readsHTML(handles){
-  return '<div class="cv-reads">'+handles.map(function(h){
+function readsHTML(handles, mid){
+  // Højst 10 avatarer, derefter +N — tap åbner hele "Set af"-listen
+  const show = handles.slice(0, 10);
+  const more = handles.length - show.length;
+  return '<div class="cv-reads" data-rmid="'+esc(mid)+'">'+show.map(function(h){
     return '<span class="cv-read" title="'+esc(user(h).name || h)+'">'+avaHTML(h, 16)+'</span>';
-  }).join("")+'</div>';
+  }).join("")+(more > 0 ? '<span class="cv-rmore">+'+more+'</span>' : '')+'</div>';
+}
+
+/* Person-liste (fx "Set af" og reaktioner): native glas-kort i appen, web-ark ellers */
+function openPeopleList(title, rows){
+  if(!rows.length) return;
+  if(window.__vfGlassCard && window.__vfSheetPost){
+    window.__vfSheetPost({
+      title: title,
+      buttons: rows.map(function(r){
+        return { label: (user(r.h).name || r.h) + (r.extra ? "   " + r.extra : ""), action: "__cancel" };
+      }).concat([{ label: t("common.cancel"), action: "__cancel", role: "cancel" }])
+    }, function(){});
+    return;
+  }
+  menuMsg = null; threadMenuFeed = null;
+  el("cmenu").classList.remove("anchor");
+  el("cmenu-card").innerHTML = '<div class="mstep">'+
+    '<div class="mgroup"><div class="mtitle">'+esc(title)+'</div>'+
+    rows.map(function(r){
+      return '<div class="cm-prow">'+avaHTML(r.h, 34)+
+        '<span class="cm-pn">'+esc(user(r.h).name || r.h)+'</span>'+
+        (r.extra ? '<span class="cm-pe">'+esc(r.extra)+'</span>' : '')+
+      '</div>';
+    }).join("")+'</div>'+
+    '<button class="mrow mcancel" data-act="cancel">'+t("common.cancel")+'</button>'+
+  '</div>';
+  el("cmenu").classList.add("on");
 }
 
 /* ---- Besked-menuen (long-press/højreklik på en boble): reager, svar, kopiér,
@@ -879,14 +909,17 @@ function msgHTML(m, first, last){
       }
     }
   }
-  // Reaktioner: grupperet pille under boblens hjørne
+  // Reaktioner: pille under boblens hjørne — højst 3 emojis (hyppigste først) + samlet
+  // tal; tap åbner listen over hvem der har reageret med hvad
   const counts = {};
   (m.reacts || []).forEach(function(r){ counts[r.emoji] = (counts[r.emoji] || 0) + 1; });
-  const rkeys = Object.keys(counts);
+  const rkeys = Object.keys(counts).sort(function(a, b){ return counts[b] - counts[a]; });
+  const rtotal = (m.reacts || []).length;
   const reacts = rkeys.length
-    ? '<span class="cv-reacts">'+rkeys.map(function(e){
-        return esc(e)+(counts[e] > 1 ? '<b>'+counts[e]+'</b>' : '');
-      }).join("")+'</span>'
+    ? '<button class="cv-reacts" data-rx="'+esc(m.id)+'">'+
+        rkeys.slice(0, 3).map(esc).join("")+
+        (rtotal > 1 ? '<b>'+rtotal+'</b>' : '')+
+      '</button>'
     : '';
   const avaCell = mine ? ''
     : (last
@@ -1170,6 +1203,25 @@ export function initChat(){
         bEl.classList.add("flash");
         setTimeout(function(){ bEl.classList.remove("flash"); }, 1300);
       }
+      return;
+    }
+    const rx = e.target.closest(".cv-reacts");
+    if(rx){
+      // Hele reaktions-listen: hvem reagerede med hvad
+      const mm = msgs.find(function(x){ return x.id === Number(rx.dataset.rx); });
+      if(mm && mm.reacts && mm.reacts.length){
+        openPeopleList(t("chat.reactions"), mm.reacts.map(function(r){
+          const h = ID2H[r.user_id];
+          return h ? { h: h, extra: r.emoji } : null;
+        }).filter(Boolean));
+      }
+      return;
+    }
+    const rd = e.target.closest(".cv-reads");
+    if(rd && rd.dataset.rmid){
+      // Hele "Set af"-listen
+      const handles = readReceipts()[Number(rd.dataset.rmid)] || [];
+      openPeopleList(t("chat.seen_by"), handles.map(function(h){ return { h: h }; }));
       return;
     }
     const sh = e.target.closest(".cv-share");

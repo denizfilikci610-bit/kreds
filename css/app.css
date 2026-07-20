@@ -1382,10 +1382,17 @@
   .cm-row svg{width:19px;height:19px;flex:0 0 auto}
   .cm-row.danger{color:var(--red)}
   .cm-row:active{background:var(--chip)}
-  /* Set-kvitteringer: små avatarer under den sidste besked hvert medlem har læst */
-  .cv-reads{display:flex;justify-content:flex-end;gap:3px;padding:3px 2px 0}
+  /* Set-kvitteringer: små avatarer under den sidste besked hvert medlem har læst
+     (højst 10 + "+N" — tap åbner hele Set af-listen) */
+  .cv-reads{display:flex;align-items:center;justify-content:flex-end;gap:3px;padding:3px 2px 0;width:100%}
+  .cv-reads:active{opacity:.6}
   .cv-read{display:flex}
   .cv-reads .av{box-shadow:0 0 0 2px var(--bg)}
+  .cv-rmore{font-size:10.5px;font-weight:700;color:var(--gray);margin-left:2px}
+  /* Person-rækker i liste-arket (Set af / Reaktioner, web-fallback) */
+  .cm-prow{display:flex;align-items:center;gap:11px;padding:9px 16px;font-size:15px;color:var(--ink)}
+  .cm-prow .cm-pn{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .cm-prow .cm-pe{flex:0 0 auto;font-size:18px}
   /* "Ulæste beskeder"-skillelinjen (fryses når tråden åbnes) */
   .cv-unread{
     display:flex;align-items:center;gap:10px;margin:14px 0 4px;
