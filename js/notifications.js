@@ -4,8 +4,8 @@ import { el, esc, avaHTML, user, fmtTime, toast, registerProfile } from "./helpe
 import { t } from "./i18n.js";
 import { scheduleRefetch } from "./realtime.js";
 import { switchTab, setFeed, resetBarHide, findPost, feedById } from "./feed.js";
-import { rerenderPostCmts, openNativeComments } from "./comments.js";
-import { openProfile } from "./profile.js";
+import { rerenderPostCmts, openNativeComments, openNativePostPage } from "./comments.js";
+import { openProfile, openPostView } from "./profile.js";
 
 /* ================= Notifikations-prik (session-only, ingen persistens) ================= */
 export function setNotifDot(on){
@@ -512,20 +512,35 @@ async function openNotifPost(pid, isCmt, cid){
   await setFeed(data.feed_id || "all");
   const p = findPost(pid);
   const nativeMemCmts = !!(isCmt && window.__vfNative && window.__vfComments && p && p.kind === "memory");
-  if(isCmt && !nativeMemCmts){
+  // Tanke-kommentarer bor nu på detalje-siden (native i appen, web-siden ellers)
+  const thoughtCmts = !!(isCmt && p && p.kind !== "memory");
+  if(isCmt && !nativeMemCmts && !thoughtCmts){
     // Fold kommentartråden ud, så svarene er synlige når vi lander
     expandedCmts.add(Number(pid));
     rerenderPostCmts(pid);
   }
   const node = document.querySelector('#feed .post[data-id="'+data.id+'"]');
   if(!node){ toast(t("notif.post_not_visible")); return false; }
-  const crow = (!nativeMemCmts && cid) ? node.querySelector('.crow[data-cid="'+cid+'"]') : null;
+  const crow = (!nativeMemCmts && !thoughtCmts && cid) ? node.querySelector('.crow[data-cid="'+cid+'"]') : null;
   (crow || node).scrollIntoView({ block:"center" });
   resetBarHide(); // programmatisk hop må ikke skjule topbaren — genstart fra landingspositionen
   const hl = crow || node;
   hl.classList.add("flash");
   setTimeout(function(){ hl.classList.remove("flash"); }, 1600);
-  if(nativeMemCmts) openNativeComments(pid, cid);
+  if(nativeMemCmts){ openNativeComments(pid, cid); return true; }
+  if(thoughtCmts){
+    if(window.__vfNative && window.__vfPostPage){
+      openNativePostPage(pid, cid); // fokuserer/fremhæver selve kommentaren på den native side
+    } else {
+      openPostView(p);
+      const mrow = cid ? el("mv-body").querySelector('.crow[data-cid="'+cid+'"]') : null;
+      if(mrow){
+        mrow.scrollIntoView({ block:"center" });
+        mrow.classList.add("flash");
+        setTimeout(function(){ mrow.classList.remove("flash"); }, 1600);
+      }
+    }
+  }
   return true;
 }
 

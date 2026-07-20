@@ -2,9 +2,9 @@ import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, expandedCmts, pv, cstate, curTab, setCurTab, setCfilePid, ID2H, FRIEND_SINCE } from "./store.js";
 import { el, esc, richText, avaHTML, user, grad, toast, fmtTime, fmtDate, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
 import { t, likesLabel } from "./i18n.js";
-import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, deleteComment, cInput, cKey, clearReply, clearCImg, openNativeComments, pushNativeComments } from "./comments.js";
+import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, deleteComment, cInput, cKey, clearReply, clearCImg, openNativeComments, pushNativeComments, pushNativePostPage } from "./comments.js";
 import { openFeedSheet, openMemberSheet } from "./kredse.js";
-import { openProfile, closeProfile, closeMemView, renderMyPosts, renderStories, refreshPv, doBlockUser } from "./profile.js";
+import { openProfile, closeProfile, closeMemView, renderMyPosts, renderStories, refreshPv, doBlockUser, openPostView } from "./profile.js";
 import { loadStories } from "./stories.js";
 import { renderSearch } from "./search.js";
 import { loadNotifs, setNotifDot } from "./notifications.js";
@@ -257,6 +257,7 @@ export function renderFeed(){
   restoreVideos(el("feed"), vsnap);
   clampMemCaps(el("feed")); // vis "Se mere" kun hvor minde-billedteksten løber over
   pushNativeComments();     // hold et evt. åbent native kommentar-sheet i sync (realtime)
+  pushNativePostPage();     // …og den native opslags-side
   if(fpid){
     const nf = el("feed").querySelector('.cbox[data-id="'+fpid+'"] .cfield');
     if(nf){ nf.focus(); try{ nf.setSelectionRange(selS, selE); }catch(_){} }
@@ -797,6 +798,7 @@ export async function setLike(id, force){
   if(on === cur) return;
   objs.forEach(function(p){ p.liked = on; p.likeCount = Math.max(0, (p.likeCount||0) + (on ? 1 : -1)); });
   applyLikeUI(id, on);
+  pushNativePostPage(); // hjertet på den native opslags-side følger med (optimistisk)
   let error = null;
   if(on){
     const r = await sb.from("likes").insert({ post_id:Number(id), user_id:me.id });
@@ -809,6 +811,7 @@ export async function setLike(id, force){
     console.error(error);
     objs.forEach(function(p){ p.liked = cur; p.likeCount = Math.max(0, p.likeCount + (on ? -1 : 1)); });
     applyLikeUI(id, cur);
+    pushNativePostPage(); // rul like tilbage på den native opslags-side
     if(on && String(error.message || "").indexOf("like_quota") >= 0){
       const fname = (user(objs[0].u).name || objs[0].u).trim().split(/\s+/)[0];
       toast(t("like.quota", { name: fname }));
@@ -1164,6 +1167,18 @@ function timelineClick(e){
       openNativeComments(cp.id);
       return;
     }
+    // En tanke åbner sin detalje-side (native i appen, web-siden ellers) — men står vi
+    // allerede PÅ web-detaljesiden, fokuserer knappen bare composeren i stedet.
+    if(cp && cp.kind !== "memory"){
+      if(cmt.closest("#mv-body")){
+        const df = el("mv-body").querySelector('.cbox[data-id="'+cp.id+'"] .cfield');
+        if(df){ df.focus(); return; }
+        // tråden er klappet sammen på siden → fald igennem og fold den ud igen
+      } else {
+        openPostView(cp);
+        return;
+      }
+    }
     const opened = toggleCmtSection(cmt.dataset.id);
     if(opened){
       const node = cmt.closest(".post");
@@ -1216,6 +1231,16 @@ function timelineClick(e){
         else if(img) openLightbox("img", img.currentSrc || img.src);
       }, 330);
     }
+    return;
+  }
+  // Tap på selve opslaget (tekst/header/luft — IKKE knapper, medie, måling eller kommentar-
+  // område, som alle har egne handlere ovenfor) → detalje-siden. Kun tanker; minder har
+  // allerede deres egen fuldskærms-side og det native sheet. Ikke på selve detalje-siden.
+  const pc = e.target.closest(".post");
+  if(pc && pc.dataset.id && !pc.closest("#mv-body") &&
+     !e.target.closest("button, a, input, .pmedia, .pollwrap, .csec, .cbox")){
+    const pp = findPost(pc.dataset.id);
+    if(pp && pp.kind !== "memory") openPostView(pp);
   }
 }
 

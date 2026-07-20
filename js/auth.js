@@ -6,6 +6,7 @@ import { loadFriends, loadFeeds, loadPosts, feedById, renderFeedbar, renderKreds
 import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPost, resetPoll } from "./compose.js";
 import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet, closeUnfriendMenu, closeBlockMenu } from "./profile.js";
 import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
+import { closeNativePostPage } from "./comments.js";
 import { closeLightbox } from "./lightbox.js";
 import { subscribeRealtime, unsubscribeRealtime } from "./realtime.js";
 import { refreshNotifDot } from "./notifications.js";
@@ -193,6 +194,7 @@ export function resetApp(){
   resetDeleteUI();
   closeFeedSheet();
   closeMemberSheet();
+  closeNativePostPage(); // en åben native opslags-side må ikke overleve et logout
   closeEditSheet();
   closeActivitySheet();
   closePostEdit();

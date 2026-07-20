@@ -3,6 +3,7 @@ import { me } from "./store.js";
 import { esc, toast } from "./helpers.js";
 import { t, stemmerLabel } from "./i18n.js";
 import { findPostAll } from "./feed.js";
+import { pushNativePostPage } from "./comments.js";
 import { scheduleRefetch } from "./realtime.js";
 
 /* ================= Meningsmålinger (stemmerLabel bor nu i i18n.js) ================= */
@@ -103,6 +104,7 @@ function rerenderPoll(pid){
   document.querySelectorAll('.post[data-id="'+pid+'"] .pollwrap').forEach(function(w){
     w.outerHTML = pollHTML(p);
   });
+  pushNativePostPage(); // målingen på den native opslags-side følger med
 }
 
 const voteSeq = new Map();

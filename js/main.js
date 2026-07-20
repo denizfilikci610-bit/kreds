@@ -3,7 +3,7 @@ import { me, curTab } from "./store.js";
 import { el, toast } from "./helpers.js";
 import { t, initI18n, setLang, hasStoredLang } from "./i18n.js";
 import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, loadQuota, setFeed, nativeKredsState } from "./feed.js";
-import { initComments, nativeCommentsAction } from "./comments.js";
+import { initComments, nativeCommentsAction, nativePostPageAction } from "./comments.js";
 import { initKredse, closeFeedSheet, closeMemberSheet, openFeedSheet, nativeFsheetAction, nativeMemberAction } from "./kredse.js";
 import { initCompose, renderComposeDest, openCompose, openThought, openMemory, nativeMemoryPost, openMemoryFallback, nativeMemoryUploaded, nativeMemoryUploadFailed } from "./compose.js";
 import { initSearch, renderSearch } from "./search.js";
@@ -139,6 +139,12 @@ if(window.__vfNative){
      window.vfComments (routes i comments.js → kører de eksisterende kommentar-funktioner). */
   window.__vfCommentsPush = function(msg){ postPanel("comments", msg); };
   window.vfComments = function(payload){ nativeCommentsAction(payload); };
+  /* --- Native OPSLAGS-SIDE (X-agtig detalje-side; kun tanker) — web-drevet ---
+     comments.js bygger snapshotten (opslag + tråd + labels) og kalder __vfPostPagePush;
+     Swift tegner fuldskærms-siden (PostPageView.swift, swipe-tilbage) og melder handlinger
+     tilbage via window.vfPostPage (routes i comments.js → eksisterende funktioner). */
+  window.__vfPostPagePush = function(msg){ postPanel("postpage", msg); };
+  window.vfPostPage = function(payload){ nativePostPageAction(payload); };
   /* --- Push-notifikations-tap (native didReceive → vfOpenNotif) — åbn det indholdet handler om.
      Payload {kind,pid,fid} = APNs custom keys (eller poll-notifikationens userInfo). Tom payload
      (ældre pushes uden keys) falder tilbage til akt-fanen; openFromPush venter selv på boot. */

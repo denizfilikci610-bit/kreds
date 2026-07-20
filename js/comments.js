@@ -1,8 +1,9 @@
 import { sb } from "./config.js";
-import { me, expandedCmts, composers, cstate, cfilePid } from "./store.js";
+import { me, expandedCmts, composers, cstate, cfilePid, USERS } from "./store.js";
 import { el, esc, avaHTML, richText, toast, uuid, HEART_SVG, user, ini, grad, imgUrl } from "./helpers.js";
-import { t, likesLabel } from "./i18n.js";
-import { findPost, findPostAll, allPostArrays, mapComment, switchTab } from "./feed.js";
+import { t, likesLabel, stemmerLabel } from "./i18n.js";
+import { findPost, findPostAll, allPostArrays, mapComment, switchTab, setLike, sharePost, feedById, setFeed, openPostMenu, openReportMenu } from "./feed.js";
+import { votePoll } from "./polls.js";
 import { openProfile, closeProfile, closeMemView } from "./profile.js";
 import { mentionCards } from "./mentions.js";
 
@@ -153,6 +154,7 @@ export async function toggleCmtLike(cid){
   cs.forEach(function(c){ c.liked = on; c.likeCount = Math.max(0, (c.likeCount||0) + (on ? 1 : -1)); });
   applyCmtLikeUI(cid);
   pushNativeComments(); // hold det native sheet i sync (optimistisk)
+  pushNativePostPage();
   let error = null;
   if(on){
     const r = await sb.from("comment_likes").insert({ comment_id:Number(cid), user_id:me.id });
@@ -166,6 +168,7 @@ export async function toggleCmtLike(cid){
     cs.forEach(function(c){ c.liked = !on; c.likeCount = Math.max(0, c.likeCount + (on ? -1 : 1)); });
     applyCmtLikeUI(cid);
     pushNativeComments(); // rul like tilbage i det native sheet
+    pushNativePostPage();
     toast(t("err.generic"));
   }
 }
@@ -210,6 +213,7 @@ export async function deleteComment(cid){
   });
   affected.forEach(function(pid){ rerenderPostCmts(pid); });
   pushNativeComments(); // opdatér det native sheet efter sletning
+  pushNativePostPage();
   toast(t("cmt.deleted"));
 }
 
@@ -271,6 +275,7 @@ export async function sendComment(pid){
   }finally{
     s.busy = false;
     pushNativeComments(); // opdatér det native sheet (ny kommentar vist, eller input frigivet ved fejl)
+    pushNativePostPage();
   }
 }
 export function cInput(e){
@@ -294,10 +299,8 @@ export function cKey(e){
 const CMT_EMOJI = ["❤️","🙌","🔥","👏","🤍","😍","😭","🥹"];
 let nativeCmtPid = null; // hvilket opslag det native sheet viser lige nu (null = lukket)
 
-function cmtSnapshot(pid){
-  const p = findPost(pid);
-  if(!p) return null;
-  const comments = buildThread(p).map(function(item){
+function cmtItems(p){
+  return buildThread(p).map(function(item){
     const c = item.c, u = user(c.u);
     return {
       id: String(c.id),
@@ -316,25 +319,32 @@ function cmtSnapshot(pid){
       mine: !!(me && c.u === me.handle)
     };
   });
+}
+function cmtLabels(){
+  return {
+    empty: t("cmt.empty"),
+    placeholder: t("cmt.ph"),
+    send: t("cmt.send"),
+    reply: t("cmt.reply"),
+    cancelReply: t("cmt.cancel_reply"),
+    replyingTo: t("cmt.replying", { u: "{u}" }), // Swift indsætter {u} → handle
+    del: t("cmt.delete"),
+    delConfirm: t("cmt.delete_confirm")
+  };
+}
+function cmtSnapshot(pid){
+  const p = findPost(pid);
+  if(!p) return null;
   return {
     open: true,
     postId: String(pid),
     title: t("cmt.title"),
     canPost: !!me,
     emoji: CMT_EMOJI,
-    comments: comments,
+    comments: cmtItems(p),
     // @-autocomplete i det native input: opslagets publikum (venner/medlemmer + forfatter)
     mentionables: mentionCards(p.feed || "all", [p.u]),
-    labels: {
-      empty: t("cmt.empty"),
-      placeholder: t("cmt.ph"),
-      send: t("cmt.send"),
-      reply: t("cmt.reply"),
-      cancelReply: t("cmt.cancel_reply"),
-      replyingTo: t("cmt.replying", { u: "{u}" }), // Swift indsætter {u} → handle
-      del: t("cmt.delete"),
-      delConfirm: t("cmt.delete_confirm")
-    }
+    labels: cmtLabels()
   };
 }
 export function openNativeComments(pid, focusCid){
@@ -375,16 +385,190 @@ export function nativeCommentsAction(payload){
   }
   const pid = Number(payload.postId != null ? payload.postId : nativeCmtPid);
   if(!pid) return;
-  if(kind === "send"){
-    const s = cstate(pid);
-    s.text = payload.text || "";
-    s.replyTo = payload.replyTo ? { id: Number(payload.replyTo), u: payload.replyToU || "" } : null;
-    s.img = null;
-    sendComment(pid); // upload/insert + rerender + pushNativeComments til sidst
-    return;
-  }
+  if(kind === "send"){ nativeSendComment(pid, payload); return; }
   if(kind === "like"){ toggleCmtLike(payload.commentId); return; }
   if(kind === "delete"){ deleteComment(payload.commentId); return; }
+}
+/* Delt af det native kommentar-sheet og den native opslags-side: læg payloaden i composer-
+   tilstanden og send via den eksisterende sendComment (upload/insert + rerender + pushes). */
+function nativeSendComment(pid, payload){
+  const s = cstate(pid);
+  s.text = payload.text || "";
+  s.replyTo = payload.replyTo ? { id: Number(payload.replyTo), u: payload.replyToU || "" } : null;
+  s.img = null;
+  sendComment(pid);
+}
+
+/* ================= Native opslags-side (KUN i app'en; kun tanker) =================
+   X-agtig detalje-side: opslaget øverst, kommentartråden under, composer i bunden.
+   Samme web-drevne mønster som kommentar-sheetet: web bygger en FULD snapshot (opslag +
+   tråd + labels) og poster den via window.__vfPostPagePush; Swift tegner den native
+   fuldskærms-side (PostPageView.swift, swipe-tilbage + tilbage-knap) og melder handlinger
+   tilbage via window.vfPostPage → nativePostPageAction. Web forbliver kilden til sandhed:
+   alle handlinger kører de EKSISTERENDE funktioner (sendComment/toggleCmtLike/deleteComment/
+   setLike/votePoll/sharePost), og et friskt snapshot skubbes tilbage (pushNativePostPage),
+   så siden holdes i sync — også ved realtime. Browser + ældre builds får web-siden
+   (#memview-skallen via openPostView i profile.js). */
+let nativePagePid = null; // hvilket opslag den native side viser lige nu (null = lukket)
+
+/* Opslags-tekst → segmenter [{t:"tekst"}|{m:"handle"}], så native kan gøre @-mentions
+   tappable. SAMME regex + dot-trim som richText i helpers.js — kun KENDTE brugere bliver
+   mentions, resten forbliver ren tekst. */
+function textSegs(s){
+  const out = [];
+  let last = 0;
+  const re = /(^|[^a-zA-Z0-9_.@])@([a-zA-Z0-9_.]{2,20})/g;
+  let m;
+  while((m = re.exec(s))){
+    let hh = m[2].toLowerCase();
+    while(hh.length >= 2 && !(USERS[hh] && USERS[hh].id) && hh.slice(-1) === "."){
+      hh = hh.slice(0, -1);
+    }
+    if(!USERS[hh] || !USERS[hh].id) continue;
+    const start = m.index + m[1].length;
+    if(start > last) out.push({ t: s.slice(last, start) });
+    out.push({ m: hh });
+    last = start + 1 + hh.length; // "@" + handle (evt. afklippede punktummer bliver tekst)
+  }
+  if(last < s.length) out.push({ t: s.slice(last) });
+  return out;
+}
+
+/* Poll-view-modellen → færdigberegnet snapshot (spejler pollHTML's regler — inkl. at
+   afgjorte governance-afstemninger mister deres klikbarhed). Web ejer al tekst/i18n. */
+function pollSnapshot(p){
+  const poll = p.poll;
+  if(!poll) return null;
+  const resolved = !!(poll.gov && poll.resolved);
+  const showRes = resolved || poll.myVote != null || !!(me && p.u === me.handle);
+  let head = "";
+  if(poll.gov){
+    head = t("gov.vote_label");
+    if(resolved) head += " · " + t("poll.closed");
+    else if(poll.left != null) head += poll.left > 0
+      ? " · " + t("gov.closes_in_min", { m: Math.ceil(poll.left / 60) })
+      : " · " + t("gov.closing");
+  }
+  return {
+    gov: !!poll.gov,
+    head: head,
+    showRes: showRes,
+    resolved: resolved,
+    meta: showRes ? stemmerLabel(poll.total) : "",
+    options: poll.options.map(function(o){
+      return {
+        id: String(o.id),
+        text: o.text,
+        pct: poll.total ? Math.round(o.votes / poll.total * 100) : 0,
+        mine: poll.myVote === o.id
+      };
+    })
+  };
+}
+
+function postPageSnapshot(pid, focusCid){
+  const p = findPost(pid);
+  if(!p || p.kind === "memory") return null;
+  const u = user(p.u);
+  const f = p.feed ? feedById(p.feed) : null;
+  const snap = {
+    open: true,
+    postId: String(pid),
+    title: t("postview.title"),
+    post: {
+      handle: p.u,
+      name: u.name || p.u,
+      avatarUrl: u.avatar_path ? imgUrl(u.avatar_path) : "",
+      initials: ini(p.u),
+      gradient: grad(p.u),
+      time: p.t,
+      kredsName: f ? f.name : "",
+      segs: textSegs(p.text || ""),
+      imgUrl: p.img ? p.img.src : "",
+      videoUrl: p.video ? p.video.src : "",
+      liked: !!p.liked,
+      likeCount: p.likeCount || 0,
+      cmtCount: p.cmts.length,
+      canShare: !p.feed,   // private kreds-opslag kan ikke deles (spejler sharePost)
+      poll: pollSnapshot(p)
+    },
+    canPost: !!me,
+    emoji: CMT_EMOJI,
+    comments: cmtItems(p),
+    mentionables: mentionCards(p.feed || "all", [p.u]),
+    labels: cmtLabels()
+  };
+  if(focusCid != null) snap.focus = String(focusCid);
+  return snap;
+}
+export function openNativePostPage(pid, focusCid){
+  pid = Number(pid);
+  const snap = postPageSnapshot(pid, focusCid);
+  if(!snap) return;
+  nativePagePid = pid;
+  if(window.__vfPostPagePush) window.__vfPostPagePush(snap);
+}
+export function pushNativePostPage(){
+  if(nativePagePid == null) return;
+  const snap = postPageSnapshot(nativePagePid);
+  // Opslaget forsvandt (slettet/anmeldt/blokeret) → luk siden i stedet for at vise et tomt skelet
+  if(!snap){ closeNativePostPage(); return; }
+  if(window.__vfPostPagePush) window.__vfPostPagePush(snap);
+}
+export function closeNativePostPage(){
+  if(nativePagePid == null) return;
+  nativePagePid = null;
+  if(window.__vfPostPagePush) window.__vfPostPagePush({ close: true }); // nulstil også native-bar-tilstand
+}
+export function nativePostPageAction(payload){
+  if(!payload) return;
+  const kind = payload.kind;
+  if(kind === "dismiss"){
+    nativePagePid = null;
+    if(window.__vfPostPagePush) window.__vfPostPagePush({ close: true });
+    return;
+  }
+  if(kind === "profile" || kind === "mention"){
+    // Avatar/navn eller en @-mention på siden → luk siden og åbn profilen (spejler sheetets gren)
+    const h = payload.handle;
+    if(!h) return;
+    closeNativePostPage();
+    if(el("memview") && el("memview").classList.contains("on")) closeMemView();
+    if(me && h === me.handle){ closeProfile(); switchTab("profil"); }
+    else openProfile(h);
+    return;
+  }
+  const pid = Number(payload.postId != null ? payload.postId : nativePagePid);
+  if(!pid) return;
+  if(kind === "send"){ nativeSendComment(pid, payload); return; }
+  if(kind === "like"){ toggleCmtLike(payload.commentId); return; }
+  if(kind === "delete"){ deleteComment(payload.commentId); return; }
+  if(kind === "postlike"){ setLike(pid); return; }
+  if(kind === "share"){ sharePost(pid); return; }
+  if(kind === "vote"){ votePoll(pid, payload.optionId); return; }
+  if(kind === "kreds"){
+    // Kreds-mærket på siden → luk alt der ligger over feedet og hop til kredsen
+    const p = findPost(pid);
+    closeNativePostPage();
+    if(el("memview") && el("memview").classList.contains("on")) closeMemView();
+    closeProfile();
+    if(p && p.feed){ switchTab("feed"); setFeed(p.feed); }
+    return;
+  }
+  if(kind === "menu"){
+    const p = findPost(pid);
+    if(!p || !me) return;
+    if(p.u === me.handle){
+      // Rediger-sheetet er web og ville gemme sig BAG den native side — luk siden først
+      closeNativePostPage();
+      openPostMenu(pid);
+    } else {
+      // Anmeld/blokér-glaskortet lægger sig OVER siden; forsvinder opslaget bagefter,
+      // lukker pushNativePostPage selv siden
+      openReportMenu(pid);
+    }
+    return;
+  }
 }
 
 export function initComments(){

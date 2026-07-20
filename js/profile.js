@@ -1,8 +1,9 @@
 import { sb, OFFICIAL_HANDLE } from "./config.js";
-import { me, state, FRIEND_SINCE, pv, curTab } from "./store.js";
+import { me, state, FRIEND_SINCE, pv, curTab, expandedCmts } from "./store.js";
 import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConsent, setConsent, imgUrl, ini } from "./helpers.js";
 import { t, setLang, getLang, policyURL } from "./i18n.js";
 import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps } from "./feed.js";
+import { openNativePostPage } from "./comments.js";
 import { openCompose, openStoryCamera } from "./compose.js";
 import { openStoryViewer } from "./stories.js";
 import { renderSearch, refreshSearchAfterFriendAdd } from "./search.js";
@@ -61,16 +62,29 @@ function timelineHTML(posts, tab, emptyHTML){
   return bar + body;
 }
 
-/* Ét minde i fuldskærms-siden #memview (glider ind fra højre). Genbruger den delte postHTML, så
-   HELE minde-kortet (header, fuld-bleed billede, samlede knapper, billedtekst, kommentarer) vises;
-   alle interaktioner (like/kommentar/del/⋯/dobbelttryk/lightbox + det native kommentar-sheet) virker
-   via feed.js' delegering, som også er bundet til #mv-body. */
+/* Ét opslag i fuldskærms-siden #memview (glider ind fra højre). Genbruger den delte postHTML, så
+   HELE kortet (header, medie, knapper, tekst, kommentarer) vises; alle interaktioner
+   (like/kommentar/del/⋯/dobbelttryk/lightbox + det native kommentar-sheet) virker via feed.js'
+   delegering, som også er bundet til #mv-body. Titlen følger opslags-typen (Minde/Opslag). */
 function openMemView(p){
   if(!p) return;
+  el("mv-title").textContent = t(p.kind === "memory" ? "memview.title" : "postview.title");
   el("mv-body").innerHTML = postHTML(p);
   clampMemCaps(el("mv-body"));
   el("mv-body").scrollTop = 0;
   el("memview").classList.add("on");
+}
+/* Opslags-detaljesiden (X-agtig: opslaget øverst, kommentartråden under). I app'en med
+   __vfPostPage åbnes den ÆGTE native fuldskærms-side (PostPageView.swift, web-drevet);
+   browser + ældre builds får web-siden (#memview-skallen) med tråden foldet ud. */
+export function openPostView(p){
+  if(!p) return;
+  if(p.kind !== "memory" && window.__vfNative && window.__vfPostPage){
+    openNativePostPage(p.id);
+    return;
+  }
+  if(p.kind !== "memory") expandedCmts.add(Number(p.id)); // tråd + composer synlige fra start
+  openMemView(p);
 }
 export function closeMemView(){
   el("memview").classList.remove("on");
