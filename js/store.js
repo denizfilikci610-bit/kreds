@@ -16,8 +16,7 @@ export const state = {
   blockedIds: [],         // uuids jeg har blokeret (RLS skjuler indholdet; listen driver UI-tilstande)
   blockReady: false,      // blocked_users-tabellen findes i DB — blokerings-UI vises kun da
   posts: [],              // posts in current view (view-model shape)
-  wholePosts: [],         // whole-kreds posts (feed_id null)
-  teasers: [],            // blurred teasers fra private kredse (kreds_teasers-RPC)
+  wholePosts: [],         // alle opslag brugeren må se (venner + egne kredse — RLS afgør)
   feeds: [],              // { id, name, memberIds:[uuid], members:[handle] }
   currentFeed: "all",
   storyGroups: []         // [{ author:{id,handle,name,avatar_path}, items:[{id,url,isVideo,seen}], allSeen, isMe }]

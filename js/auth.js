@@ -179,7 +179,6 @@ export function resetApp(){
   state.blockReady = false;
   state.posts = [];
   state.wholePosts = [];
-  state.teasers = [];
   state.feeds = [];
   state.currentFeed = "all";
   try{ sessionStorage.setItem("vf_cur_feed", "all"); }catch(_e){} // ryd valgt kreds ved logout

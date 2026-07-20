@@ -79,7 +79,8 @@ export function closeMemView(){
 
 export async function renderMyPosts(){
   if(!me) return;
-  const mine = state.wholePosts.filter(function(p){ return p.u === me.handle; });
+  // Kun venne-opslag (feed_id null) — kreds-opslag hører til i kredsen, ikke på profilen
+  const mine = state.wholePosts.filter(function(p){ return p.u === me.handle && !p.feed; });
   el("stat-posts").textContent = mine.length;
   el("stat-friends").textContent = state.humanFriends.length;
   el("stat-kredse").textContent = state.feeds.length;
@@ -547,7 +548,7 @@ function profTimelineClick(e, isPv){
   if(gi){
     // Åbn mindet i den dedikerede fuldskærms-side (#memview)
     const id = gi.dataset.mem;
-    const list = isPv ? pv.posts : state.wholePosts.filter(function(p){ return p.u === me.handle; });
+    const list = isPv ? pv.posts : state.wholePosts.filter(function(p){ return p.u === me.handle && !p.feed; });
     const p = list.find(function(x){ return String(x.id) === String(id); });
     if(p) openMemView(p);
   }

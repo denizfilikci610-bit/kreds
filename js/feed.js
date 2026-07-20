@@ -52,37 +52,6 @@ export function mapPost(row){
     cmts: cmts
   };
 }
-/* Teasers fra private kredse (kreds_teasers-RPC — serveren sender ALDRIG indhold) */
-/* Kredse med en optimistisk 'Anmodning sendt' der endnu ikke er bekræftet af serveren */
-const pendingReq = new Set();
-/* Kredse med en optimistisk 'annulleret' der endnu ikke er bekræftet (overlever refetch) */
-const cancelledReq = new Set();
-async function mapTeasers(rows){
-  const unknown = [];
-  rows.forEach(function(r){
-    if(!ID2H[r.author] && unknown.indexOf(r.author) < 0) unknown.push(r.author);
-  });
-  if(unknown.length){
-    const r = await sb.from("profiles").select("*").in("id", unknown);
-    if(!r.error) (r.data || []).forEach(registerProfile);
-  }
-  return rows.map(function(r){
-    const requested = (!!r.requested || pendingReq.has(r.feed_id)) && !cancelledReq.has(r.feed_id);
-    if(r.requested) pendingReq.delete(r.feed_id);    // serveren bekræftede anmodningen
-    if(!r.requested) cancelledReq.delete(r.feed_id); // serveren bekræftede annulleringen
-    return {
-      teaser: true,
-      id: "t" + r.post_id,
-      u: ID2H[r.author] || "?",
-      created: r.created_at,
-      t: fmtTime(r.created_at),
-      feedId: r.feed_id,
-      feedName: r.feed_name || "",
-      requested: requested
-    };
-  });
-}
-
 /* ================= Ikoner (tabbar) ================= */
 const IC = {
   homeO:'<path class="stroke" d="M3.9 10.7 12 3.6l8.1 7.1V20a1 1 0 0 1-1 1h-4.7v-6.4H9.6V21H4.9a1 1 0 0 1-1-1Z"/>',
@@ -227,118 +196,6 @@ export function postHTML(p){
   );
 }
 
-/* ---- Teaser-kort: sløret pladsholder + anmod-knap (ingen actions/kommentarer) ---- */
-export function teaserHTML(p){
-  const name = user(p.u).name;
-  const btn = treqHTML(p);
-  return (
-    '<article class="post teaser" data-tid="'+esc(p.id)+'">'+
-      '<button class="pavab" data-u="'+esc(p.u)+'" aria-label="'+t("aria.profile")+'">'+
-        avaHTML(p.u, 40)+
-      '</button>'+
-      '<div class="pcol">'+
-        '<div class="phead">'+
-          '<span class="nm">'+esc(name)+'</span>'+
-          '<span class="badge">'+BADGE()+'</span>'+
-          '<span class="ph">@'+esc(p.u)+' · '+esc(p.t)+'</span>'+
-        '</div>'+
-        '<div class="pmedia tmedia">'+
-          '<div class="tlock">'+
-            '<span class="tlocki" aria-hidden="true"><svg viewBox="0 0 24 24"><g class="stroke"><rect x="5" y="10.5" width="14" height="9.5" rx="2.4"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></g></svg></span>'+
-            '<span class="ttxt">'+t("teaser.shared", { name:esc(name) })+' <b class="tkreds">'+esc(p.feedName)+'</b></span>'+
-            '<span class="tsub">'+t("teaser.members_only")+'</span>'+
-            btn+
-          '</div>'+
-        '</div>'+
-      '</div>'+
-    '</article>'
-  );
-}
-/* 5-sek fortryd-vindue efter en join-anmodning: knappen tæller ned og kan trykkes for at fortryde;
-   bagefter bliver den til et dæmpet, ikke-klikbart "Anmodning sendt ✓". */
-const joinCountdown = new Map(); // feedId -> sekunder tilbage i fortryd-vinduet
-let joinTimer = null;
-let joinSeq = 0;                  // supersession: kun den NYESTE handling pr. kreds må rydde op
-const joinSeqOf = new Map();
-function treqState(f, requested){
-  const cd = joinCountdown.get(f);
-  if(cd != null) return { cls:"treq undo", txt:t("teaser.undo", { n:cd }), dis:false };
-  if(requested)  return { cls:"treq sent", txt:t("teaser.sent"), dis:true };
-  return { cls:"treq", txt:t("teaser.request"), dis:false };
-}
-function treqHTML(p){
-  const s = treqState(p.feedId, p.requested);
-  return '<button class="'+s.cls+'" data-f="'+esc(p.feedId)+'"'+(s.dis ? " disabled" : "")+'>'+esc(s.txt)+'</button>';
-}
-function refreshTreqButtons(){
-  document.querySelectorAll(".treq[data-f]").forEach(function(b){
-    const f = b.dataset.f;
-    const tz = state.teasers.find(function(x){ return x.feedId === f; });
-    const s = treqState(f, (tz ? tz.requested : false) || pendingReq.has(f));
-    b.className = s.cls;
-    b.textContent = s.txt;
-    b.disabled = s.dis;
-  });
-}
-function startJoinTicker(){
-  if(joinTimer) return;
-  joinTimer = setInterval(function(){
-    joinCountdown.forEach(function(sec, f){
-      if(sec <= 1) joinCountdown.delete(f);   // vinduet slut → bliver til "Anmodning sendt"
-      else joinCountdown.set(f, sec - 1);
-    });
-    refreshTreqButtons();
-    if(joinCountdown.size === 0){ clearInterval(joinTimer); joinTimer = null; }
-  }, 1000);
-}
-function setTeaserReqUI(f, on){
-  state.teasers.forEach(function(x){ if(x.feedId === f) x.requested = on; });
-  refreshTreqButtons();
-}
-async function cancelJoin(f){
-  if(!me || !f) return;
-  const seq = ++joinSeq; joinSeqOf.set(f, seq);
-  joinCountdown.delete(f);
-  pendingReq.delete(f);
-  cancelledReq.add(f);      // negativ optimistisk — overlever en baggrunds-refetch mens RPC'en kører
-  setTeaserReqUI(f, false); // optimistisk tilbage til "Anmod om at være med"
-  const { error } = await sb.rpc("cancel_join_request", { f: f });
-  if(error){
-    if(joinSeqOf.get(f) !== seq) return; // afløst af en nyere handling
-    console.error(error);
-    cancelledReq.delete(f);
-    pendingReq.add(f);
-    setTeaserReqUI(f, true); // fortryd fejlede → "Anmodning sendt"
-    toast(t("err.generic"));
-    return;
-  }
-  scheduleRefetch(); // hold teaser-listen frisk (evt. afstemning fjernet)
-  toast(t("friend.request_cancelled"));
-}
-async function requestJoin(f){
-  if(!me || !f) return;
-  const seq = ++joinSeq; joinSeqOf.set(f, seq);
-  pendingReq.add(f);
-  cancelledReq.delete(f);
-  joinCountdown.set(f, 5);  // start 5-sek fortryd-vindue med nedtælling
-  setTeaserReqUI(f, true);
-  startJoinTicker();
-  const { error } = await sb.rpc("request_join_kreds", { f: f });
-  if(!error) return;
-  if(joinSeqOf.get(f) !== seq) return; // afløst af en nyere handling — rør ikke tilstanden
-  console.error(error);
-  const m = String(error.message || "");
-  joinCountdown.delete(f);
-  pendingReq.delete(f);
-  if(m.indexOf("already_member") >= 0){
-    toast(t("teaser.already"));
-    scheduleRefetch();
-    return;
-  }
-  setTeaserReqUI(f, false);
-  toast(m.indexOf("not_allowed") >= 0 ? t("teaser.not_allowed") : t("err.generic"));
-}
-
 /* Bevar video-position hen over re-render af timeline-HTML
    (feed-videoer er altid lydløse — lyd hører til i lightboxen) */
 export function snapVideos(container){
@@ -366,16 +223,14 @@ export function renderFeed(){
     html += '<div class="emptynote" style="padding:24px 20px;text-align:center">'+t("feed.empty_friends")+'</div>';
   }
   /* Ingen fastgøring: alle opslag (inkl. den officielle profil) flyder kronologisk */
-  const items = (state.currentFeed === "all" && state.teasers.length)
-    ? state.posts.concat(state.teasers).sort(function(a,b){ return new Date(b.created) - new Date(a.created); })
-    : state.posts;
+  const items = state.posts;
   if(items.length){
     /* Flet reklame-kort ind efter hver AD_EVERY opslag (kun i appen + med samtykke).
        Ikke efter det allersidste opslag, så feedet ikke slutter på en reklame. */
     const withAds = adsEnabled();
     let adIdx = 0;
     html += items.map(function(p, idx){
-      let card = p.teaser ? teaserHTML(p) : postHTML(p);
+      let card = postHTML(p);
       if(withAds && (idx + 1) % AD_EVERY === 0 && (idx + 1) < items.length){
         card += adSlotHTML(adIdx++);
       }
@@ -418,7 +273,7 @@ function flagNewPosts(){
   const seenMs = seen ? new Date(seen).getTime() : 0;
   state.posts.forEach(function(p){
     // Kun rigtige opslag fra andre — egne og @vibefeed (inkl. det fastgjorte
-    // velkomstopslag) er undtaget; teasers renderes separat og flagges aldrig
+    // velkomstopslag) er undtaget
     p.isNew = !!(seenMs && me && p.u !== me.handle && p.u !== OFFICIAL_HANDLE &&
                  new Date(p.created).getTime() > seenMs);
   });
@@ -448,8 +303,7 @@ function feedSig(){
             p.poll ? JSON.stringify(p.poll) : 0,
             p.cmts.map(function(c){ return [c.id, c.text || "", c.likeCount, c.liked ? 1 : 0, c.img || ""]; })];
   });
-  const teasers = state.teasers.map(function(t){ return [t.id, t.requested ? 1 : 0]; });
-  return JSON.stringify([state.currentFeed, posts, teasers]);
+  return JSON.stringify([state.currentFeed, posts]);
 }
 
 /* ================= Data-hentning ================= */
@@ -464,33 +318,22 @@ export async function loadPosts(advanceSeen){
   // baggrunds-refetch (realtime/polling) = false. Default true for eksisterende kald.
   if(advanceSeen === undefined) advanceSeen = true;
   if(!me) return;
-  // Luk evt. udløbne kreds-afstemninger (10-min-frist) når man åbner en specifik kreds
-  if(advanceSeen && state.currentFeed !== "all"){ sb.rpc("close_due_votes").then(function(){}, function(){}); }
+  // Luk evt. udløbne kreds-afstemninger (10-min-frist) — afgjorte afstemninger ses
+  // også i "Hele kredsen", så RPC'en kaldes ved alle bruger-initierede hentninger
+  if(advanceSeen){ sb.rpc("close_due_votes").then(function(){}, function(){}); }
   try{
-    const reqs = [ postQuery().is("feed_id", null) ];
+    // Ufiltreret forespørgsel = ALT brugeren må se (RLS: venne-opslag + egne kredses
+    // opslag) → "Hele kredsen". En specifik kreds henter derudover sine egne opslag
+    // separat, så dens fulde historik ikke klemmes af den fælles limit på 100.
+    const reqs = [ postQuery() ];
     const cur = state.currentFeed;
     if(cur !== "all") reqs.push(postQuery().eq("feed_id", cur));
-    else reqs.push(sb.rpc("kreds_teasers")); // kun i 'Hele kredsen'
     const res = await Promise.all(reqs);
     if(state.currentFeed !== cur) return;
     if(res[0].error) throw res[0].error;
     if(cur !== "all" && res[1].error) throw res[1].error;
     state.wholePosts = (res[0].data || []).map(mapPost);
-    if(cur === "all"){
-      state.posts = state.wholePosts;
-      if(res[1].error){
-        // Teasers er ren pynt — de må ikke vælte hele feedet
-        console.error(res[1].error);
-        state.teasers = [];
-      } else {
-        const t = await mapTeasers(res[1].data || []);
-        if(state.currentFeed !== cur) return;
-        state.teasers = t;
-      }
-    } else {
-      state.teasers = [];
-      state.posts = (res[1].data || []).map(mapPost);
-    }
+    state.posts = (cur === "all") ? state.wholePosts : (res[1].data || []).map(mapPost);
     flagNewPosts();
     // Bruger-initieret: gen-render altid. Baggrund: kun når noget faktisk ændrede sig.
     const sig = feedSig();
@@ -1240,13 +1083,6 @@ function timelineClick(e){
     if(el("memview").classList.contains("on")) closeMemView();
     if(me && u === me.handle){ closeProfile(); switchTab("profil"); }
     else openProfile(u);
-    return;
-  }
-  const tq = e.target.closest(".treq");
-  if(tq){
-    if(tq.disabled) return;
-    if(tq.classList.contains("undo")) cancelJoin(tq.dataset.f);
-    else requestJoin(tq.dataset.f);
     return;
   }
   const like = e.target.closest(".like-btn");
