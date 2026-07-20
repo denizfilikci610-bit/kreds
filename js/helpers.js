@@ -29,6 +29,7 @@ export function registerProfile(p){
     since: p.created_at ? new Date(p.created_at).getFullYear() : "",
     id: p.id,
     avatar_path: p.avatar_path !== undefined ? p.avatar_path : (prev ? prev.avatar_path : null),
+    banner_path: p.banner_path !== undefined ? p.banner_path : (prev ? prev.banner_path : null),
     bio: p.bio !== undefined ? p.bio : (prev ? prev.bio : null)
   };
   if(p.id) ID2H[p.id] = p.handle;

@@ -69,6 +69,7 @@
 
     <!-- PROFIL -->
     <section class="view" id="view-profil">
+      <div class="pbanner" id="own-banner"></div>
       <div class="phead-own">
         <div id="own-ava" style="display:flex;flex:0 0 auto"></div>
         <div class="pstats">
@@ -220,6 +221,7 @@
       </div>
     </div>
     <div class="pv-body" id="pv-body">
+      <div class="pbanner" id="pv-banner"></div>
       <div class="phead-own">
         <span id="pv-ava" style="display:flex;flex:0 0 auto"></span>
         <div class="pstats">
@@ -265,6 +267,10 @@
     <div class="cmt-grab"></div>
     <div class="cmt-title" data-i18n="profile.edit">Rediger profil</div>
     <div class="ep-scroll" style="flex:1;overflow-y:auto;min-height:0">
+      <div class="ep-banwrap">
+        <div class="pbanner ep-bprev" id="ep-bprev"></div>
+        <button class="pic" id="ep-banner" data-i18n="ep.banner">Skift banner</button>
+      </div>
       <div class="ep-avarow">
         <span id="ep-ava" style="display:flex;flex:0 0 auto"></span>
         <button class="pic" id="ep-pic" data-i18n="ep.pic">Skift profilbillede</button>
@@ -307,6 +313,7 @@
       </div>
     </div>
     <input type="file" id="ep-file" accept="image/*" style="display:none">
+    <input type="file" id="ep-bfile" accept="image/*" style="display:none">
   </div>
 
   <!-- Rediger opslag -->

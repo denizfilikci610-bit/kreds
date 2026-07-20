@@ -120,7 +120,13 @@ export async function renderMyPosts(){
   if(!r.error && r.count != null && me) el("stat-posts").textContent = r.count;
 }
 
+function renderBanner(id, path){
+  const node = el(id);
+  node.innerHTML = path ? '<img src="' + esc(imgUrl(path)) + '" alt="">' : "";
+  node.classList.toggle("on", !!path);
+}
 export function setOwnUI(){
+  renderBanner("own-banner", me.banner_path);
   el("own-ava").innerHTML = avaHTML(me.handle, 86);
   el("own-name").textContent = user(me.handle).name;
   el("own-handle").textContent = "@" + me.handle;
@@ -131,7 +137,7 @@ export function setOwnUI(){
 }
 
 export function closeEditSheet(){
-  if(window.__vfEsheet){ epStagedAvatar = null; window.__vfEsheetPush({ close: true }); return; }
+  if(window.__vfEsheet){ epStagedAvatar = null; epStagedBanner = null; window.__vfEsheetPush({ close: true }); return; }
   el("esheet").classList.remove("on");
   if(!el("fsheet").classList.contains("on") && !el("edsheet").classList.contains("on") && !el("msheet").classList.contains("on") && !el("asheet").classList.contains("on"))
     el("scrim").classList.remove("on");
@@ -149,6 +155,7 @@ function syncAdsChips(){
    "Gem gør alt": navn/bio/aktivitet/sprog/samtykke + et evt. valgt foto samles og
    committes FØRST når man trykker Gem. Web'en ejer alle mutationer; native staged'er. */
 let epStagedAvatar = null; // data-URL for et valgt (endnu ikke gemt) profilbillede
+let epStagedBanner = null; // data-URL for et valgt (endnu ikke gemt) profil-banner
 let epToken = 0;
 
 function epheetSnapshot(){
@@ -159,6 +166,8 @@ function epheetSnapshot(){
     picLabel: t("ep.pic"),
     nameLabel: t("ep.name"), namePlaceholder: t("ep.name_ph"), nameMaxLength: 40,
     handleLabel: t("ep.handle"), handle: me ? (me.handle || "") : "", // vises read-only (Brugernavn)
+    bannerLabel: t("ep.banner"),
+    bannerUrl: me && me.banner_path ? imgUrl(me.banner_path) : "",
     bioLabel: t("ep.bio"), bioPlaceholder: t("ep.bio_ph"), bioMaxLength: 160,
     activityLabel: t("ep.activity"), shareLabel: t("ep.share"), shareNote: t("ep.share_note"),
     langLabel: t("ep.lang"), langDaLabel: "Dansk", langEnLabel: "English",
@@ -183,6 +192,7 @@ function meAvatarCard(){
 }
 /* Native → web: window.vfAvatar(dataURL) — stager billedet (uploades først ved Gem). */
 export function avatarStage(dataURL){ epStagedAvatar = dataURL || null; }
+export function bannerStage(dataURL){ epStagedBanner = dataURL || null; }
 /* Native → web: window.vfEsheet(obj). Sprog/samtykke sendes KUN i 'save' (Gem gør alt). */
 export function nativeEsheetAction(obj){
   if(!obj) return;
@@ -211,6 +221,25 @@ function avatarBlobFromImage(img){
     c.toBlob(function(blob){ resolve(blob); }, "image/jpeg", 0.85);
   });
 }
+/* Banner: cover-beskaering til 1280x432 (ca. 3:1, YouTube-agtigt) */
+function bannerBlobFromImage(img){
+  return new Promise(function(resolve){
+    const W = 1280, H = 432;
+    const scale = Math.max(W / img.width, H / img.height);
+    const sw = W / scale, sh = H / scale;
+    const sx = (img.width - sw) / 2, sy = (img.height - sh) / 2;
+    const c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    c.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+    c.toBlob(function(blob){ resolve(blob); }, "image/jpeg", 0.85);
+  });
+}
+async function uploadBannerBlob(blob){
+  let path = me.id + "/banner-" + uuid() + ".jpg";
+  const up = await sb.storage.from("post-images").upload(path, blob, { contentType: "image/jpeg" });
+  if(up.error) throw up.error;
+  return (up.data && up.data.path) ? up.data.path : path;
+}
 async function uploadAvatarBlob(blob){
   let path = me.id + "/avatar-" + uuid() + ".jpg";
   const up = await sb.storage.from("post-images").upload(path, blob, { contentType: "image/jpeg" });
@@ -232,20 +261,32 @@ async function nativeEsheetSave(obj){
       if(!blob) throw new Error("img");
       newPath = await uploadAvatarBlob(blob);
     }
+    let newBanner = null; const oldBanner = me.banner_path;
+    if(epStagedBanner){
+      const bimg = await imgFromSource(epStagedBanner);
+      const bblob = await bannerBlobFromImage(bimg);
+      if(!bblob) throw new Error("img");
+      newBanner = await uploadBannerBlob(bblob);
+    }
     const patch = { name: name, bio: bio || null, show_activity: share };
     if(newPath) patch.avatar_path = newPath;
+    if(newBanner) patch.banner_path = newBanner;
     const { error } = await sb.from("profiles").update(patch).eq("id", me.id);
     if(error){
       if(newPath) sb.storage.from("post-images").remove([newPath]).catch(function(){});
+      if(newBanner) sb.storage.from("post-images").remove([newBanner]).catch(function(){});
       throw error;
     }
     if(newPath && oldPath) sb.storage.from("post-images").remove([oldPath]).catch(function(){});
+    if(newBanner && oldBanner) sb.storage.from("post-images").remove([oldBanner]).catch(function(){});
     me.name = name; me.bio = bio || null; me.show_activity = share;
     if(newPath) me.avatar_path = newPath;
+    if(newBanner) me.banner_path = newBanner;
     registerProfile(me);
     const newConsent = obj.consent === "limited" ? "limited" : "personal";
     if(newConsent !== getConsent()) setConsent(newConsent); // per-enhed; poster til ad-broen
     epStagedAvatar = null;
+    epStagedBanner = null;
     window.__vfEsheetPush({ close: true });
     setOwnUI(); renderFeed(); renderStories(); renderMyPosts(); setTabIcons(curTab); refreshPv();
     if(el("view-search").classList.contains("active")) renderSearch();
@@ -507,6 +548,7 @@ export async function openProfile(h){
   el("pv-stat-friends").textContent = "–";
   el("pv-stat-kredse").textContent = "–";
   el("pv-ava").innerHTML = avaHTML(h, 86);
+  renderBanner("pv-banner", user(h).banner_path);
   renderPvRelation(h);
   /* "Se aktivitet" — skjules på egen profil, for den officielle bot og for blokerede */
   const act = el("pv-act");
@@ -560,6 +602,7 @@ export function refreshPv(){
     applyFeedSound();
     clampMemCaps(el("pv-posts"));
     el("pv-ava").innerHTML = avaHTML(pv.u, 86);
+    renderBanner("pv-banner", user(pv.u).banner_path);
   }
 }
 
@@ -588,12 +631,14 @@ el("pv-posts").addEventListener("click", function(e){ profTimelineClick(e, true)
 el("editprof").addEventListener("click", function(){
   if(!me) return;
   // App'en: ægte native Liquid Glass-sheet i stedet for web-sheet'et.
-  if(window.__vfEsheet){ epStagedAvatar = null; window.__vfEsheetPush(epheetSnapshot()); return; }
+  if(window.__vfEsheet){ epStagedAvatar = null; epStagedBanner = null; window.__vfEsheetPush(epheetSnapshot()); return; }
   el("ep-name").value = me.name || "";
   el("ep-bio").value = me.bio || "";
   el("ep-share").checked = me.show_activity !== false;
   el("ep-ava").innerHTML = avaHTML(me.handle, 72);
   el("ep-file").value = "";
+  el("ep-bprev").innerHTML = me.banner_path ? '<img src="' + esc(imgUrl(me.banner_path)) + '" alt="">' : "";
+  el("ep-bfile").value = "";
   syncAdsChips();
   resetDeleteUI();
   epCan();
@@ -632,6 +677,46 @@ el("lang-en").addEventListener("click", function(){ setLang("en"); });
 /* ---- Reklame-samtykke (per enhed — setConsent poster også til den native bro) ---- */
 el("ads-personal").addEventListener("click", function(){ setConsent("personal"); syncAdsChips(); });
 el("ads-limited").addEventListener("click", function(){ setConsent("limited"); syncAdsChips(); });
+/* ---- Profil-banner (browser: uploades straks ved valg, som profilbilledet) ---- */
+el("ep-banner").addEventListener("click", function(){ el("ep-bfile").click(); });
+el("ep-bfile").addEventListener("change", function(){
+  const file = this.files && this.files[0];
+  if(!file || !me) return;
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = function(){
+    URL.revokeObjectURL(url);
+    bannerBlobFromImage(img).then(async function(blob){
+      if(!blob){ toast(t("img.read_failed")); return; }
+      if(!me) return;
+      const old = me.banner_path;
+      try{
+        const path = await uploadBannerBlob(blob);
+        const upd = await sb.from("profiles").update({ banner_path: path }).eq("id", me.id);
+        if(upd.error){
+          sb.storage.from("post-images").remove([path]).catch(function(){});
+          throw upd.error;
+        }
+        if(old) sb.storage.from("post-images").remove([old]).catch(function(){});
+        me.banner_path = path;
+        registerProfile(me);
+        setOwnUI();
+        el("ep-bprev").innerHTML = '<img src="' + esc(imgUrl(path)) + '" alt="">';
+        refreshPv();
+        toast(t("profile.updated"));
+      }catch(err){
+        console.error(err);
+        toast(t("err.generic"));
+      }
+      el("ep-bfile").value = "";
+    });
+  };
+  img.onerror = function(){
+    URL.revokeObjectURL(url);
+    toast(t("img.read_failed"));
+  };
+  img.src = url;
+});
 /* ---- Profilbillede ---- */
 el("ep-pic").addEventListener("click", function(){ el("ep-file").click(); });
 el("ep-file").addEventListener("change", function(){

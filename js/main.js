@@ -7,7 +7,7 @@ import { initComments, nativeCommentsAction, nativePostPageAction } from "./comm
 import { initKredse, closeFeedSheet, closeMemberSheet, openFeedSheet, nativeFsheetAction, nativeMemberAction } from "./kredse.js";
 import { initCompose, renderComposeDest, openCompose, openThought, openMemory, nativeMemoryPost, openMemoryFallback, nativeMemoryUploaded, nativeMemoryUploadFailed } from "./compose.js";
 import { initSearch, renderSearch } from "./search.js";
-import { initProfile, closeEditSheet, closeActivitySheet, renderStories, renderMyPosts, refreshPv, nativeEsheetAction, avatarStage } from "./profile.js";
+import { initProfile, closeEditSheet, closeActivitySheet, renderStories, renderMyPosts, refreshPv, nativeEsheetAction, avatarStage, bannerStage } from "./profile.js";
 import { initNotifs, loadNotifs, openFromPush } from "./notifications.js";
 import { initLightbox } from "./lightbox.js";
 import { initStories } from "./stories.js";
@@ -127,6 +127,7 @@ if(window.__vfNative){
   window.__vfEsheetPush = function(msg){ postPanel("esheet", msg); };
   window.vfEsheet = function(payload){ nativeEsheetAction(payload); };
   window.vfAvatar = function(dataURL){ avatarStage(dataURL); }; // stager valgt foto til Gem
+  window.vfBanner = function(dataURL){ bannerStage(dataURL); }; // stager valgt banner til Gem
   // Native Instagram-galleri → minde (native uploader direkte til Storage)
   window.vfMemory = function(obj){ nativeMemoryPost(obj); };
   window.vfMemoryUploaded = function(){ nativeMemoryUploaded(); };

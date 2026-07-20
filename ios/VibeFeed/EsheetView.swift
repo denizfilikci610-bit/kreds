@@ -51,6 +51,11 @@ final class EsheetModel: ObservableObject {
     @Published var avatarInitials = "?"
     @Published var avatarGradient: [String] = []
 
+    // Banner (YouTube-agtigt, valgfrit)
+    @Published var bannerLabel = ""
+    @Published var bannerUrl = ""              // current banner ("" = none)
+    @Published var pickedBanner: UIImage?      // preview of a newly-picked banner (uploaded on Save)
+
     // Native-local staged state
     @Published var name = ""
     @Published var bio = ""
@@ -64,6 +69,7 @@ final class EsheetModel: ObservableObject {
 
     var onAction: ((String) -> Void)?          // JSON object literal → window.vfEsheet
     var onAvatar: ((String) -> Void)?          // data URL → window.vfAvatar (stages it in the web)
+    var onBanner: ((String) -> Void)?          // data URL → window.vfBanner (stages it in the web)
 
     var canSave: Bool { !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
@@ -80,6 +86,7 @@ final class EsheetModel: ObservableObject {
         title = str(dict, "title"); picLabel = str(dict, "picLabel")
         nameLabel = str(dict, "nameLabel"); namePlaceholder = str(dict, "namePlaceholder")
         handleLabel = str(dict, "handleLabel"); handle = str(dict, "handle")
+        bannerLabel = str(dict, "bannerLabel"); bannerUrl = str(dict, "bannerUrl"); pickedBanner = nil
         bioLabel = str(dict, "bioLabel"); bioPlaceholder = str(dict, "bioPlaceholder")
         activityLabel = str(dict, "activityLabel"); shareLabel = str(dict, "shareLabel"); shareNote = str(dict, "shareNote")
         langLabel = str(dict, "langLabel"); langDaLabel = str(dict, "langDaLabel"); langEnLabel = str(dict, "langEnLabel")
@@ -131,6 +138,11 @@ final class EsheetModel: ObservableObject {
         onAvatar?(dataURL)
     }
 
+    func stagePickedBanner(_ image: UIImage, dataURL: String) {
+        pickedBanner = image
+        onBanner?(dataURL)
+    }
+
     private func send(_ obj: [String: Any]) {
         guard let d = try? JSONSerialization.data(withJSONObject: obj),
               let s = String(data: d, encoding: .utf8) else { return }
@@ -152,6 +164,7 @@ func vfImageDataURL(_ image: UIImage, maxEdge: CGFloat = 1024, quality: CGFloat 
 struct EditProfilePage: View {
     @ObservedObject private var model = EsheetModel.shared
     @State private var pickerItem: PhotosPickerItem?
+    @State private var bannerItem: PhotosPickerItem?
     @State private var slet = ""
     @FocusState private var nameFocused: Bool
     @State private var dragX: CGFloat = 0
@@ -199,6 +212,7 @@ struct EditProfilePage: View {
         )
         .onAppear { dragX = 0; dragging = false }
         .onChange(of: pickerItem) { _, item in loadPicked(item) }
+        .onChange(of: bannerItem) { _, item in loadPickedBanner(item) }
     }
 
     // MARK: - Header (standard back chevron + centered bold title + Gem til højre)
@@ -314,6 +328,36 @@ struct EditProfilePage: View {
 
     private var avatarBlock: some View {
         VStack(spacing: 12) {
+            // Banner (YouTube-agtigt) — tap på fladen eller linket vælger et nyt
+            PhotosPicker(selection: $bannerItem, matching: .images) {
+                ZStack {
+                    Group {
+                        if let img = model.pickedBanner {
+                            Image(uiImage: img).resizable().scaledToFill()
+                        } else if !model.bannerUrl.isEmpty, let u = URL(string: model.bannerUrl) {
+                            AsyncImage(url: u) { img in img.resizable().scaledToFill() } placeholder: { Color.primary.opacity(0.06) }
+                        } else {
+                            Color.primary.opacity(0.06)
+                        }
+                    }
+                    if model.pickedBanner == nil && model.bannerUrl.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "photo")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text(model.bannerLabel)
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(height: 92)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .padding(.horizontal, 16)
+            }
+            PhotosPicker(selection: $bannerItem, matching: .images) {
+                Text(model.bannerLabel).font(.system(size: 14, weight: .bold)).foregroundStyle(vfRed)
+            }
             PhotosPicker(selection: $pickerItem, matching: .images) {
                 Group {
                     if let img = model.pickedAvatar {
@@ -323,13 +367,15 @@ struct EditProfilePage: View {
                     }
                 }
                 .frame(width: 96, height: 96).clipShape(Circle())
+                .padding(.top, 8)
             }
             PhotosPicker(selection: $pickerItem, matching: .images) {
                 Text(model.picLabel).font(.system(size: 15, weight: .bold)).foregroundStyle(vfRed)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 22)
+        .padding(.top, 14)
+        .padding(.bottom, 22)
     }
 
     /// IG-agtig række: label i fast venstre kolonne, værdi/felt til højre, hårstreg under
@@ -412,6 +458,16 @@ struct EditProfilePage: View {
             if let data = try? await item.loadTransferable(type: Data.self), let img = UIImage(data: data),
                let dataURL = vfImageDataURL(img) {
                 await MainActor.run { model.stagePickedImage(img, dataURL: dataURL) }
+            }
+        }
+    }
+
+    private func loadPickedBanner(_ item: PhotosPickerItem?) {
+        guard let item else { return }
+        Task {
+            if let data = try? await item.loadTransferable(type: Data.self), let img = UIImage(data: data),
+               let dataURL = vfImageDataURL(img, maxEdge: 1600) {
+                await MainActor.run { model.stagePickedBanner(img, dataURL: dataURL) }
             }
         }
     }

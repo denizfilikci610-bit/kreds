@@ -197,6 +197,10 @@ struct ContentView: View {
             EsheetModel.shared.onAvatar = { dataURL in
                 model.webView?.evaluateJavaScript("window.vfAvatar && window.vfAvatar('\(dataURL)')", completionHandler: nil)
             }
+            // Picked profile banner — same staging pattern, committed on Save.
+            EsheetModel.shared.onBanner = { dataURL in
+                model.webView?.evaluateJavaScript("window.vfBanner && window.vfBanner('\(dataURL)')", completionHandler: nil)
+            }
             // Native memory gallery: the web returns a Storage upload URL, native uploads the media
             // directly (bypassing CSP/scheme limits), then the web creates the post.
             PhotoLibModel.shared.onShare = { json in
