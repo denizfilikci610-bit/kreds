@@ -1254,6 +1254,17 @@
   .cv-msg.mine .cv-bubble{background:var(--red);color:#fff}
   .cv-text{white-space:pre-wrap}
   .cv-time{font-size:10.5px;color:var(--gray);margin:3px 12px 0}
+  /* Set-kvitteringer: små avatarer under den sidste besked hvert medlem har læst */
+  .cv-reads{display:flex;justify-content:flex-end;gap:3px;padding:3px 2px 0}
+  .cv-read{display:flex}
+  .cv-reads .av{box-shadow:0 0 0 2px var(--bg)}
+  /* "Ulæste beskeder"-skillelinjen (fryses når tråden åbnes) */
+  .cv-unread{
+    display:flex;align-items:center;gap:10px;margin:14px 0 4px;
+    color:var(--gray);font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.4px;
+  }
+  .cv-unread::before,.cv-unread::after{content:"";flex:1;height:1px;background:var(--line)}
   /* Minde-deling i en boble: miniature + "delte et minde" — tap åbner opslaget */
   .cv-share{display:flex;flex-direction:column;gap:6px;align-items:flex-start;padding:0;color:inherit;text-align:left}
   .cv-share:active{opacity:.7}

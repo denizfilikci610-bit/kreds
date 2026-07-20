@@ -145,6 +145,7 @@ const DA = {
   "chat.shared_memory": "delte et minde",
   "chat.you": "Dig",
   "chat.say_hi": "Sig hej 👋",
+  "chat.unread": "Ulæste beskeder",
 
   /* Notifikationer */
   "notif.liked": "likede dit opslag",
@@ -581,6 +582,7 @@ const EN = {
   "chat.shared_memory": "shared a memory",
   "chat.you": "You",
   "chat.say_hi": "Say hi 👋",
+  "chat.unread": "Unread messages",
 
   /* Notifications */
   "notif.liked": "liked your post",

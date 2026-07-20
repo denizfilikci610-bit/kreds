@@ -18,6 +18,10 @@ let chatFeed = null;   // åben tråds feed_id (null = lukket)
 let msgs = [];         // den åbne tråds beskeder (ældste først)
 let lastByFeed = {};   // feed_id -> seneste besked (listens previews)
 let chatSeq = 0;       // supersession: kun nyeste åbning må skrive tråden
+let reads = {};        // åben tråd: user_id -> last_read_at (set-kvitteringer)
+let readsOk = false;   // false = kreds_chat_reads utilgængelig → kvitteringer skjules
+let unreadAtId = null; // beskeden "Ulæste beskeder"-linjen står FØR (fryses ved åbning)
+let myReadSent = 0;    // seneste last_read_at jeg selv har skrevet (ms) — mod dubletter
 
 function mapMsg(r){
   if(r.author_profile) registerProfile(r.author_profile);
@@ -100,19 +104,54 @@ export async function openKredsChat(feedId){
   el("cv-body").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
   el("chatview").classList.add("on");
   const seq = ++chatSeq;
-  const { data, error } = await sb.from("kreds_messages")
-    .select(MSG_SELECT)
-    .eq("feed_id", feedId)
-    .order("created_at", { ascending: true })
-    .limit(300);
+  // Beskeder + set-kvitteringer hentes parallelt. Kvitteringerne er fail-soft: findes
+  // tabellen ikke endnu (migrationen kreds_chat_reads), vises tråden bare uden dem.
+  const [mres, rr] = await Promise.all([
+    sb.from("kreds_messages")
+      .select(MSG_SELECT)
+      .eq("feed_id", feedId)
+      .order("created_at", { ascending: true })
+      .limit(300),
+    sb.from("kreds_chat_reads").select("user_id, last_read_at").eq("feed_id", feedId)
+  ]);
   if(chatFeed !== feedId || seq !== chatSeq) return; // lukket/skiftet imens
-  if(error){
-    console.error(error);
+  if(mres.error){
+    console.error(mres.error);
     el("cv-body").innerHTML = '<div class="emptynote">'+t("err.generic")+'</div>';
     return;
   }
-  msgs = (data || []).map(mapMsg);
+  msgs = (mres.data || []).map(mapMsg);
+  reads = {}; readsOk = false; unreadAtId = null; myReadSent = 0;
+  if(!rr.error){
+    readsOk = true;
+    (rr.data || []).forEach(function(r){ reads[r.user_id] = r.last_read_at; });
+    myReadSent = reads[me.id] ? new Date(reads[me.id]).getTime() : 0;
+    // "Ulæste beskeder"-linjen fryses ved åbning: første besked fra andre efter mit mærke
+    const firstUnread = msgs.find(function(m){
+      return m.authorId !== me.id && new Date(m.created).getTime() > myReadSent;
+    });
+    unreadAtId = firstUnread ? firstUnread.id : null;
+  }
   renderThread(true);
+  markThreadRead();
+}
+
+/* Min egen kvittering: læst til og med tråden(s) nyeste besked. Ankres til beskedens
+   server-tid (ikke klient-uret), skrives kun fremad og kun mens tråden faktisk er
+   synlig — en tråd åben i baggrunden markerer ikke noget som læst. */
+function markThreadRead(){
+  if(!me || chatFeed == null || !readsOk || document.hidden) return;
+  if(!el("chatview").classList.contains("on")) return;
+  const real = msgs.filter(function(m){ return String(m.id).indexOf("tmp-") !== 0; });
+  if(!real.length) return;
+  const newest = real[real.length - 1].created;
+  const ts = new Date(newest).getTime();
+  if(ts <= myReadSent) return;
+  myReadSent = ts;
+  reads[me.id] = newest;
+  sb.from("kreds_chat_reads")
+    .upsert({ feed_id: chatFeed, user_id: me.id, last_read_at: newest })
+    .then(function(r){ if(r.error) console.error(r.error); }, function(){});
 }
 export function closeKredsChat(){
   chatFeed = null;
@@ -163,22 +202,55 @@ export function resetChat(){
   closeKredsChat();
   msgs = [];
   lastByFeed = {};
+  reads = {}; readsOk = false; unreadAtId = null; myReadSent = 0;
   el("chat-list").innerHTML = "";
   el("cv-input").value = "";
 }
 
 function renderThread(scrollBottom){
   const box = el("cv-body");
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  const prevTop = box.scrollTop;
+  const seenBy = readReceipts();
   // Messenger-agtig gruppering: beskeder i træk fra samme afsender klumpes — navn kun
-  // øverst i gruppen, avatar og tid kun ved gruppens sidste boble
+  // øverst i gruppen, avatar og tid kun ved gruppens sidste boble. "Ulæste beskeder"-
+  // linjen bryder en gruppe, så boblen efter linjen får navn/avatar igen.
   box.innerHTML = msgs.length
     ? msgs.map(function(m, i){
-        const first = i === 0 || msgs[i - 1].authorId !== m.authorId;
-        const last = i === msgs.length - 1 || msgs[i + 1].authorId !== m.authorId;
-        return msgHTML(m, first, last);
+        const first = i === 0 || msgs[i - 1].authorId !== m.authorId || m.id === unreadAtId;
+        const last = i === msgs.length - 1 || msgs[i + 1].authorId !== m.authorId ||
+                     msgs[i + 1].id === unreadAtId;
+        return (m.id === unreadAtId ? '<div class="cv-unread">'+t("chat.unread")+'</div>' : '')+
+               msgHTML(m, first, last)+
+               (seenBy[m.id] ? readsHTML(seenBy[m.id]) : '');
       }).join("")
     : '<div class="emptynote">'+t("chat.no_messages")+'</div>';
-  if(scrollBottom) box.scrollTop = box.scrollHeight;
+  box.scrollTop = (scrollBottom || nearBottom) ? box.scrollHeight : prevTop;
+}
+/* Set-kvitteringer: for hvert andet medlem findes den sidste besked (id) de har læst.
+   Er ankeret medlemmets egen besked, vises ingen kvittering (som Messenger: at man
+   selv har sendt den siger det hele). */
+function readReceipts(){
+  const out = {}; // besked-id -> [handles]
+  if(!readsOk || !msgs.length) return out;
+  Object.keys(reads).forEach(function(uid){
+    if(me && uid === me.id) return;
+    const h = ID2H[uid];
+    if(!h) return; // ukendt/blokeret profil → ingen kvittering
+    const ts = new Date(reads[uid]).getTime();
+    let mk = null;
+    for(let i = msgs.length - 1; i >= 0; i--){
+      if(new Date(msgs[i].created).getTime() <= ts){ mk = msgs[i]; break; }
+    }
+    if(!mk || mk.authorId === uid) return;
+    (out[mk.id] = out[mk.id] || []).push(h);
+  });
+  return out;
+}
+function readsHTML(handles){
+  return '<div class="cv-reads">'+handles.map(function(h){
+    return '<span class="cv-read" title="'+esc(user(h).name || h)+'">'+avaHTML(h, 16)+'</span>';
+  }).join("")+'</div>';
 }
 function msgHTML(m, first, last){
   const mine = !!(me && m.authorId === me.id);
@@ -234,6 +306,7 @@ async function sendChatMsg(){
   if(!msgs.some(function(x){ return x.id === real.id; })) msgs.push(real);
   lastByFeed[feedId] = real;
   renderThread(true);
+  markThreadRead();
 }
 
 /* Delings-besked → åbn selve opslaget (hent det hvis det ikke er i de lokale arrays) */
@@ -261,9 +334,25 @@ export function chatRealtime(payload){
       if(!msgs.some(function(x){ return x.id === m.id; })){
         msgs.push(m);
         renderThread(true);
+        markThreadRead(); // tråden er åben og synlig → den nye besked er læst
       }
     }
   }, function(){});
+}
+
+/* Realtime på kvitteringer (egen kanal i realtime.js): flyt avatarerne live i en åben tråd */
+export function chatReadsRealtime(payload){
+  if(!me || !payload) return;
+  const row = payload.new;
+  if(!row || !row.feed_id || !row.user_id || !row.last_read_at) return;
+  if(chatFeed !== row.feed_id || !el("chatview").classList.contains("on")) return;
+  readsOk = true; // tabellen svarer — kvitteringer kan vises
+  const ts = new Date(row.last_read_at).getTime();
+  const prev = reads[row.user_id] ? new Date(reads[row.user_id]).getTime() : 0;
+  if(ts <= prev) return;
+  reads[row.user_id] = row.last_read_at;
+  if(row.user_id === me.id){ if(ts > myReadSent) myReadSent = ts; return; } // fx anden enhed
+  renderThread(false);
 }
 
 export function initChat(){
@@ -272,6 +361,10 @@ export function initChat(){
     window.visualViewport.addEventListener("resize", queueFit);
     window.visualViewport.addEventListener("scroll", queueFit);
   }
+  // Tilbage i forgrunden med en åben tråd → det sete er nu læst
+  document.addEventListener("visibilitychange", function(){
+    if(!document.hidden) markThreadRead();
+  });
   el("cv-back").addEventListener("click", closeKredsChat);
   el("cv-send").addEventListener("click", sendChatMsg);
   el("cv-input").addEventListener("keydown", function(e){

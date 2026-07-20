@@ -7,10 +7,10 @@ import { refreshMemberSheet } from "./kredse.js";
 import { loadPvPosts } from "./profile.js";
 import { renderSearch } from "./search.js";
 import { realtimeNotify, scheduleNotifDotRefresh } from "./notifications.js";
-import { chatRealtime } from "./chat.js";
+import { chatRealtime, chatReadsRealtime } from "./chat.js";
 
 /* ================= Realtime + fokus ================= */
-let channel = null, refetchTimer = null, pollTimer = null;
+let channel = null, readsChannel = null, refetchTimer = null, pollTimer = null;
 
 /* Sikkerhedsnet: realtime giver øjeblikkelige INSERTs, men et let poll hvert
    12. sekund (kun mens fanen er synlig) fanger også sletninger/redigeringer/
@@ -96,10 +96,16 @@ export function subscribeRealtime(){
       realtimeNotify("mentions", payload); // RLS leverer kun MINE mentions → pålidelig prik
     })
     .subscribe();
+  // Set-kvitteringer på EGEN kanal: mangler kreds_chat_reads-tabellen endnu (web kan
+  // deployes før migrationen), fejler kun denne kanal — ikke alle lytterne ovenfor.
+  readsChannel = sb.channel("chat-reads")
+    .on("postgres_changes", { event:"*", schema:"public", table:"kreds_chat_reads" }, chatReadsRealtime)
+    .subscribe();
   startPolling();
 }
 export function unsubscribeRealtime(){
   if(channel){ sb.removeChannel(channel); channel = null; }
+  if(readsChannel){ sb.removeChannel(readsChannel); readsChannel = null; }
   clearTimeout(refetchTimer);
   stopPolling();
 }
