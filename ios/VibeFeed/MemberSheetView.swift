@@ -90,6 +90,8 @@ final class MemberSheetModel: ObservableObject {
         }
     }
 
+    /// Tap på selve personen (avatar/navn) → webben lukker arket og åbner profil-SIDEN.
+    func profile(_ handle: String) { send(["kind": "profile", "feedId": feedId, "h": handle]) }
     func remove(_ uid: String) { pending.insert(uid); send(["kind": "remove", "feedId": feedId, "uid": uid]) }
     func invite(_ uid: String) { pending.insert(uid); send(["kind": "invite", "feedId": feedId, "uid": uid]) }
     func cancelInvite(_ uid: String) { pending.insert(uid); send(["kind": "cancelInvite", "feedId": feedId, "uid": uid]) }
@@ -157,19 +159,26 @@ struct GlassMemberSheet: View {
                                             _ name: String, _ handle: String, ownerBadge: Bool,
                                             @ViewBuilder trailing: () -> Trailing) -> some View {
         HStack(spacing: 12) {
-            GlassAvatar(url: avatarUrl, initials: initials, gradient: gradient, size: 44)
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 6) {
-                    Text(name).font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.primary).lineLimit(1)
-                    if ownerBadge {
-                        Text(model.L("owner"))
-                            .font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
-                            .padding(.horizontal, 7).padding(.vertical, 2)
-                            .glassBG(Capsule())
+            // Selve personen er tryk-bar: åbner profil-siden (webben lukker arket først)
+            Button { model.profile(handle) } label: {
+                HStack(spacing: 12) {
+                    GlassAvatar(url: avatarUrl, initials: initials, gradient: gradient, size: 44)
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 6) {
+                            Text(name).font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.primary).lineLimit(1)
+                            if ownerBadge {
+                                Text(model.L("owner"))
+                                    .font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
+                                    .padding(.horizontal, 7).padding(.vertical, 2)
+                                    .glassBG(Capsule())
+                            }
+                        }
+                        Text("@\(handle)").font(.system(size: 13)).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
-                Text("@\(handle)").font(.system(size: 13)).foregroundStyle(.secondary).lineLimit(1)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             Spacer(minLength: 8)
             trailing()
         }
