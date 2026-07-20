@@ -1,0 +1,4 @@
+-- Arkivkopi af migrationen "chat_thread_prefs" (kørt 2026-07-21 via apply_migration).
+-- kreds_chat_prefs(feed_id, user_id, pinned, muted, marked_unread, cleared_at):
+-- tråd-præferencer pr. bruger (fastgør/mute/markér ulæst/ryd historik kun for mig).
+-- RLS: kun egne rækker, insert kræver medlemskab. Fuld SQL: se migrationslisten.

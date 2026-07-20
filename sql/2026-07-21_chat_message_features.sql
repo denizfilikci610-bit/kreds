@@ -1,0 +1,6 @@
+-- Arkivkopi af migrationen "chat_message_features" (kørt 2026-07-21 via apply_migration).
+-- Chat-beskeder: citat-svar (reply_to), medier (image_path/video_path), redigering
+-- (edited_at, kolonne-grant på text, 15-min-vindue i policy, DB-stemplet edited_at),
+-- reaktioner (kreds_message_reactions m. RLS/block-gate/realtime) og anmeldelser
+-- (message_reports + restriktiv select-gate der skjuler anmeldte beskeder for
+-- anmelderen). Fuld SQL: se migrationslisten i Supabase (list_migrations).

@@ -6,6 +6,7 @@ import { scheduleRefetch } from "./realtime.js";
 import { switchTab, setFeed, resetBarHide, findPost, feedById } from "./feed.js";
 import { rerenderPostCmts, openNativeComments, openNativePostPage } from "./comments.js";
 import { openProfile, openPostView } from "./profile.js";
+import { openKredsChat } from "./chat.js";
 
 /* ================= Notifikations-prik (session-only, ingen persistens) ================= */
 export function setNotifDot(on){
@@ -563,6 +564,12 @@ export async function openFromPush(payload){
   const kind = payload && payload.kind;
   const pid = payload && payload.pid;
   const cid = payload && payload.cid;
+  // Chat-push: åbn selve tråden (Beskeder-fanen bagved, så tilbage-pilen lander rigtigt)
+  if(kind === "chat" && payload.fid){
+    switchTab("chat");
+    openKredsChat(String(payload.fid));
+    return;
+  }
   // En mention er kun kommentar-agtig når den skete I en kommentar (cid sat)
   const isCmt = kind === "mention" ? !!cid : !!PUSH_CMT_KINDS[kind];
   if(kind && PUSH_POST_KINDS[kind] && pid && await openNotifPost(pid, isCmt, cid)) return;

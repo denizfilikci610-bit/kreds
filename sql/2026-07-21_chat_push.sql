@@ -1,0 +1,5 @@
+-- Arkivkopi af migrationen "chat_push" (kørt 2026-07-21 via apply_migration).
+-- app_hidden.tg_push_chat_msg (AFTER INSERT på kreds_messages): push til alle trådens
+-- medlemmer undtagen afsenderen via notify_push(kind 'chat', fid). Springer over:
+-- delings-beskeder (post_id, dækket af opslags-push), blokerede og mutede tråde
+-- (kreds_chat_prefs.muted). Tekster i send-push v39; poll-events i notif-poll v32.
