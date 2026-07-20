@@ -612,7 +612,11 @@ function openThreadMenu(feedId){
     '<div class="mgroup">'+
       (!f.isDm ? '<button class="mrow" data-tact="members">'+t("chat.members")+'</button>' : '')+
       '<button class="mrow" data-tact="pin">'+t(pf.pinned ? "chat.unpin" : "chat.pin")+'</button>'+
-      '<button class="mrow" data-tact="mute">'+t(pf.muted ? "chat.unmute" : "chat.mute")+'</button>'+
+      '<button class="mrow mrow-ic" data-tact="mute">'+
+        (pf.muted
+          ? '<svg viewBox="0 0 24 24"><g class="stroke"><path d="M18 13.5V10a6 6 0 0 0-12 0v3.5L4 17h16ZM10 20a2.4 2.4 0 0 0 4 0"/></g></svg>'+t("chat.unmute")
+          : MUTE_SVG+t("chat.mute"))+
+      '</button>'+
       '<button class="mrow" data-tact="unreadmark">'+t("chat.mark_unread")+'</button>'+
       '<button class="mrow danger" data-tact="clear">'+t(f.isDm ? "chat.del_thread" : "chat.clear_thread")+'</button>'+
       (other ? '<button class="mrow danger" data-tact="block">'+t("rm.block")+'</button>' : '')+
@@ -629,7 +633,14 @@ function threadMenuAct(act){
   const pf = prefs[fid] || {};
   if(act === "members"){ closeMsgMenu(); openMemberSheet(fid); return; }
   if(act === "pin"){ closeMsgMenu(); setPref(fid, { pinned: !pf.pinned }); renderChatList(false); return; }
-  if(act === "mute"){ closeMsgMenu(); setPref(fid, { muted: !pf.muted }); renderChatList(false); return; }
+  if(act === "mute"){
+    closeMsgMenu();
+    const nowMuted = !pf.muted;
+    setPref(fid, { muted: nowMuted });
+    renderChatList(false);
+    toast(t(nowMuted ? "chat.muted_toast" : "chat.unmuted_toast")); // gør resultatet utvetydigt
+    return;
+  }
   if(act === "unreadmark"){ closeMsgMenu(); setPref(fid, { markedUnread: true }); renderChatList(false); return; }
   if(act === "clear"){
     confirmStep(t(f.isDm ? "chat.del_confirm" : "chat.clear_confirm"), t("chat.clear_note"),

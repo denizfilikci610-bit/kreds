@@ -1281,6 +1281,9 @@
   .cv-avasp{width:28px;flex:0 0 auto}
   .cv-msg.mine{align-self:flex-end;flex-direction:row-reverse}
   .cv-ava{flex:0 0 auto;padding:0;border-radius:50%}
+  /* Avataren flugter med BOBLENS underkant, ikke med tids-linjen under den
+     (rækken er align-items:flex-end, og tiden fylder ~18px i bunden af kolonnen) */
+  .cv-msg .pavab.cv-ava{margin-bottom:18px}
   .cv-col{display:flex;flex-direction:column;min-width:0}
   .cv-msg.mine .cv-col{align-items:flex-end}
   .cv-nm{font-size:11.5px;font-weight:700;color:var(--gray);margin:0 0 2px 12px}
@@ -1323,6 +1326,9 @@
   /* Beskedens eget billede/video: uden boble-baggrund når det står alene */
   .cv-mimg{max-width:210px;max-height:280px;border-radius:14px;display:block}
   .cv-bubble.cv-bare{background:none;padding:0}
+  /* Tråd-menu-række med ikon (fx klokken på Slå lyd fra/til) */
+  .mrow-ic{display:flex;align-items:center;gap:11px}
+  .mrow-ic svg{width:18px;height:18px;flex:0 0 auto}
   /* ---- Besked-menuen (iMessage-anatomi): forankret ved boblen ---- */
   #cmenu.anchor{padding:0}
   #cmenu.anchor.on{display:block}
