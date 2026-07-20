@@ -167,6 +167,8 @@ const DA = {
   "chat.reported": "Beskeden er anmeldt og skjult",
   "chat.replying_to": "Svar til {n}",
   "chat.q_media": "📷 Medie",
+  "chat.attach": "Vedhæft billede",
+  "chat.typing": "{n} skriver ...",
   "aria.private_comment": "Kommentér privat",
 
   /* Notifikationer */
@@ -626,6 +628,8 @@ const EN = {
   "chat.reported": "The message has been reported and hidden",
   "chat.replying_to": "Replying to {n}",
   "chat.q_media": "📷 Media",
+  "chat.attach": "Attach photo",
+  "chat.typing": "{n} is typing ...",
   "aria.private_comment": "Comment privately",
 
   /* Notifications */

@@ -1,6 +1,6 @@
 import { sb } from "./config.js";
 import { me, state, ID2H } from "./store.js";
-import { el, esc, avaHTML, user, toast, fmtTime, imgUrl, registerProfile } from "./helpers.js";
+import { el, esc, avaHTML, user, toast, fmtTime, imgUrl, registerProfile, uuid } from "./helpers.js";
 import { t } from "./i18n.js";
 import { feedById, findPost, postQuery, mapPost, switchTab, loadFeeds } from "./feed.js";
 import { openPostView, openProfile, closeProfile, doBlockUser } from "./profile.js";
@@ -29,6 +29,7 @@ let myReadsOk = false; // om myReads er hentet — ellers vises ingen ulæst-pri
 let pendingShare = null; // { feed, post }: minde der sendes med som kontekst på næste besked
 let pendingReply = null; // { id, u, text, media }: besked der citeres i næste besked
 let editingMsg = null;   // besked-id under redigering (composeren sender da en UPDATE)
+let cvImg = null;        // { blob, url }: valgt billede klar til afsendelse
 
 function mapMsg(r){
   if(r.author_profile) registerProfile(r.author_profile);
@@ -155,6 +156,7 @@ export async function openKredsChat(feedId){
     ? t("chat.only_two")
     : (f.members.length === 1 ? t("chat.kreds_sub_one") : t("chat.kreds_sub", { n: f.members.length }));
   renderCtxBar();
+  joinTyping(feedId);
   el("cv-body").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
   el("chatview").classList.add("on");
   const seq = ++chatSeq;
@@ -233,6 +235,49 @@ function clearCtx(){
   pendingReply = null; pendingShare = null; editingMsg = null;
   renderCtxBar();
 }
+/* Valgt billede (komprimeret til 1080px JPEG som kommentarer) klar over composeren */
+function renderImgPrev(){
+  const box = el("cv-imgprev");
+  if(!cvImg){ box.hidden = true; box.innerHTML = ""; return; }
+  box.innerHTML = '<img src="'+esc(cvImg.url)+'" alt="">'+
+    '<button class="cv-ctxx" aria-label="'+t("chat.ctx_close")+'">'+
+      '<svg viewBox="0 0 24 24"><path class="stroke" d="M6 6l12 12M18 6 6 18"/></svg>'+
+    '</button>';
+  box.hidden = false;
+}
+function clearImg(){
+  if(cvImg && cvImg.url) URL.revokeObjectURL(cvImg.url);
+  cvImg = null;
+  renderImgPrev();
+}
+
+/* ---- "X skriver ..." via realtime broadcast (flygtigt, ingen database) ---- */
+let typingCh = null, typingHideTimer = 0, typingSentAt = 0;
+function joinTyping(feedId){
+  leaveTyping();
+  typingCh = sb.channel("typing-" + feedId);
+  typingCh.on("broadcast", { event: "typing" }, function(p){
+    const h = p && p.payload && p.payload.h;
+    if(!h || (me && h === me.handle) || chatFeed !== feedId) return;
+    const box = el("cv-typing");
+    box.textContent = t("chat.typing", { n: (user(h).name || h).split(/\s+/)[0] });
+    box.hidden = false;
+    clearTimeout(typingHideTimer);
+    typingHideTimer = setTimeout(function(){ box.hidden = true; }, 3500);
+  }).subscribe();
+}
+function leaveTyping(){
+  if(typingCh){ sb.removeChannel(typingCh); typingCh = null; }
+  clearTimeout(typingHideTimer);
+  el("cv-typing").hidden = true;
+}
+function sendTyping(){
+  if(!typingCh || !me) return;
+  const now = Date.now();
+  if(now - typingSentAt < 2000) return; // højst én broadcast pr. 2 sek.
+  typingSentAt = now;
+  typingCh.send({ type: "broadcast", event: "typing", payload: { h: me.handle } });
+}
 
 /* Kommentar på et KREDS-minde fra feedet: åbn kredsens tråd med mindet som synlig
    kontekst på svaret */
@@ -286,6 +331,8 @@ export function closeKredsChat(){
   chatFeed = null;
   pendingShare = null; pendingReply = null; editingMsg = null;
   renderCtxBar();
+  clearImg();
+  leaveTyping();
   el("cv-input").blur();
   unpinChat();
   el("chatview").classList.remove("on");
@@ -334,7 +381,8 @@ export function resetChat(){
   msgs = [];
   lastByFeed = {};
   reads = {}; readsOk = false; unreadAtId = null; myReadSent = 0;
-  myReads = {}; myReadsOk = false; pendingShare = null;
+  myReads = {}; myReadsOk = false; pendingShare = null; pendingReply = null; editingMsg = null;
+  clearImg();
   el("chat-list").innerHTML = "";
   el("cv-input").value = "";
 }
@@ -536,9 +584,9 @@ async function sendChatMsg(){
   if(!me || chatFeed == null) return;
   const inp = el("cv-input");
   const text = inp.value.trim();
-  if(!text) return;
   // Redigerings-tilstand: composeren opdaterer den valgte besked i stedet for at sende
   if(editingMsg != null){
+    if(!text) return;
     const mid = editingMsg;
     const feedId = chatFeed;
     editingMsg = null;
@@ -558,37 +606,57 @@ async function sendChatMsg(){
     renderThread(false);
     return;
   }
+  if(!text && !cvImg) return;
   inp.value = "";
   const feedId = chatFeed;
-  // Kontekst: et minde (post_id) eller et citat-svar (reply_to)
+  // Kontekst: et minde (post_id), et citat-svar (reply_to) og/eller et billede
   const share = (pendingShare && pendingShare.feed === feedId) ? pendingShare : null;
   const reply = pendingReply;
+  const img = cvImg;
+  if(img){ cvImg = null; renderImgPrev(); }
   const sp = share ? findPost(share.post) : null;
   // Optimistisk: vis beskeden med det samme, byt til den rigtige række fra serveren
   const temp = { id: "tmp-" + Date.now(), feed: feedId, u: me.handle, authorId: me.id,
                  text: text, postId: share ? share.post : null,
                  thumb: sp && sp.img ? sp.img.src : "",
                  thumbVideo: sp && !sp.img && sp.video ? sp.video.src : "",
-                 mimg: "", mvideo: "", edited: false, reacts: [],
+                 mimg: img ? img.url : "", mvideo: "", edited: false, reacts: [],
                  replyTo: reply || null,
                  t: fmtTime(new Date().toISOString()), created: new Date().toISOString() };
   msgs.push(temp);
   renderThread(true);
+  // Fejl-oprydning: giv tekst OG billede tilbage, så intet mistes
+  const fail = function(uploadedPath){
+    msgs = msgs.filter(function(x){ return x.id !== temp.id; });
+    renderThread(false);
+    inp.value = text;
+    if(img){ cvImg = img; renderImgPrev(); }
+    if(uploadedPath) sb.storage.from("post-images").remove([uploadedPath]).catch(function(){});
+    toast(t("err.generic"));
+  };
+  let imgPath = null;
+  if(img){
+    imgPath = me.id + "/" + uuid() + ".jpg";
+    const up = await sb.storage.from("post-images").upload(imgPath, img.blob, { contentType: "image/jpeg" });
+    if(chatFeed !== feedId) return;
+    if(up.error){ console.error(up.error); fail(null); return; }
+    if(up.data && up.data.path) imgPath = up.data.path;
+  }
   const { data, error } = await sb.from("kreds_messages")
-    .insert({ feed_id: feedId, author: me.id, text: text,
+    .insert({ feed_id: feedId, author: me.id, text: text || null,
               post_id: share ? Number(share.post) : null,
-              reply_to: reply ? Number(reply.id) : null })
+              reply_to: reply ? Number(reply.id) : null,
+              image_path: imgPath })
     .select(MSG_SELECT)
     .single();
   if(chatFeed !== feedId) return; // tråden blev lukket/skiftet imens
-  msgs = msgs.filter(function(x){ return x.id !== temp.id; });
   if(error){
     console.error(error);
-    renderThread(false);
-    inp.value = text; // giv teksten tilbage, så intet mistes
-    toast(t("err.generic"));
+    fail(imgPath);
     return;
   }
+  msgs = msgs.filter(function(x){ return x.id !== temp.id; });
+  if(img && img.url) URL.revokeObjectURL(img.url);
   const real = mapMsg(data);
   if(share && pendingShare === share) pendingShare = null; // konteksten er afleveret
   if(reply && pendingReply === reply) pendingReply = null;
@@ -715,7 +783,37 @@ export function initChat(){
     // Krydset fortryder konteksten (minde/citat/redigering)
     if(e.target.closest(".cv-ctxx")) clearCtx();
   });
+  el("cv-imgprev").addEventListener("click", function(e){
+    if(e.target.closest(".cv-ctxx")) clearImg();
+  });
+  // Vedhæft billede: komprimeres til 1080px JPEG (samme flow som kommentar-billeder)
+  el("cv-photo").addEventListener("click", function(){ el("cv-file").click(); });
+  el("cv-file").addEventListener("change", function(){
+    const file = this.files && this.files[0];
+    this.value = "";
+    if(!file || chatFeed == null) return;
+    const im = new Image();
+    const url = URL.createObjectURL(file);
+    im.onload = function(){
+      const max = 1080;
+      const s = Math.min(1, max / Math.max(im.width, im.height));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(im.width * s));
+      c.height = Math.max(1, Math.round(im.height * s));
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(function(blob){
+        if(!blob){ toast(t("img.read_failed")); return; }
+        if(cvImg && cvImg.url) URL.revokeObjectURL(cvImg.url);
+        cvImg = { blob: blob, url: URL.createObjectURL(blob) };
+        renderImgPrev();
+      }, "image/jpeg", 0.85);
+    };
+    im.onerror = function(){ URL.revokeObjectURL(url); toast(t("img.read_failed")); };
+    im.src = url;
+  });
   el("cv-send").addEventListener("click", sendChatMsg);
+  el("cv-input").addEventListener("input", sendTyping);
   el("cv-input").addEventListener("keydown", function(e){
     if(e.key === "Enter" && !e.isComposing) sendChatMsg();
   });
