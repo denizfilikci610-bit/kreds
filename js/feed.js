@@ -118,6 +118,16 @@ function actionsHTML(p){
   );
 }
 const DOTS_SVG = '<svg viewBox="0 0 24 24"><g class="fillic"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></g></svg>';
+/* Kreds-mærke på opslag i "Hele kredsen": lille pille med kreds-ikon + kredsens navn.
+   Tap skifter til kredsen (håndteres i timelineClick). Inde i en specifik kreds er
+   mærket redundant og udelades — derfor gates der på state.currentFeed. */
+const KREDS_SVG = '<svg viewBox="0 0 24 24"><circle class="stroke" cx="12" cy="12" r="7.3"/><g class="fillic"><circle cx="12" cy="4.7" r="2.1"/><circle cx="5.7" cy="15.7" r="2.1"/><circle cx="18.3" cy="15.7" r="2.1"/></g></svg>';
+function kredsChipHTML(p){
+  if(state.currentFeed !== "all" || !p.feed) return "";
+  const f = feedById(p.feed);
+  if(!f) return "";
+  return '<button class="kchip" data-feed="'+esc(f.id)+'">'+KREDS_SVG+'<span>'+esc(f.name)+'</span></button>';
+}
 /* Minde-billedtekster der er foldet UD (Set overlever en re-render, så en åben tekst ikke
    klapper sammen midt i læsningen ved en baggrunds-refetch). */
 const capsOpen = new Set();
@@ -152,7 +162,7 @@ function memoryHTML(p, inner){
           avaHTML(p.u, 34)+
         '</button>'+
         '<div class="mhcol">'+
-          '<span class="mhrow"><span class="nm">'+esc(user(p.u).name)+'</span><span class="badge">'+BADGE()+'</span></span>'+
+          '<span class="mhrow"><span class="nm">'+esc(user(p.u).name)+'</span><span class="badge">'+BADGE()+'</span>'+kredsChipHTML(p)+'</span>'+
           '<span class="mdate">'+esc(fmtDate(p.created))+'</span>'+
         '</div>'+
         (p.isNew ? '<span class="newchip">'+t("post.new")+'</span>' : '')+
@@ -185,6 +195,7 @@ export function postHTML(p){
           '<span class="nm">'+esc(user(p.u).name)+'</span>'+
           '<span class="badge">'+BADGE()+'</span>'+
           '<span class="ph">@'+esc(p.u)+' · '+esc(p.t)+'</span>'+
+          kredsChipHTML(p)+
           (p.isNew ? '<span class="newchip">'+t("post.new")+'</span>' : '')+
           '<button class="dots" data-id="'+p.id+'" aria-label="'+t("aria.more")+'">'+DOTS_SVG+'</button>'+
         '</div>'+
@@ -1083,6 +1094,16 @@ function timelineClick(e){
     if(el("memview").classList.contains("on")) closeMemView();
     if(me && u === me.handle){ closeProfile(); switchTab("profil"); }
     else openProfile(u);
+    return;
+  }
+  // Kreds-mærket på et opslag → hop til den kreds. Kan også trykkes fra minde-fuldskærms-
+  // siden og en profil (overlays over feedet) — luk dem først, ellers skifter feedet usynligt.
+  const kc = e.target.closest(".kchip");
+  if(kc){
+    if(el("memview").classList.contains("on")) closeMemView();
+    closeProfile();
+    switchTab("feed");
+    setFeed(kc.dataset.feed);
     return;
   }
   const like = e.target.closest(".like-btn");
