@@ -116,12 +116,17 @@
     background:linear-gradient(to bottom, var(--bg) 58%, transparent);
     z-index:60;pointer-events:none;   /* over topbar/feedbar/indhold, men under profil/lightbox/ark (egen baggrund) */
   }
+  /* Ordmærke som billede (theme-bevidst): sort i lys mode, hvidt i mørk mode. Teksten
+     beholdes i DOM'en for skærmlæsere, men skjules visuelt. */
   .wordmark{
-    font-family:Georgia,"Times New Roman",serif;
-    font-weight:700;font-size:26px;letter-spacing:-.5px;
-    color:var(--ink);
+    background-image:url(../img/logo-light.png);
+    background-repeat:no-repeat;background-position:left center;background-size:contain;
+    width:117px;height:24px;
+    font-size:0;color:transparent;line-height:0;overflow:hidden;
   }
-  .wordmark .prik{color:var(--red)}
+  @media (prefers-color-scheme: dark){ .wordmark{ background-image:url(../img/logo-dark.png); } }
+  .wordmark .prik{display:none}
+  .authview .wordmark,.langview .wordmark,.consentview .wordmark{width:214px;height:44px;margin:0 auto}
   .nosparkle{padding:6px 2px;color:var(--ink)}
   .nosparkle svg{width:23px;height:23px;display:block}
   .tright{display:flex;align-items:center;gap:10px}
@@ -1268,12 +1273,14 @@
   }
   .splash.gone{opacity:0;pointer-events:none}
   /* Statisk brand på splashen (ejeren fravalgte animationen) */
-  .sp-brand{display:flex;align-items:flex-end;justify-content:center}
+  .sp-brand{display:flex;align-items:center;justify-content:center}
   .sp-name{
-    font-family:Georgia,"Times New Roman",serif;font-weight:800;font-size:44px;color:var(--ink);
-    letter-spacing:-.5px;line-height:1;white-space:nowrap;
+    background-image:url(../img/logo-light.png);
+    background-repeat:no-repeat;background-position:center;background-size:contain;
+    width:238px;height:49px;font-size:0;color:transparent;line-height:0;white-space:nowrap;
   }
-  .sp-dot{width:12px;height:12px;border-radius:50%;background:var(--red);margin:0 0 5px 3px;flex:0 0 auto}
+  @media (prefers-color-scheme: dark){ .sp-name{ background-image:url(../img/logo-dark.png); } }
+  .sp-dot{display:none}
   /* Sprog-skift direkte på login-skærmen (gættes automatisk fra enheden ved første start) */
   .auth-lang{
     position:absolute;top:calc(14px + env(safe-area-inset-top));right:16px;z-index:1;
