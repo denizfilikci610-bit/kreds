@@ -296,8 +296,14 @@ function startReply(m){
   renderCtxBar();
   el("cv-input").focus();
 }
+/* Skrivefeltet vokser nedad med indholdet (op til CSS-max ~5 linjer) og krymper igen */
+function growInput(){
+  const inp = el("cv-input");
+  inp.style.height = "auto";
+  inp.style.height = Math.min(inp.scrollHeight, 118) + "px";
+}
 function clearCtx(){
-  if(editingMsg != null) el("cv-input").value = "";
+  if(editingMsg != null){ el("cv-input").value = ""; growInput(); }
   pendingReply = null; pendingShare = null; editingMsg = null;
   renderCtxBar();
 }
@@ -544,6 +550,7 @@ function openMsgMenu(mid, anchorEl){
       if(a === "edit"){
         editingMsg = m.id; pendingReply = null; pendingShare = null;
         el("cv-input").value = m.text;
+        growInput();
         renderCtxBar();
         el("cv-input").focus();
         return;
@@ -907,6 +914,7 @@ async function sendChatMsg(){
     const feedId = chatFeed;
     editingMsg = null;
     inp.value = "";
+    growInput();
     renderCtxBar();
     const { data, error } = await sb.from("kreds_messages")
       .update({ text: text }).eq("id", mid).select(MSG_SELECT).single();
@@ -924,6 +932,7 @@ async function sendChatMsg(){
   }
   if(!text) return;
   inp.value = "";
+  growInput();
   const feedId = chatFeed;
   // Kontekst: et minde (post_id) eller et citat-svar (reply_to)
   const share = (pendingShare && pendingShare.feed === feedId) ? pendingShare : null;
@@ -951,6 +960,7 @@ async function sendChatMsg(){
     console.error(error);
     renderThread(false);
     inp.value = text; // giv teksten tilbage, så intet mistes
+    growInput();
     toast(t("err.generic"));
     return;
   }
@@ -1091,9 +1101,14 @@ export function initChat(){
     openMemoryFor(chatFeed);
   });
   el("cv-send").addEventListener("click", sendChatMsg);
-  el("cv-input").addEventListener("input", sendTyping);
+  el("cv-input").addEventListener("input", function(){ growInput(); sendTyping(); });
   el("cv-input").addEventListener("keydown", function(e){
-    if(e.key === "Enter" && !e.isComposing) sendChatMsg();
+    // Enter sender (shift+enter = ny linje på desktop); preventDefault så textarea'en
+    // ikke også indsætter et linjeskift
+    if(e.key === "Enter" && !e.shiftKey && !e.isComposing){
+      e.preventDefault();
+      sendChatMsg();
+    }
   });
   // Tråd-menuen: ⋯ i headeren, long-press (eller højreklik) på en liste-række
   el("cv-hmenu").addEventListener("click", function(){
@@ -1249,6 +1264,7 @@ export function initChat(){
       closeMsgMenu();
       editingMsg = m.id; pendingReply = null; pendingShare = null;
       el("cv-input").value = m.text;
+      growInput();
       renderCtxBar();
       el("cv-input").focus();
     }

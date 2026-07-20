@@ -1303,7 +1303,8 @@
     background:var(--chip);color:var(--ink);
     border-radius:18px;padding:9px 13px;
     font-size:15px;line-height:1.35;
-    overflow-wrap:break-word;min-width:0;
+    overflow-wrap:anywhere;min-width:0; /* anywhere er BÆRENDE: break-word reducerer
+       ikke min-content i flex, så lange ord uden mellemrum stak sidelæns ud */
     display:flex;flex-direction:column;gap:6px;
     position:relative;z-index:1; /* boblen ligger FORAN citat-chippen (den grå bagved) */
   }
@@ -1398,7 +1399,7 @@
   /* Composer i bunden af tråden: blød skygge i stedet for en streg */
   .cv-composer{
     flex:0 0 auto;
-    display:flex;align-items:center;gap:10px;
+    display:flex;align-items:flex-end;gap:10px; /* knapperne bliver i bunden når feltet vokser */
     padding:10px 12px calc(10px + env(safe-area-inset-bottom));
     background:var(--bg);
     box-shadow:0 -8px 20px rgba(0,0,0,.07);
@@ -1430,13 +1431,16 @@
   #cv-plus svg{width:24px;height:24px}
   #cv-plus:active{opacity:.6}
   .chatview.dm #cv-plus{opacity:.3}
-  .cv-composer input{
+  /* Skrivefeltet vokser NEDAD mens man skriver (auto-grow i JS, max ~5 linjer) */
+  .cv-composer textarea{
     flex:1;min-width:0;
     background:var(--chip);color:var(--ink);
-    border:none;border-radius:999px;
-    padding:11px 16px;font-size:15px;
+    border:none;border-radius:20px;
+    padding:11px 16px;font-size:15px;line-height:1.35;
+    resize:none;max-height:118px;overflow-y:auto;
   }
-  .cv-composer input::placeholder{color:var(--gray)}
+  .cv-composer textarea:focus{outline:none}
+  .cv-composer textarea::placeholder{color:var(--gray)}
   /* Tastaturet er åbent (JS pinner siden til den synlige viewport): tastaturet dækker
      hjemme-indikatoren, så safe-area-luften i bunden af composeren skal væk */
   .chatview.kb .cv-composer{padding-bottom:10px}
