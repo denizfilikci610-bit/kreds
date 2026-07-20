@@ -15,7 +15,8 @@ import { openMemoryFor } from "./compose.js";
    miniature af billedet og åbner opslaget ved tap. Realtime-INSERTs appendes live. */
 
 const MSG_SELECT = "*, author_profile:profiles!author(*), post:posts(id, image_path, video_path), " +
-  "reply:kreds_messages!reply_to(id, author, text, post_id, image_path, video_path, author_profile:profiles!author(handle, name)), " +
+  "reply:kreds_messages!reply_to(id, author, text, post_id, image_path, video_path, " +
+    "author_profile:profiles!author(handle, name), post:posts(id, image_path, video_path)), " +
   "reactions:kreds_message_reactions(user_id, emoji)";
 
 let chatFeed = null;   // åben tråds feed_id (null = lukket)
@@ -57,7 +58,11 @@ function mapMsg(r){
       author: rp.author,
       u: rp.author_profile ? rp.author_profile.handle : (ID2H[rp.author] || null),
       text: rp.text || "",
-      media: !!(rp.post_id || rp.image_path || rp.video_path)
+      media: !!(rp.post_id || rp.image_path || rp.video_path),
+      thumb: rp.image_path ? imgUrl(rp.image_path)
+        : (rp.post && rp.post.image_path ? imgUrl(rp.post.image_path) : ""),
+      vthumb: (!rp.image_path && rp.video_path) ? imgUrl(rp.video_path)
+        : (rp.post && !rp.post.image_path && rp.post.video_path ? imgUrl(rp.post.video_path) : "")
     } : null,
     reacts: r.reactions || [],                             // [{user_id, emoji}]
     t: fmtTime(r.created_at),
@@ -268,8 +273,13 @@ function renderCtxBar(){
     return;
   }
   if(pendingReply){
-    box.innerHTML = '<span class="cv-ctxtxt"><b>'+t("chat.replying_to", { n: esc(user(pendingReply.u).name || pendingReply.u) })+'</b><br>'+
-      esc(snip(pendingReply.text, 70) || (pendingReply.media ? t("chat.q_media") : ""))+'</span>'+closeBtn;
+    const th = pendingReply.thumb
+      ? '<img class="cv-ctxthumb" src="'+esc(pendingReply.thumb)+'" alt="">'
+      : pendingReply.vthumb
+      ? '<video class="cv-ctxthumb" src="'+esc(pendingReply.vthumb)+'#t=0.1" muted playsinline preload="metadata"></video>'
+      : '';
+    box.innerHTML = th+'<span class="cv-ctxtxt"><b>'+t("chat.replying_to", { n: esc(user(pendingReply.u).name || pendingReply.u) })+'</b><br>'+
+      esc(snip(pendingReply.text, 70) || (pendingReply.media && !th ? t("chat.q_media") : ""))+'</span>'+closeBtn;
     box.hidden = false;
     return;
   }
@@ -287,7 +297,9 @@ function renderCtxBar(){
 }
 /* Swipe/menu-valget "Svar": citér beskeden i den næste */
 function startReply(m){
-  pendingReply = { id: m.id, u: m.u, text: m.text, media: !!(m.postId || m.mimg || m.mvideo) };
+  pendingReply = { id: m.id, u: m.u, text: m.text, media: !!(m.postId || m.mimg || m.mvideo),
+                   thumb: m.mimg || m.thumb || "",
+                   vthumb: (!m.mimg && m.mvideo) ? m.mvideo : (!m.thumb ? m.thumbVideo : "") };
   pendingShare = null;
   editingMsg = null;
   renderCtxBar();
@@ -847,18 +859,29 @@ function msgHTML(m, first, last){
     ? '<video class="cv-mimg" src="'+esc(m.mvideo)+'" controls playsinline preload="metadata"></video>'
     : '';
   const bare = media && !m.text && !share;
-  // Citat-svar: den citerede besked som lille blok over boblen — tap hopper derop.
-  // Robust: uden kendt afsender vises kun indholdet, og et helt tomt citat (fx efter
-  // en slettet besked) vises slet ikke — aldrig et "?".
+  // Citat-svar (Messenger-agtigt): etiket "Svar til Navn" + den citerede besked som
+  // tydelig chip m. evt. miniature — tap hopper til beskeden. Robust: uden kendt
+  // afsender vises kun indholdet, og et helt tomt citat (slettet besked) vises ikke.
   let quote = "";
   if(m.replyTo){
     const rh = m.replyTo.u || ID2H[m.replyTo.author] || null;
     const rname = rh ? esc((user(rh).name || rh).split(/\s+/)[0]) : "";
-    const rtxt = esc(snip(m.replyTo.text, 64) || (m.replyTo.media ? t("chat.q_media") : ""));
-    if(rname || rtxt){
-      quote = '<button class="cv-quote" data-q="'+esc(m.replyTo.id)+'">'+
-        (rname ? '<b>'+rname+'</b> ' : '')+rtxt+
-      '</button>';
+    const rthumb = m.replyTo.thumb
+      ? '<img class="cv-qthumb" src="'+esc(m.replyTo.thumb)+'" alt="">'
+      : m.replyTo.vthumb
+      ? '<video class="cv-qthumb" src="'+esc(m.replyTo.vthumb)+'#t=0.1" muted playsinline preload="metadata"></video>'
+      : '';
+    const rtxt = esc(snip(m.replyTo.text, 64) || (m.replyTo.media && !rthumb ? t("chat.q_media") : ""));
+    if(rname || rtxt || rthumb){
+      quote = '<div class="cv-qwrap">'+
+        '<span class="cv-qlabel">'+
+          '<svg viewBox="0 0 24 24"><path class="stroke" d="M9.5 7 4.5 12l5 5M4.5 12H14a5.5 5.5 0 0 1 5.5 5.5v1"/></svg>'+
+          (rname ? t("chat.replying_to", { n: rname }) : t("chat.menu_reply"))+
+        '</span>'+
+        '<button class="cv-quote" data-q="'+esc(m.replyTo.id)+'">'+
+          rthumb+(rtxt ? '<span class="cv-qtxt">'+rtxt+'</span>' : '')+
+        '</button>'+
+      '</div>';
     }
   }
   // Reaktioner: grupperet pille under boblens hjørne
@@ -1134,7 +1157,8 @@ export function initChat(){
   });
   el("cv-body").addEventListener("click", function(e){
     if(lpFired){ lpFired = false; return; } // long-press må ikke også udløse et tap
-    const q = e.target.closest(".cv-quote");
+    const qw = e.target.closest(".cv-qwrap");
+    const q = qw ? qw.querySelector(".cv-quote") : e.target.closest(".cv-quote");
     if(q){
       // Tap på citatet hopper til den citerede besked og fremhæver den
       const tEl = el("cv-body").querySelector('.cv-msg[data-mid="'+q.dataset.q+'"]');
