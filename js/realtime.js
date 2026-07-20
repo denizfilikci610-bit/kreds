@@ -7,6 +7,7 @@ import { refreshMemberSheet } from "./kredse.js";
 import { loadPvPosts } from "./profile.js";
 import { renderSearch } from "./search.js";
 import { realtimeNotify, scheduleNotifDotRefresh } from "./notifications.js";
+import { chatRealtime } from "./chat.js";
 
 /* ================= Realtime + fokus ================= */
 let channel = null, refetchTimer = null, pollTimer = null;
@@ -51,6 +52,9 @@ async function doRefetch(){
 export function subscribeRealtime(){
   if(channel) return;
   channel = sb.channel("db-changes")
+    .on("postgres_changes", { event:"INSERT", schema:"public", table:"kreds_messages" }, function(payload){
+      chatRealtime(payload); // nye chat-beskeder appendes live i en åben tråd + listen
+    })
     .on("postgres_changes", { event:"*", schema:"public", table:"posts" }, function(payload){
       scheduleRefetch();
       realtimeNotify("posts", payload);  // nye opslag (ikke egne) tænder hjerte-prikken

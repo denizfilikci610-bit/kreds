@@ -1224,6 +1224,52 @@
   .pv-head .t2{font-size:12.5px;color:var(--gray)}
   .pv-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 
+  /* ================= Beskeder (kreds-chat, Messenger-agtig) ================= */
+  .chatrow{display:flex;align-items:center;gap:12px;width:100%;padding:11px 16px;text-align:left}
+  .chatrow:active{background:var(--chip)}
+  .chattime{flex:0 0 auto;font-size:12px;color:var(--gray);align-self:flex-start;padding-top:3px}
+  /* Tråd-siden: under minde-siden (z-90), så et delt minde kan åbnes ovenpå */
+  .chatview{z-index:85}
+  .chatview .pv-body{padding:12px 12px 6px;display:flex;flex-direction:column;gap:10px}
+  .cv-msg{display:flex;gap:8px;align-items:flex-end;max-width:86%}
+  .cv-msg.mine{align-self:flex-end;flex-direction:row-reverse}
+  .cv-ava{flex:0 0 auto;padding:0;border-radius:50%}
+  .cv-col{display:flex;flex-direction:column;min-width:0}
+  .cv-msg.mine .cv-col{align-items:flex-end}
+  .cv-nm{font-size:11.5px;font-weight:700;color:var(--gray);margin:0 0 2px 12px}
+  .cv-bubble{
+    background:var(--chip);color:var(--ink);
+    border-radius:18px;padding:9px 13px;
+    font-size:15px;line-height:1.35;
+    overflow-wrap:break-word;min-width:0;
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .cv-msg.mine .cv-bubble{background:var(--red);color:#fff}
+  .cv-text{white-space:pre-wrap}
+  .cv-time{font-size:10.5px;color:var(--gray);margin:3px 12px 0}
+  /* Minde-deling i en boble: miniature + "delte et minde" — tap åbner opslaget */
+  .cv-share{display:flex;flex-direction:column;gap:6px;align-items:flex-start;padding:0;color:inherit;text-align:left}
+  .cv-share:active{opacity:.7}
+  .cv-thumb{width:150px;height:150px;object-fit:cover;border-radius:12px;display:block}
+  .cv-sharetxt{font-size:13px;font-weight:600;opacity:.85}
+  /* Composer i bunden af tråden */
+  .cv-composer{
+    flex:0 0 auto;
+    display:flex;align-items:center;gap:10px;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);
+    background:var(--bg);
+  }
+  .cv-composer input{
+    flex:1;min-width:0;
+    background:var(--chip);color:var(--ink);
+    border:none;border-radius:999px;
+    padding:11px 16px;font-size:15px;
+  }
+  .cv-composer input::placeholder{color:var(--gray)}
+  #cv-send{flex:0 0 auto;color:var(--red);font-size:15px;font-weight:800;padding:8px 4px}
+  #cv-send:active{opacity:.6}
+
   /* ---- Live pinch-zoom på minde-billeder (fixed klon + dæmpet baggrund) ---- */
   .pz-dim{position:fixed;inset:0;z-index:240;background:#000;opacity:0;pointer-events:none}
   .pz-clone{position:fixed;z-index:241;object-fit:cover;pointer-events:none;will-change:transform}

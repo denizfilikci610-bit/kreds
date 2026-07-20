@@ -136,6 +136,16 @@ const DA = {
   "search.no_match": "Ingen i din kreds matcher.",
   "search.empty": "Din kreds er tom endnu. Søg efter dine venner her 🔍",
 
+  /* Beskeder (kreds-chat) */
+  "chat.title": "Beskeder",
+  "chat.empty": "Ingen kredse endnu. Opret en kreds, så får I en tråd her.",
+  "chat.no_messages": "Ingen beskeder endnu. Sig hej 👋",
+  "chat.ph": "Skriv en besked ...",
+  "chat.send": "Send",
+  "chat.shared_memory": "delte et minde",
+  "chat.you": "Dig",
+  "chat.say_hi": "Sig hej 👋",
+
   /* Notifikationer */
   "notif.liked": "likede dit opslag",
   "notif.commented": "svarede på dit opslag",
@@ -561,6 +571,16 @@ const EN = {
   "search.requested": "Request sent",
   "search.no_match": "No one in your circle matches.",
   "search.empty": "Your circle is empty so far. Search for your friends here 🔍",
+
+  /* Beskeder (kreds-chat) */
+  "chat.title": "Messages",
+  "chat.empty": "No circles yet. Create a circle to get a thread here.",
+  "chat.no_messages": "No messages yet. Say hi 👋",
+  "chat.ph": "Write a message ...",
+  "chat.send": "Send",
+  "chat.shared_memory": "shared a memory",
+  "chat.you": "You",
+  "chat.say_hi": "Say hi 👋",
 
   /* Notifications */
   "notif.liked": "liked your post",

@@ -56,6 +56,12 @@
       <div id="search-list"></div>
     </section>
 
+    <!-- BESKEDER (kreds-chats) -->
+    <section class="view" id="view-chat">
+      <div class="pagetitle" data-i18n="chat.title">Beskeder</div>
+      <div id="chat-list"></div>
+    </section>
+
     <!-- NOTIFIKATIONER -->
     <section class="view" id="view-akt">
       <div class="pagetitle" data-i18n="tab.notifs">Notifikationer</div>
@@ -99,8 +105,8 @@
     <button data-view="search" aria-label="Søg" data-i18n-aria="tab.search">
       <svg viewBox="0 0 24 24" id="ic-search"></svg>
     </button>
-    <button id="tab-compose" aria-label="Nyt opslag" data-i18n-aria="tab.compose">
-      <svg viewBox="0 0 24 24"><g class="stroke"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M12 8.4v7.2M8.4 12h7.2"/></g></svg>
+    <button data-view="chat" aria-label="Beskeder" data-i18n-aria="chat.title">
+      <svg viewBox="0 0 24 24" id="ic-chat"></svg>
     </button>
     <button data-view="akt" aria-label="Notifikationer" data-i18n-aria="tab.notifs">
       <svg viewBox="0 0 24 24" id="ic-bell"></svg>
@@ -253,6 +259,24 @@
       </div>
     </div>
     <div class="pv-body" id="mv-body"></div>
+  </div>
+
+  <!-- Kreds-chat: én tråd i fuld skærm (glider ind fra højre) -->
+  <div class="postview chatview" id="chatview" role="dialog" aria-label="Beskeder" data-i18n-aria="chat.title">
+    <div class="pv-head">
+      <button class="back" id="cv-back" aria-label="Tilbage" data-i18n-aria="common.back">
+        <svg viewBox="0 0 24 24"><path class="stroke" d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div>
+        <div class="t1" id="cv-title"></div>
+        <div class="t2" id="cv-sub"></div>
+      </div>
+    </div>
+    <div class="pv-body" id="cv-body"></div>
+    <div class="cv-composer">
+      <input id="cv-input" placeholder="Skriv en besked ..." data-i18n-ph="chat.ph" maxlength="500" autocomplete="off">
+      <button id="cv-send" data-i18n="chat.send">Send</button>
+    </div>
   </div>
 
   <!-- Rediger profil -->

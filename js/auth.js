@@ -7,6 +7,7 @@ import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPo
 import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet, closeListSheet, closeNativeListPage, resetSaved, closeUnfriendMenu, closeBlockMenu } from "./profile.js";
 import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
 import { closeNativePostPage } from "./comments.js";
+import { resetChat } from "./chat.js";
 import { closeLightbox } from "./lightbox.js";
 import { subscribeRealtime, unsubscribeRealtime } from "./realtime.js";
 import { refreshNotifDot } from "./notifications.js";
@@ -196,6 +197,7 @@ export function resetApp(){
   closeNativePostPage(); // en åben native opslags-side må ikke overleve et logout
   closeListSheet();
   closeNativeListPage();
+  resetChat();
   closeEditSheet();
   closeActivitySheet();
   closePostEdit();

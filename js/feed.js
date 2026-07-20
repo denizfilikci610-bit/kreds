@@ -2,6 +2,7 @@ import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, expandedCmts, pv, cstate, curTab, setCurTab, setCfilePid, ID2H, FRIEND_SINCE } from "./store.js";
 import { el, esc, richText, avaHTML, user, grad, toast, fmtTime, fmtDate, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
 import { t, likesLabel } from "./i18n.js";
+import { renderChatList, openKredsChat } from "./chat.js";
 import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, deleteComment, cInput, cKey, clearReply, clearCImg, openNativeComments, pushNativeComments, pushNativePostPage } from "./comments.js";
 import { openFeedSheet, openMemberSheet } from "./kredse.js";
 import { openProfile, closeProfile, closeMemView, renderMyPosts, renderStories, refreshPv, doBlockUser, openPostView } from "./profile.js";
@@ -61,12 +62,15 @@ const IC = {
   searchF:'<g class="stroke" stroke-width="2.9"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></g>',
   heartO:'<path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
   heartF:'<path class="fillic" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
+  chatO:'<path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/>',
+  chatF:'<path class="fillic" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/>',
   userO:'<g class="stroke"><circle cx="12" cy="8" r="3.7"/><path d="M5 20c.8-3.7 3.6-5.6 7-5.6s6.2 1.9 7 5.6"/></g>',
   userF:'<circle class="fillic" cx="12" cy="8" r="4"/><path class="fillic" d="M4.4 20.5c.8-4 3.9-6.1 7.6-6.1s6.8 2.1 7.6 6.1Z"/>'
 };
 export function setTabIcons(active){
   el("ic-home").innerHTML   = active === "feed"   ? IC.homeF   : IC.homeO;
   el("ic-search").innerHTML = active === "search" ? IC.searchF : IC.searchO;
+  el("ic-chat").innerHTML   = active === "chat"   ? IC.chatF   : IC.chatO;
   el("ic-bell").innerHTML   = active === "akt"    ? IC.heartF  : IC.heartO;
   el("ic-user").innerHTML   = active === "profil" ? IC.userF   : IC.userO;
   const av = el("tab-ava"), fallbackIc = el("ic-user");
@@ -106,7 +110,7 @@ function actionsHTML(p){
     '<div class="pactions">'+
       '<button class="cmt-btn" data-id="'+p.id+'" aria-label="'+t("aria.comments")+'">'+
         '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>'+
-        cntHTML(p.cmts.length)+
+        cntHTML(p.kind === "memory" && p.feed ? 0 : p.cmts.length)+
       '</button>'+
       '<button class="like-btn'+(p.liked ? " on" : "")+'" data-id="'+p.id+'" aria-pressed="'+p.liked+'" aria-label="'+t("aria.like")+'">'+
         HEART_SVG+
@@ -207,7 +211,9 @@ function memoryHTML(p, inner){
         '<button class="cap-more" data-id="'+p.id+'">'+t(openCap ? "memory.less" : "memory.more")+'</button>'+
       '</div>'
     : '';
-  const nativeCmts = window.__vfNative && window.__vfComments; // native sheet ejer kommentarerne i app'en
+  // Kreds-minder har INGEN kommentar-sektion (kommentarer bor i kredsens chat);
+  // venne-minder: native sheet ejer kommentarerne i app'en, browser beholder inline
+  const nativeCmts = (window.__vfNative && window.__vfComments) || !!p.feed;
   return (
     '<article class="post memory" data-id="'+p.id+'">'+
       '<div class="mhead">'+
@@ -788,6 +794,7 @@ export function switchTab(name){
   moveTabIndicator(name);
   setTabIcons(name);
   if(name === "search") renderSearch();
+  if(name === "chat") renderChatList();
   if(name === "akt"){ loadNotifs(); setNotifDot(false); }
   if(name === "profil") renderMyPosts();
   applyFeedSound(); // lyden følger den synlige kontekst — skjulte views skal være lydløse
@@ -1239,8 +1246,14 @@ function timelineClick(e){
   }
   const cmt = e.target.closest(".cmt-btn");
   if(cmt){
-    // I app'en åbner et minde sine kommentarer i det native Liquid Glass-sheet (ikke inline)
     const cp = findPost(cmt.dataset.id);
+    // KREDS-minder kommenteres i kredsens CHAT (Messenger-tråden) — ikke i kommentarer
+    if(cp && cp.kind === "memory" && cp.feed){
+      if(el("memview").classList.contains("on")) closeMemView();
+      openKredsChat(cp.feed);
+      return;
+    }
+    // I app'en åbner et VENNE-minde sine kommentarer i det native Liquid Glass-sheet
     if(window.__vfNative && window.__vfComments && cp && cp.kind === "memory"){
       openNativeComments(cp.id);
       return;

@@ -4,7 +4,7 @@ import SwiftUI
 /// (NotifManager handles the `type:"tab"` message and updates this).
 final class TabBarModel: ObservableObject {
     static let shared = TabBarModel()
-    @Published var active: String = "feed"   // feed | search | akt | profil
+    @Published var active: String = "feed"   // feed | search | chat | akt | profil
     @Published var dot: Bool = false          // notification dot on the bell
     @Published var compact: Bool = false      // scrolled down → shrink
     @Published var visible: Bool = true       // hidden while a sheet/lightbox/profile is on top
@@ -43,10 +43,12 @@ struct NativeTabBar: View {
     @ObservedObject private var model = TabBarModel.shared
     @Namespace private var ns
 
-    // "compose" er flyttet ud til de flydende knapper (NativeComposeButtons) → 4 faner.
+    // "compose" er flyttet ud til de flydende knapper (NativeComposeButtons).
+    // Midterpladsen er nu BESKEDER (kreds-chat, Messenger-agtig) → 5 faner.
     private let items: [TabItem] = [
         .init(id: "feed",    symbol: "house.fill",              isView: true),
         .init(id: "search",  symbol: "magnifyingglass",        isView: true),
+        .init(id: "chat",    symbol: "message.fill",           isView: true),
         .init(id: "akt",     symbol: "bell.fill",              isView: true),
         .init(id: "profil",  symbol: "person.crop.circle.fill", isView: true),
     ]

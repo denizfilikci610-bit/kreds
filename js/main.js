@@ -15,6 +15,7 @@ import { initRealtime, scheduleRefetch } from "./realtime.js";
 import { initAuth, boot, showAuth, showRecovery, setAuthMode, refreshAuthMode, pushNativeCreds } from "./auth.js";
 import { initPullRefresh } from "./pullrefresh.js";
 import { initPinchZoom } from "./pinchzoom.js";
+import { initChat, renderChatList } from "./chat.js";
 import { initMentions } from "./mentions.js";
 
 /* ================= i18n =================
@@ -29,6 +30,7 @@ initI18n(function(){
   renderFeed();
   renderComposeDest();
   if(curTab === "akt") loadNotifs();
+  if(curTab === "chat") renderChatList();
   if(curTab === "profil") renderMyPosts();
   if(el("view-search").classList.contains("active")) renderSearch();
   refreshPv();
@@ -51,6 +53,7 @@ initMentions();
 initAuth();
 initPullRefresh(); // ren pull-to-refresh for hele appen (erstatter native webview-bounce)
 initPinchZoom();   // live pinch-zoom på minde-billeder direkte i feedet (Instagram-agtigt)
+initChat();        // kreds-chat (Messenger-agtig beskeder-fane)
 
 el("scrim").addEventListener("click", function(){ closeFeedSheet(); closeMemberSheet(); closeEditSheet(); closeActivitySheet(); closeListSheet(); closePostEdit(); });
 
@@ -161,7 +164,7 @@ if(window.__vfNative){
     const compact = document.body.classList.contains("hidebar");
     // Skjul barerne når noget ligger ovenpå ELLER vi ikke er på hoved-appen (boot-splash, login, gates)
     const blocked = nativeSheetOpen || !!document.querySelector(
-        "#scrim.on, .compose.on, .profileview.on, .postview.on, #lightbox.on, #authview.on, #langview.on, #consentview.on"
+        "#scrim.on, .compose.on, .profileview.on, .postview.on, #chatview.on, #lightbox.on, #authview.on, #langview.on, #consentview.on"
       ) || document.body.classList.contains("lb-lock")
       || !!(el("splash") && !el("splash").classList.contains("gone"));
     const visible = !blocked;

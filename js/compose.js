@@ -382,7 +382,6 @@ el("compose-dest").addEventListener("click", function(e){
   composeDest = p.dataset.d;
   renderComposeDest();
 });
-el("tab-compose").addEventListener("click", openCompose);
 el("compose-cancel").addEventListener("click", closeCompose);
 
 ta.addEventListener("input", function(){ updateRing(); canPost(); });
