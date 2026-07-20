@@ -666,7 +666,9 @@
   .emptynote{padding:18px 16px;color:var(--gray);font-size:14px}
 
   /* ================= Notifikationer ================= */
-  .pagetitle{font-size:19px;font-weight:800;color:var(--ink);padding:12px 16px 8px;border-bottom:1px solid var(--line)}
+  .pagetitle{font-size:19px;font-weight:800;color:var(--ink);padding:12px 16px 8px}
+  /* Beskeder-fanen er helt uden streger (Messenger-ren): heller ingen topbar-linje */
+  body[data-tab="chat"] .topbar{border-bottom-color:transparent}
   .notif{
     display:flex;align-items:center;gap:12px;
     padding:11px 16px;

@@ -792,6 +792,7 @@ function appScrolled(){
 /* ================= Tabs ================= */
 export function switchTab(name){
   setCurTab(name);
+  document.body.dataset.tab = name; // CSS kan style pr. fane (fx Beskeder uden streger)
   // Husk den aktive fane over et reload (pull-to-refresh) — sessionStorage overlever
   // location.reload(), men er tom ved kold app-start (ny WKWebView) → feed som default.
   try{ sessionStorage.setItem("vf_cur_tab", name); }catch(_e){}
