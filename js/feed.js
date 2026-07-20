@@ -122,6 +122,12 @@ const DOTS_SVG = '<svg viewBox="0 0 24 24"><g class="fillic"><circle cx="5" cy="
    Tap skifter til kredsen (håndteres i timelineClick). Inde i en specifik kreds er
    mærket redundant og udelades — derfor gates der på state.currentFeed. */
 const KREDS_SVG = '<svg viewBox="0 0 24 24"><circle class="stroke" cx="12" cy="12" r="7.3"/><g class="fillic"><circle cx="12" cy="4.7" r="2.1"/><circle cx="5.7" cy="15.7" r="2.1"/><circle cx="18.3" cy="15.7" r="2.1"/></g></svg>';
+/* Pillen i egen række lige OVER handlingsrækken (kommentar/like/del) — i headeren blev
+   kreds-navnet klemt til "Br…" ved lange navne. Tom streng når opslaget ikke har kreds. */
+function kredsChipRow(p){
+  const chip = kredsChipHTML(p);
+  return chip ? '<div class="kchiprow">'+chip+'</div>' : '';
+}
 function kredsChipHTML(p){
   if(state.currentFeed !== "all" || !p.feed) return "";
   const f = feedById(p.feed);
@@ -162,7 +168,7 @@ function memoryHTML(p, inner){
           avaHTML(p.u, 34)+
         '</button>'+
         '<div class="mhcol">'+
-          '<span class="mhrow"><span class="nm">'+esc(user(p.u).name)+'</span><span class="badge">'+BADGE()+'</span>'+kredsChipHTML(p)+'</span>'+
+          '<span class="mhrow"><span class="nm">'+esc(user(p.u).name)+'</span><span class="badge">'+BADGE()+'</span></span>'+
           '<span class="mdate">'+esc(fmtDate(p.created))+'</span>'+
         '</div>'+
         (p.isNew ? '<span class="newchip">'+t("post.new")+'</span>' : '')+
@@ -170,6 +176,7 @@ function memoryHTML(p, inner){
       '</div>'+
       '<div class="mmedia pmedia" data-id="'+p.id+'">'+inner+BIGHEART+'</div>'+
       '<div class="mbelow">'+
+        kredsChipRow(p)+
         actionsHTML(p)+
         cap+
         (nativeCmts ? '' : cmtSectionHTML(p))+
@@ -195,11 +202,11 @@ export function postHTML(p){
           '<span class="nm">'+esc(user(p.u).name)+'</span>'+
           '<span class="badge">'+BADGE()+'</span>'+
           '<span class="ph">@'+esc(p.u)+' · '+esc(p.t)+'</span>'+
-          kredsChipHTML(p)+
           (p.isNew ? '<span class="newchip">'+t("post.new")+'</span>' : '')+
           '<button class="dots" data-id="'+p.id+'" aria-label="'+t("aria.more")+'">'+DOTS_SVG+'</button>'+
         '</div>'+
         postBody(p, media)+
+        kredsChipRow(p)+
         actionsHTML(p)+
         cmtSectionHTML(p)+
       '</div>'+

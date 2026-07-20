@@ -387,7 +387,6 @@ struct PostPageView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                if !p.kredsName.isEmpty { kredsChip(p.kredsName) }
                 if !p.segs.isEmpty {
                     Text(attributed(p.segs))
                         .font(.system(size: 15))
@@ -405,6 +404,8 @@ struct PostPageView: View {
                 }
                 media(p)
                 if let poll = p.poll { pollView(poll) }
+                // Kreds-mærket i egen række lige over handlingsrækken (som i web-feedet)
+                if !p.kredsName.isEmpty { kredsChip(p.kredsName) }
                 actionsRow(p)
             }
         }
@@ -443,7 +444,7 @@ struct PostPageView: View {
             .background(Capsule().fill(chipFill))
         }
         .buttonStyle(.plain)
-        .padding(.top, 2)
+        .padding(.top, 9)
     }
 
     private func attributed(_ segs: [PostSeg]) -> AttributedString {
