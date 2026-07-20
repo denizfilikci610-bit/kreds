@@ -3,6 +3,29 @@ import WebKit
 
 let vibefeedURL = URL(string: "https://vibefeed.dk")!
 
+/// iOS lægger som standard en tilbehørsbjælke (pil op/ned + flueben) oven på tastaturet
+/// i et WKWebView. Den fjernes her, så chat-composeren klæber direkte på tastaturet som
+/// i Messenger: WKContentView får en dynamisk runtime-subklasse hvis inputAccessoryView
+/// er nil. (Ingen private API-kald — kun offentlige Objective-C-runtime-funktioner; er
+/// klassen ikke fundet på en fremtidig iOS, sker der bare ingenting.)
+private func hideKeyboardAccessoryBar(of webView: WKWebView) {
+    guard let contentView = webView.scrollView.subviews.first(where: {
+        String(describing: type(of: $0)).hasPrefix("WKContent")
+    }) else { return }
+    let subclassName = "WKContentView_VFNoAccessory"
+    var subclass: AnyClass? = NSClassFromString(subclassName)
+    if subclass == nil, let superclass = object_getClass(contentView) {
+        subclass = objc_allocateClassPair(superclass, subclassName, 0)
+        if let subclass {
+            let selector = #selector(getter: UIResponder.inputAccessoryView)
+            let block: @convention(block) (AnyObject) -> UIView? = { _ in nil }
+            class_addMethod(subclass, selector, imp_implementationWithBlock(block), "@@:")
+            objc_registerClassPair(subclass)
+        }
+    }
+    if let subclass { object_setClass(contentView, subclass) }
+}
+
 final class WebViewModel: ObservableObject {
     @Published var failed = false
     weak var webView: WKWebView?
@@ -75,6 +98,8 @@ struct WebView: UIViewRepresentable {
         // what revealed a black gap + spinner and pushed the whole UI down). Pull-to-
         // refresh is now a clean in-app gesture handled in the web (js/pullrefresh.js).
         webView.scrollView.bounces = false
+
+        hideKeyboardAccessoryBar(of: webView)
 
         model.webView = webView
         // Let the ad manager call back into the page (fill/collapse slots).
