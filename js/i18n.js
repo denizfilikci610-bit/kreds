@@ -345,6 +345,7 @@ const DA = {
   /* Rediger profil (sheet) */
   "ep.pic": "Skift profilbillede",
   "ep.name": "Dit navn",
+  "ep.handle": "Brugernavn",
   "ep.name_ph": "Dit navn",
   "ep.bio": "Din bio",
   "ep.bio_ph": "Skriv lidt om dig selv ...",
@@ -765,6 +766,7 @@ const EN = {
   /* Edit profile (sheet) */
   "ep.pic": "Change profile photo",
   "ep.name": "Your name",
+  "ep.handle": "Username",
   "ep.name_ph": "Your name",
   "ep.bio": "Your bio",
   "ep.bio_ph": "Write a little about yourself ...",

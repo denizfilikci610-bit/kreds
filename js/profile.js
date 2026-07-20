@@ -158,6 +158,7 @@ function epheetSnapshot(){
     title: t("profile.edit"),
     picLabel: t("ep.pic"),
     nameLabel: t("ep.name"), namePlaceholder: t("ep.name_ph"), nameMaxLength: 40,
+    handleLabel: t("ep.handle"), handle: me ? (me.handle || "") : "", // vises read-only (Brugernavn)
     bioLabel: t("ep.bio"), bioPlaceholder: t("ep.bio_ph"), bioMaxLength: 160,
     activityLabel: t("ep.activity"), shareLabel: t("ep.share"), shareNote: t("ep.share_note"),
     langLabel: t("ep.lang"), langDaLabel: "Dansk", langEnLabel: "English",

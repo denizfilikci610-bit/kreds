@@ -2,11 +2,14 @@ import SwiftUI
 import PhotosUI
 import UIKit
 
-/// Native Liquid Glass "Rediger profil" (edit profile) bottom sheet. A staged form: name, bio, share,
-/// language, ad-consent and a picked photo are all held natively and committed together on Save (the
-/// owner chose "Save = everything"). The web owns every mutation: it uploads the staged avatar, updates
-/// the profile, applies setLang/setConsent, and runs the (unchanged) account-delete sequence. Native
-/// only renders glass, collects input, and reports actions. Browser keeps the CSS #esheet.
+/// Native "Rediger profil" — a FULL-SCREEN page (Instagram-style: centered avatar with a
+/// "change picture" link, label/value form rows, sections below) that slides in from the
+/// right with the app's standard back chevron and swipe-right-to-go-back. Still a staged
+/// form: name, bio, share, language, ad-consent and a picked photo are all held natively
+/// and committed together on Save in the header (the owner chose "Save = everything").
+/// The web owns every mutation: it uploads the staged avatar, updates the profile, applies
+/// setLang/setConsent, and runs the (unchanged) account-delete sequence. Native only
+/// renders, collects input, and reports actions. Browser keeps the CSS #esheet sheet.
 
 final class EsheetModel: ObservableObject {
     static let shared = EsheetModel()
@@ -19,6 +22,8 @@ final class EsheetModel: ObservableObject {
     @Published var picLabel = ""
     @Published var nameLabel = ""
     @Published var namePlaceholder = ""
+    @Published var handleLabel = ""
+    @Published var handle = ""          // read-only (Brugernavn) — vises, kan ikke ændres
     @Published var bioLabel = ""
     @Published var bioPlaceholder = ""
     @Published var activityLabel = ""
@@ -74,6 +79,7 @@ final class EsheetModel: ObservableObject {
         token = (dict["token"] as? Int) ?? token + 1
         title = str(dict, "title"); picLabel = str(dict, "picLabel")
         nameLabel = str(dict, "nameLabel"); namePlaceholder = str(dict, "namePlaceholder")
+        handleLabel = str(dict, "handleLabel"); handle = str(dict, "handle")
         bioLabel = str(dict, "bioLabel"); bioPlaceholder = str(dict, "bioPlaceholder")
         activityLabel = str(dict, "activityLabel"); shareLabel = str(dict, "shareLabel"); shareNote = str(dict, "shareNote")
         langLabel = str(dict, "langLabel"); langDaLabel = str(dict, "langDaLabel"); langEnLabel = str(dict, "langEnLabel")
@@ -111,9 +117,9 @@ final class EsheetModel: ObservableObject {
     func dismiss() { send(["kind": "dismiss"]) }
     func chooseLang(_ v: String) { lang = v }
     func chooseConsent(_ v: String) { consent = v }
-    /// Åbner privatlivspolitikken i i-app-browseren OVENPÅ sheetet — brugeren bliver i
+    /// Åbner privatlivspolitikken i i-app-browseren OVENPÅ siden — brugeren bliver i
     /// appen, og de stagede ændringer består. (window.open over broen blokeres af WKWebView,
-    /// og en navigation væk fra index.html ville dræbe SPA'en under sheetet.)
+    /// og en navigation væk fra index.html ville dræbe SPA'en under siden.)
     func openPolicy() {
         let s = policyUrl.isEmpty ? "https://vibefeed.dk/privatliv.html" : policyUrl
         if let url = URL(string: s) { InAppBrowser.present(url) }
@@ -143,111 +149,208 @@ func vfImageDataURL(_ image: UIImage, maxEdge: CGFloat = 1024, quality: CGFloat 
     return "data:image/jpeg;base64," + data.base64EncodedString()
 }
 
-struct GlassEditProfileSheet: View {
+struct EditProfilePage: View {
     @ObservedObject private var model = EsheetModel.shared
     @State private var pickerItem: PhotosPickerItem?
     @State private var slet = ""
     @FocusState private var nameFocused: Bool
+    @State private var dragX: CGFloat = 0
+    @State private var dragging = false
+
+    private let hairline = Color.primary.opacity(0.1)
+
+    /// Real top inset from the key window (the page ignores the container safe area,
+    /// mirroring PostPageView).
+    private var topInset: CGFloat {
+        (UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }?
+            .keyWindow?.safeAreaInsets.top) ?? 0
+    }
 
     var body: some View {
-        GlassBottomSheet(onDismiss: { if model.deleteStep { model.deleteStep = false } else { model.dismiss() } }) {
-            VStack(spacing: 0) {
-                Text(model.deleteStep ? model.delSure : model.title)
-                    .font(.system(size: 16, weight: .bold)).foregroundStyle(Color.primary)
-                    .padding(.bottom, 10)
-                if model.deleteStep { deleteConfirm } else { form }
-            }
-            .padding(.top, 2)
+        VStack(spacing: 0) {
+            header
+            if model.deleteStep { deleteConfirm } else { form }
         }
+        .background(Color(uiColor: .systemBackground))
+        .ignoresSafeArea(.container) // kun skærm-kanterne — tastaturet skubber stadig felterne op
+        .offset(x: max(0, dragX))
+        // Swipe mod højre hvor som helst → tilbage (samme gestus som opslags-siden)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 18)
+                .onChanged { v in
+                    let w = v.translation.width, h = v.translation.height
+                    if dragging || (w > 0 && abs(w) > abs(h) * 1.4) {
+                        dragging = true
+                        dragX = max(0, w)
+                    }
+                }
+                .onEnded { v in
+                    let flick = v.predictedEndTranslation.width > 240
+                    if dragging && (dragX > 90 || flick) {
+                        withAnimation(.easeOut(duration: 0.2)) { dragX = UIScreen.main.bounds.width }
+                        if model.deleteStep { model.deleteStep = false; dragX = 0 } else { model.dismiss() }
+                    } else {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { dragX = 0 }
+                    }
+                    dragging = false
+                }
+        )
+        .onAppear { dragX = 0; dragging = false }
         .onChange(of: pickerItem) { _, item in loadPicked(item) }
     }
 
-    // MARK: form
-    private var form: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    avatarRow
-                    sectionLabel(model.nameLabel)
-                    field { TextField(model.namePlaceholder, text: $model.name)
-                        .focused($nameFocused)
-                        .font(.system(size: 16, weight: .semibold))
-                        .onChange(of: model.name) { _, v in if v.count > model.nameMaxLength { model.name = String(v.prefix(model.nameMaxLength)) } }
-                    }
-                    sectionLabel(model.bioLabel)
-                    field {
-                        ZStack(alignment: .topLeading) {
-                            if model.bio.isEmpty {
-                                Text(model.bioPlaceholder).font(.system(size: 16)).foregroundStyle(.secondary)
-                                    .padding(.top, 2).padding(.leading, 5)
-                            }
-                            TextEditor(text: $model.bio)
-                                .font(.system(size: 16)).frame(minHeight: 74)
-                                .scrollContentBackground(.hidden)
-                                .onChange(of: model.bio) { _, v in if v.count > model.bioMaxLength { model.bio = String(v.prefix(model.bioMaxLength)) } }
-                        }
-                    }
-                    sectionLabel(model.activityLabel)
-                    HStack {
-                        Text(model.shareLabel).font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.primary)
-                        Spacer()
-                        Toggle("", isOn: $model.share).labelsHidden().tint(vfRed)
-                    }.padding(.horizontal, 18).padding(.top, 2)
-                    Text(model.shareNote).font(.system(size: 13)).foregroundStyle(.secondary)
-                        .padding(.horizontal, 18).padding(.top, 4)
-                    sectionLabel(model.langLabel)
-                    segments([(("da"), model.langDaLabel), ("en", model.langEnLabel)], selected: model.lang) { model.chooseLang($0) }
-                    sectionLabel(model.privacyLabel)
-                    segments([("personal", model.adsPersonalLabel), ("limited", model.adsLimitedLabel)], selected: model.consent) { model.chooseConsent($0) }
-                    Button { model.openPolicy() } label: {
-                        Text(model.policyLabel).font(.system(size: 13, weight: .semibold)).underline()
-                            .foregroundStyle(.secondary).padding(.horizontal, 18).padding(.top, 14)
-                    }.buttonStyle(.plain)
-                    Button { model.deleteStep = true; slet = "" } label: {
-                        Text(model.deleteOpenLabel).font(.system(size: 14, weight: .semibold)).foregroundStyle(vfRed)
-                            .padding(.horizontal, 18).padding(.top, 18).padding(.bottom, 6)
-                    }.buttonStyle(.plain)
+    // MARK: - Header (standard back chevron + centered bold title + Gem til højre)
+
+    private var header: some View {
+        ZStack {
+            Text(model.deleteStep ? model.delSure : model.title)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(Color.primary)
+                .lineLimit(1)
+                .padding(.horizontal, 84)
+            HStack {
+                Button {
+                    if model.deleteStep { model.deleteStep = false } else { model.dismiss() }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(Color.primary)
+                        .padding(6)
+                        .contentShape(Rectangle())
                 }
-                .padding(.bottom, 8)
+                .buttonStyle(.plain)
+                Spacer()
+                if !model.deleteStep {
+                    Button { nameFocused = false; model.save() } label: {
+                        ZStack {
+                            Text(model.saveLabel)
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(vfRed)
+                                .opacity(model.saving ? 0 : 1)
+                            if model.saving { ProgressView().tint(vfRed) }
+                        }
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!model.canSave || model.saving)
+                    .opacity(model.canSave ? 1 : 0.45)
+                }
             }
-            .scrollDismissesKeyboard(.interactively)
-            saveButton
+            .padding(.horizontal, 12)
         }
+        .frame(height: 52)
+        .padding(.top, topInset)
+        .overlay(alignment: .bottom) { Rectangle().fill(hairline).frame(height: 0.5) }
     }
 
-    private var avatarRow: some View {
-        HStack(spacing: 14) {
-            Group {
-                if let img = model.pickedAvatar {
-                    Image(uiImage: img).resizable().scaledToFill()
-                } else {
-                    GlassAvatar(url: model.avatarUrl, initials: model.avatarInitials, gradient: model.avatarGradient, size: 72)
+    // MARK: - Form (Instagram-agtigt: centreret avatar + link, label/værdi-rækker, sektioner)
+
+    private var form: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                avatarBlock
+                Rectangle().fill(hairline).frame(height: 0.5)
+                formRow(model.nameLabel) {
+                    TextField(model.namePlaceholder, text: $model.name)
+                        .focused($nameFocused)
+                        .font(.system(size: 16))
+                        .onChange(of: model.name) { _, v in if v.count > model.nameMaxLength { model.name = String(v.prefix(model.nameMaxLength)) } }
                 }
+                if !model.handle.isEmpty {
+                    formRow(model.handleLabel) {
+                        // Brugernavnet kan ikke ændres (mentions/venskaber peger på det)
+                        Text(model.handle)
+                            .font(.system(size: 16))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                formRow(model.bioLabel, lastRow: true) {
+                    TextField(model.bioPlaceholder, text: $model.bio, axis: .vertical)
+                        .font(.system(size: 16))
+                        .lineLimit(1...5)
+                        .onChange(of: model.bio) { _, v in if v.count > model.bioMaxLength { model.bio = String(v.prefix(model.bioMaxLength)) } }
+                }
+                Rectangle().fill(hairline).frame(height: 0.5)
+
+                // Del min aktivitet (toggle-række som IG's etiket-række)
+                HStack(alignment: .center) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(model.shareLabel).font(.system(size: 16)).foregroundStyle(Color.primary)
+                        Text(model.shareNote).font(.system(size: 12.5)).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 14)
+                    Toggle("", isOn: $model.share).labelsHidden().tint(vfRed)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 13)
+                Rectangle().fill(hairline).frame(height: 0.5)
+
+                sectionLabel(model.langLabel)
+                segments([("da", model.langDaLabel), ("en", model.langEnLabel)], selected: model.lang) { model.chooseLang($0) }
+                sectionLabel(model.privacyLabel)
+                segments([("personal", model.adsPersonalLabel), ("limited", model.adsLimitedLabel)], selected: model.consent) { model.chooseConsent($0) }
+                Button { model.openPolicy() } label: {
+                    Text(model.policyLabel).font(.system(size: 13, weight: .semibold)).underline()
+                        .foregroundStyle(.secondary).padding(.horizontal, 16).padding(.top, 14)
+                }.buttonStyle(.plain)
+
+                Rectangle().fill(hairline).frame(height: 0.5).padding(.top, 18)
+                Button { model.deleteStep = true; slet = "" } label: {
+                    Text(model.deleteOpenLabel)
+                        .font(.system(size: 16, weight: .semibold)).foregroundStyle(vfRed)
+                        .padding(.horizontal, 16).padding(.vertical, 14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }.buttonStyle(.plain)
             }
-            .frame(width: 72, height: 72).clipShape(Circle())
+            .padding(.bottom, 30)
+        }
+        .scrollDismissesKeyboard(.interactively)
+    }
+
+    private var avatarBlock: some View {
+        VStack(spacing: 12) {
+            PhotosPicker(selection: $pickerItem, matching: .images) {
+                Group {
+                    if let img = model.pickedAvatar {
+                        Image(uiImage: img).resizable().scaledToFill()
+                    } else {
+                        GlassAvatar(url: model.avatarUrl, initials: model.avatarInitials, gradient: model.avatarGradient, size: 96)
+                    }
+                }
+                .frame(width: 96, height: 96).clipShape(Circle())
+            }
             PhotosPicker(selection: $pickerItem, matching: .images) {
                 Text(model.picLabel).font(.system(size: 15, weight: .bold)).foregroundStyle(vfRed)
             }
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 18).padding(.top, 6).padding(.bottom, 2)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 22)
     }
 
-    private var saveButton: some View {
-        Button { nameFocused = false; model.save() } label: {
-            ZStack {
-                Text(model.saveLabel).font(.system(size: 16, weight: .bold)).foregroundStyle(.white).opacity(model.saving ? 0 : 1)
-                if model.saving { ProgressView().tint(.white) }
+    /// IG-agtig række: label i fast venstre kolonne, værdi/felt til højre, hårstreg under
+    private func formRow<V: View>(_ label: String, lastRow: Bool = false, @ViewBuilder _ content: () -> V) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(label)
+                .font(.system(size: 16))
+                .foregroundStyle(Color.primary)
+                .frame(width: 108, alignment: .leading)
+            VStack(alignment: .leading, spacing: 0) {
+                content()
+                    .padding(.bottom, 12)
+                if !lastRow { Rectangle().fill(hairline).frame(height: 0.5) }
             }
-            .frame(maxWidth: .infinity).padding(.vertical, 15)
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(vfRed))
-            .opacity(model.canSave && !model.saving ? 1 : 0.45)
         }
-        .buttonStyle(.plain).disabled(!model.canSave || model.saving)
-        .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 4)
+        .padding(.leading, 16)
+        .padding(.top, 13)
+        .padding(.trailing, 16)
     }
 
-    // MARK: delete confirm
+    // MARK: - delete confirm (uændret to-trins SLET-flow, nu som side-indhold)
     private var deleteConfirm: some View {
         VStack(spacing: 12) {
             Text(model.delText).font(.system(size: 14)).foregroundStyle(.secondary)
@@ -256,7 +359,7 @@ struct GlassEditProfileSheet: View {
                 .textInputAutocapitalization(.characters).autocorrectionDisabled()
                 .multilineTextAlignment(.center).font(.system(size: 17, weight: .bold))
                 .padding(.horizontal, 16).padding(.vertical, 13)
-                .glassBG(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.06)))
                 .padding(.horizontal, 24)
             Button { model.confirmDelete() } label: {
                 ZStack {
@@ -273,23 +376,16 @@ struct GlassEditProfileSheet: View {
             Button { model.deleteStep = false } label: {
                 Text(model.cancelLabel).font(.system(size: 14, weight: .semibold)).foregroundStyle(.secondary).padding(.vertical, 4)
             }.buttonStyle(.plain)
+            Spacer()
         }
-        .padding(.top, 8).padding(.bottom, 16)
+        .padding(.top, 24)
     }
 
     // MARK: helpers
     private func sectionLabel(_ s: String) -> some View {
         Text(s.uppercased()).font(.system(size: 12, weight: .bold)).foregroundStyle(.secondary).kerning(0.4)
-            .padding(.leading, 18).padding(.top, 16).padding(.bottom, 4)
+            .padding(.leading, 16).padding(.top, 18).padding(.bottom, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    private func field<V: View>(@ViewBuilder _ content: () -> V) -> some View {
-        content()
-            .foregroundStyle(Color.primary)
-            .padding(.horizontal, 14).padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .glassBG(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .padding(.horizontal, 16)
     }
     private func segments(_ opts: [(String, String)], selected: String, _ pick: @escaping (String) -> Void) -> some View {
         HStack(spacing: 8) {
@@ -321,21 +417,18 @@ struct GlassEditProfileSheet: View {
     }
 }
 
-/// Overlays the edit-profile glass sheet + a dimming scrim on the host view when open.
+/// Overlays the full-screen edit-profile page on the host view when open (slides in from
+/// the right like the post page / web profile pages).
 struct EsheetHost: ViewModifier {
     @ObservedObject private var model = EsheetModel.shared
     func body(content: Content) -> some View {
         ZStack {
             content
             if model.open {
-                Color.black.opacity(0.28).ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .onTapGesture { model.dismiss() }
-                    .transition(.opacity)
-                GlassEditProfileSheet()
-                    .transition(.move(edge: .bottom))
+                EditProfilePage()
+                    .transition(.move(edge: .trailing))
             }
         }
-        .animation(.spring(response: 0.36, dampingFraction: 0.86), value: model.open)
+        .animation(.spring(response: 0.34, dampingFraction: 0.88), value: model.open)
     }
 }
