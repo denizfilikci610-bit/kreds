@@ -210,6 +210,7 @@ struct EditProfilePage: View {
                     image: ci,
                     aspect: cropIsBanner ? 1280.0 / 432.0 : 1,
                     circular: !cropIsBanner,
+                    targetSize: cropIsBanner ? CGSize(width: 1280, height: 432) : CGSize(width: 1024, height: 1024),
                     title: cropIsBanner ? model.bannerLabel : model.picLabel,
                     cancelLabel: model.cancelLabel,
                     useLabel: model.useLabel,

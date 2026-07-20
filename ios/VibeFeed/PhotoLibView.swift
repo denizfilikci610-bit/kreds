@@ -15,7 +15,7 @@ struct PLFeed: Identifiable, Equatable { let id: String; let name: String }
 final class PhotoLibModel: NSObject, ObservableObject {
     static let shared = PhotoLibModel()
 
-    enum Step { case camera, gallery, trim, caption }
+    enum Step { case camera, gallery, trim, crop, caption }
     @Published var open = false
     @Published var forCompose = false   // åbnet fra en TANKE (Tag med kamera) → hæft medie, opret ikke minde
     @Published var isStory = false      // åbnet som STORY → indsæt i stories (24t), ingen billedtekst
@@ -24,6 +24,11 @@ final class PhotoLibModel: NSObject, ObservableObject {
     @Published var assets: [PHAsset] = []
     @Published var selected: PHAsset?
     @Published var capturedImage: UIImage?   // et foto taget med kameraet, ELLER poster-frame for en optaget video
+    // Galleri-billede → beskærings-trin: mindet SKAL være 1080x1080 (1:1) eller 1080x1350 (4:5)
+    @Published var cropSource: UIImage?      // det valgte billede i fuld preview-opløsning
+    @Published var croppedImage: UIImage?    // det godkendte udsnit (præcis 1080-format)
+    @Published var cropAspect: CGFloat = 4.0 / 5.0
+    @Published var fitLabel = ""
     @Published var capturedVideoURL: URL?    // en video optaget med det indbyggede kamera (≤6 s)
     @Published var caption = ""
     @Published var dest = "all"
@@ -90,6 +95,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
         }
         if let l = dict["labels"] as? [String: Any] {
             title = s(l, "title"); nextLabel = s(l, "next"); cancelLabel = s(l, "cancel"); shareLabel = s(l, "share")
+            fitLabel = s(l, "fit")
             captionPlaceholder = s(l, "captionPlaceholder"); destLabel = s(l, "destLabel"); allLabel = s(l, "allLabel")
             limitedNote = s(l, "limited"); manageLabel = s(l, "manage"); deniedNote = s(l, "denied"); settingsLabel = s(l, "settings")
             trimHint = s(l, "trimHint")
@@ -105,6 +111,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
         step = (forCompose && (dict["start"] as? String) == "gallery") ? .gallery : .camera
         videoAsset = nil; videoDuration = 0; trimStart = 0; trimDuration = VF_MAX_VID; showTrimStep = false; preparingTrim = false
         pendingData = nil; exportSession = nil; trimReqSeq += 1
+        cropSource = nil; croppedImage = nil; cropAspect = 4.0 / 5.0
         open = true
         requestAndLoad()
     }
@@ -171,7 +178,24 @@ final class PhotoLibModel: NSObject, ObservableObject {
     /// step; otherwise straight to caption (the whole short clip is used). For an IMAGE, go to caption.
     func prepareAndAdvance() {
         guard let asset = selected else { return }
-        if asset.mediaType != .video { showTrimStep = false; if forCompose { share() } else { step = .caption }; return }
+        if asset.mediaType != .video {
+            showTrimStep = false
+            if forCompose { share(); return }
+            // Minde: galleri-billeder SKAL beskæres til 1080x1080 eller 1080x1350 —
+            // hent fuld preview-opløsning og vis beskærings-trinnet
+            trimReqSeq += 1
+            let seqI = trimReqSeq
+            preparingTrim = true
+            previewImageFull(asset) { [weak self] img in
+                guard let self, seqI == self.trimReqSeq else { return }
+                self.preparingTrim = false
+                guard let img else { return }
+                self.cropSource = img
+                self.croppedImage = nil
+                self.step = .crop
+            }
+            return
+        }
         trimReqSeq += 1
         let seq = trimReqSeq   // the grid is frozen while preparingTrim, so `selected` == `asset` in the callback
         preparingTrim = true
@@ -211,6 +235,14 @@ final class PhotoLibModel: NSObject, ObservableObject {
             export45Video(vurl)
             return
         }
+        // Galleri-billede beskåret til 1080-formatet: upload det beskårne.
+        if let cimg = croppedImage {
+            sharing = true
+            guard let data = cimg.jpegData(compressionQuality: 0.88) else { sharing = false; return }
+            pendingData = data
+            send(isVideo: false, ext: "jpg", mime: "image/jpeg")
+            return
+        }
         // Foto taget med kameraet (allerede beskåret til 4:5): upload direkte.
         if let shot = capturedImage {
             sharing = true
@@ -235,11 +267,18 @@ final class PhotoLibModel: NSObject, ObservableObject {
         }
     }
 
+    /// Beskåret galleri-billede godkendt (allerede PRÆCIS 1080-format) → billedtekst
+    func useCropped(_ img: UIImage) {
+        croppedImage = img
+        step = .caption
+    }
+
     /// Et foto taget med kameraet → beskær til præcis 4:5 (1080x1350). Tanke: upload straks; minde: billedtekst.
     func useCaptured(_ image: UIImage) {
         capturedImage = cropTo45(image)
         capturedVideoURL = nil
         selected = nil; videoAsset = nil; showTrimStep = false
+        cropSource = nil; croppedImage = nil
         if forCompose { share() } else { step = .caption }
     }
 
@@ -434,6 +473,7 @@ struct MemoryGalleryScreen: View {
                     case .gallery: gallery
                     case .trim:
                         if let a = model.videoAsset { VideoTrimView(asset: a) } else { gallery }
+                    case .crop: cropStep
                     case .caption: caption
                     }
                 }
@@ -448,8 +488,10 @@ struct MemoryGalleryScreen: View {
                 case .camera: model.dismiss()
                 case .gallery: if model.forCompose { model.dismiss() } else { model.step = .camera }  // tanke: annuller lukker; minde: tilbage til kameraet
                 case .trim: model.step = .gallery
+                case .crop: model.step = .gallery
                 case .caption:
                     if model.capturedImage != nil { model.step = .camera }
+                    else if model.croppedImage != nil { model.step = .crop } // tilbage til beskæringen
                     else { model.step = model.showTrimStep ? .trim : .gallery }
                 }
             }
@@ -472,6 +514,8 @@ struct MemoryGalleryScreen: View {
             case .trim:
                 Button(model.nextLabel) { if model.forCompose { model.share() } else { model.step = .caption } }
                     .font(.system(size: 16, weight: .bold)).foregroundStyle(vfRed)
+            case .crop:
+                EmptyView()   // beskærings-trinnet har sine egne knapper
             case .caption:
                 Button { model.share() } label: {
                     if model.sharing { ProgressView() } else {
@@ -537,6 +581,52 @@ struct MemoryGalleryScreen: View {
     }
 
     // MARK: caption step
+    /// Beskærings-trinnet: mindet SKAL være 1080x1080 (1:1) eller 1080x1350 (4:5).
+    /// Træk/knib tilpasser udsnittet; format-pillerne skifter rammen.
+    private var cropStep: some View {
+        ZStack(alignment: .top) {
+            if let src = model.cropSource {
+                VFCropView(
+                    image: src,
+                    aspect: model.cropAspect,
+                    circular: false,
+                    targetSize: model.cropAspect == 1
+                        ? CGSize(width: 1080, height: 1080)
+                        : CGSize(width: 1080, height: 1350),
+                    title: "",
+                    cancelLabel: model.cancelLabel,
+                    useLabel: model.nextLabel,
+                    onCancel: { model.step = .gallery },
+                    onDone: { model.useCropped($0) }
+                )
+                .id(model.cropAspect)   // ny ramme (og frisk pan/zoom) når formatet skiftes
+            }
+            VStack(spacing: 7) {
+                if !model.fitLabel.isEmpty {
+                    Text(model.fitLabel)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.9))
+                }
+                HStack(spacing: 8) {
+                    aspectPill("1:1", value: 1)
+                    aspectPill("4:5", value: 4.0 / 5.0)
+                }
+            }
+            .padding(.top, 10)
+        }
+    }
+
+    private func aspectPill(_ label: String, value: CGFloat) -> some View {
+        Button { model.cropAspect = value } label: {
+            Text(label)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18).padding(.vertical, 8)
+                .background(Capsule().fill(abs(model.cropAspect - value) < 0.01 ? vfRed : Color.white.opacity(0.18)))
+        }
+        .buttonStyle(.plain)
+    }
+
     private var caption: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -548,6 +638,10 @@ struct MemoryGalleryScreen: View {
                         .padding(.bottom, 6)
                 } else if let shot = model.capturedImage {
                     Image(uiImage: shot).resizable().scaledToFit()   // hele 4:5, ikke beskåret
+                        .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.5)
+                        .padding(.bottom, 6)
+                } else if let ci = model.croppedImage {
+                    Image(uiImage: ci).resizable().scaledToFit()   // det godkendte 1080-udsnit
                         .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.5)
                         .padding(.bottom, 6)
                 } else if let sel = model.selected {

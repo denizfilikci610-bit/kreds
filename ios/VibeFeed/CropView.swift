@@ -10,6 +10,7 @@ struct VFCropView: View {
     let image: UIImage
     let aspect: CGFloat          // frame width / height (1 = avatar, 1280/432 = banner)
     let circular: Bool
+    let targetSize: CGSize       // output-pixelmål (1024² avatar, 1280x432 banner, 1080x… minde)
     let title: String
     let cancelLabel: String
     let useLabel: String
@@ -150,7 +151,7 @@ struct VFCropView: View {
         let cy = image.size.height / 2 - off.height / t
         let vx = cx - visW / 2
         let vy = cy - visH / 2
-        let target = circular ? CGSize(width: 1024, height: 1024) : CGSize(width: 1280, height: 432)
+        let target = targetSize
         let k = target.width / visW
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
