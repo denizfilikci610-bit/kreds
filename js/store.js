@@ -19,6 +19,7 @@ export const state = {
   wholePosts: [],         // alle opslag brugeren må se (venner + egne kredse — RLS afgør)
   feeds: [],              // { id, name, memberIds:[uuid], members:[handle] }
   currentFeed: "all",
+  savedPosts: [],         // mine gemte opslag (kun minder i UI'et; privat, saved_posts-tabellen)
   storyGroups: []         // [{ author:{id,handle,name,avatar_path}, items:[{id,url,isVideo,seen}], allSeen, isMe }]
 };
 

@@ -4,7 +4,7 @@ import { me, setMe, state, FRIEND_SINCE, pv, expandedCmts, clearComposers, setCf
 import { el, registerProfile, toast, getConsent, showConsentGate } from "./helpers.js";
 import { loadFriends, loadFeeds, loadPosts, feedById, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu, closeReportMenu, resetFeedbarSearch, resetTapState, resetBarHide, clearUnseenFeeds } from "./feed.js";
 import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPost, resetPoll } from "./compose.js";
-import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet, closeListSheet, closeNativeListPage, closeUnfriendMenu, closeBlockMenu } from "./profile.js";
+import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet, closeListSheet, closeNativeListPage, resetSaved, closeUnfriendMenu, closeBlockMenu } from "./profile.js";
 import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
 import { closeNativePostPage } from "./comments.js";
 import { closeLightbox } from "./lightbox.js";
@@ -180,6 +180,8 @@ export function resetApp(){
   state.blockReady = false;
   state.posts = [];
   state.wholePosts = [];
+  state.savedPosts = [];
+  resetSaved(); // Gemte-fanen henter friskt for næste konto
   state.feeds = [];
   state.currentFeed = "all";
   try{ sessionStorage.setItem("vf_cur_feed", "all"); }catch(_e){} // ryd valgt kreds ved logout

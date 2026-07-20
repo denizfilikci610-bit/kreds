@@ -2,7 +2,7 @@ import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab, expandedCmts } from "./store.js";
 import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConsent, setConsent, imgUrl, ini } from "./helpers.js";
 import { t, setLang, getLang, policyURL } from "./i18n.js";
-import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps, applyFeedSound, switchTab, setFeed, feedById } from "./feed.js";
+import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps, applyFeedSound, switchTab, setFeed, feedById, POST_SELECT } from "./feed.js";
 import { openNativePostPage, rerenderPostCmts } from "./comments.js";
 import { openCompose, openStoryCamera } from "./compose.js";
 import { openStoryViewer } from "./stories.js";
@@ -35,31 +35,53 @@ export function renderStories(){
 /* ================= Egen profil ================= */
 /* ---- Profil-tidslinje: toggle "Tanker" (kort, KUN tanker) / "Minder" (3-kolonne grid, KUN minder).
    Grid-tap på et minde → hele opslaget (likes/kommentarer) i samme container (genbruger timelineClick). ---- */
-let myTab = "list", pvTab = "list"; // 'list' (Tanker) | 'grid' (Minder)
+let myTab = "list", pvTab = "list"; // 'list' (Tanker) | 'grid' (Minder) | 'saved' (Gemte, kun egen)
 const P_GRID_ICON = '<svg viewBox="0 0 24 24" width="17" height="17"><g fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/></g></svg>';
 const P_LIST_ICON = '<svg viewBox="0 0 24 24" width="17" height="17"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></g></svg>';
 /* Et minde åbnes nu i en dedikeret fuldskærms-side (#memview), ikke inline i profilen. */
-function timelineHTML(posts, tab, emptyHTML){
+const P_SAVE_ICON = '<svg viewBox="0 0 24 24" width="17" height="17"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M7 3.8h10a1 1 0 0 1 1 1v15.4l-6-4.1-6 4.1V4.8a1 1 0 0 1 1-1Z"/></svg>';
+function gridHTML(posts, emptyText){
+  const mems = posts.filter(function(p){ return p.kind === "memory" && (p.img || p.video); });
+  return mems.length
+    ? '<div class="pgrid">'+mems.map(function(p){
+        const m = p.video
+          ? '<video src="'+esc(p.video.src)+'#t=0.1" muted playsinline preload="metadata"></video>'
+          : '<img src="'+esc(p.img.src)+'" alt="" loading="lazy" draggable="false">';
+        return '<button class="pgrid-item" data-mem="'+esc(p.id)+'">'+m+(p.video ? '<span class="pgrid-play"></span>' : '')+'</button>';
+      }).join("")+'</div>'
+    : '<div class="emptynote">'+emptyText+'</div>';
+}
+/* Instagram-agtig fane-række (ikoner m. streg under den aktive). Gemte-fanen er PRIVAT
+   og findes kun på egen profil (withSaved). */
+function timelineHTML(posts, tab, emptyHTML, withSaved){
   const bar = '<div class="profbar">'+
     '<button class="profbar-btn'+(tab === "grid" ? " on" : "")+'" data-ptab="grid" aria-label="'+esc(t("prof.grid"))+'">'+P_GRID_ICON+'</button>'+
     '<button class="profbar-btn'+(tab === "list" ? " on" : "")+'" data-ptab="list" aria-label="'+esc(t("prof.list"))+'">'+P_LIST_ICON+'</button>'+
+    (withSaved ? '<button class="profbar-btn'+(tab === "saved" ? " on" : "")+'" data-ptab="saved" aria-label="'+esc(t("prof.saved"))+'">'+P_SAVE_ICON+'</button>' : '')+
   '</div>';
   let body;
-  if(tab === "grid"){
-    const mems = posts.filter(function(p){ return p.kind === "memory" && (p.img || p.video); });
-    body = mems.length
-      ? '<div class="pgrid">'+mems.map(function(p){
-          const m = p.video
-            ? '<video src="'+esc(p.video.src)+'#t=0.1" muted playsinline preload="metadata"></video>'
-            : '<img src="'+esc(p.img.src)+'" alt="" loading="lazy" draggable="false">';
-          return '<button class="pgrid-item" data-mem="'+esc(p.id)+'">'+m+(p.video ? '<span class="pgrid-play"></span>' : '')+'</button>';
-        }).join("")+'</div>'
-      : '<div class="emptynote">'+t("memories.empty")+'</div>';
+  if(tab === "saved"){
+    body = gridHTML(posts, t(savedLoaded ? "save.empty" : "common.loading"));
+  } else if(tab === "grid"){
+    body = gridHTML(posts, t("memories.empty"));
   } else {
     const thoughts = posts.filter(function(p){ return p.kind !== "memory"; }); // Tanker: minder vises IKKE her
     body = thoughts.length ? thoughts.map(postHTML).join("") : emptyHTML;
   }
   return bar + body;
+}
+/* Mine gemte opslag: hentes første gang Gemte-fanen åbnes (derefter holder toggleSave
+   listen opdateret lokalt). RLS filtrerer gemte opslag jeg ikke længere må se. */
+let savedLoaded = false;
+export function resetSaved(){ savedLoaded = false; }
+async function loadSavedPosts(){
+  if(!me) return;
+  const { data, error } = await sb.from("saved_posts")
+    .select("created_at, post:posts(" + POST_SELECT + ")")
+    .order("created_at", { ascending: false });
+  if(error){ console.error(error); return; }
+  state.savedPosts = (data || []).map(function(r){ return r.post; }).filter(Boolean).map(mapPost);
+  savedLoaded = true;
 }
 
 /* Ét opslag i fuldskærms-siden #memview (glider ind fra højre). Genbruger den delte postHTML, så
@@ -110,8 +132,12 @@ export async function renderMyPosts(){
   el("stat-posts").textContent = mine.length;
   el("stat-friends").textContent = state.humanFriends.length;
   el("stat-kredse").textContent = state.feeds.length;
+  if(myTab === "saved" && !savedLoaded){
+    loadSavedPosts().then(function(){ if(me && myTab === "saved") renderMyPosts(); });
+  }
+  const list = myTab === "saved" ? state.savedPosts : mine;
   const vsnap = snapVideos(el("myposts"));
-  el("myposts").innerHTML = timelineHTML(mine, myTab, '<div class="emptynote">'+t("myposts.empty")+'</div>');
+  el("myposts").innerHTML = timelineHTML(list, myTab, '<div class="emptynote">'+t("myposts.empty")+'</div>', true);
   restoreVideos(el("myposts"), vsnap);
   applyFeedSound();
   clampMemCaps(el("myposts"));
@@ -838,8 +864,8 @@ export function initProfile(){
 function profTimelineClick(e, isPv){
   const tb = e.target.closest(".profbar-btn");
   if(tb){
-    const tab = tb.dataset.ptab === "grid" ? "grid" : "list";
-    if(isPv){ pvTab = tab; refreshPv(); }
+    const tab = tb.dataset.ptab; // grid | list | saved (saved renderes kun på egen profil)
+    if(isPv){ pvTab = tab === "grid" ? "grid" : "list"; refreshPv(); }
     else { myTab = tab; renderMyPosts(); }
     return;
   }
@@ -847,7 +873,9 @@ function profTimelineClick(e, isPv){
   if(gi){
     // Åbn mindet i den dedikerede fuldskærms-side (#memview)
     const id = gi.dataset.mem;
-    const list = isPv ? pv.posts : state.wholePosts.filter(function(p){ return p.u === me.handle && !p.feed; });
+    const list = isPv ? pv.posts
+      : (myTab === "saved" ? state.savedPosts
+         : state.wholePosts.filter(function(p){ return p.u === me.handle && !p.feed; }));
     const p = list.find(function(x){ return String(x.id) === String(id); });
     if(p) openMemView(p);
   }

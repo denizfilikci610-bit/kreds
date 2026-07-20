@@ -496,15 +496,20 @@
   .post.memory .cap-more:active{opacity:.5}
   /* Handlingsknapper samlet tæt til venstre (Instagram-stil), rækkefølge: hjerte, kommentar, del */
   .post.memory .pactions{justify-content:flex-start;gap:20px}
+  .post.memory .pactions .save-btn{order:4;margin-left:auto} /* sidst i order-rækken (1/2/3), yderst th. */
+  .save-btn.on{color:var(--ink)}
+  .save-btn.on svg path{fill:var(--ink);stroke:var(--ink)}
   .post.memory .like-btn{order:1}
   .post.memory .cmt-btn{order:2}
   .post.memory .share-btn{order:3}
   /* Minde-compose: ingen afstemning */
   .compose.memory #pollbtn{display:none}
   /* Profil: toggle (Alt/Minder) + 3-kolonne minde-grid */
-  .profbar{display:flex;justify-content:center;gap:8px;padding:8px 0 6px;border-top:1px solid var(--line)}
-  .profbar-btn{display:flex;align-items:center;justify-content:center;padding:7px 22px;border-radius:999px;color:var(--gray)}
-  .profbar-btn.on{color:var(--ink);background:var(--chip)}
+  /* Instagram-agtige profil-faner: ikoner i fuld bredde med streg under den aktive */
+  .profbar{display:flex;border-top:1px solid var(--line)}
+  .profbar-btn{flex:1;display:flex;align-items:center;justify-content:center;padding:12px 0 11px;color:var(--gray);position:relative}
+  .profbar-btn.on{color:var(--ink)}
+  .profbar-btn.on::after{content:"";position:absolute;left:26%;right:26%;bottom:-1px;height:2px;background:var(--ink)}
   .profbar-btn:active{opacity:.6}
   .pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px 0}
   .pgrid-item{position:relative;display:block;aspect-ratio:1;background:var(--chip);overflow:hidden}
@@ -838,7 +843,6 @@
     text-align:center;
   }
   .chipbtn:active{opacity:.7}
-  .ptl{font-size:14px;font-weight:700;padding:12px 16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--ink)}
 
   /* ================= Tabbar (flydende liquid glass) ================= */
   /* Svævende, matteret pille; indhold glider bag den. Krymper ved scroll ned (body.hidebar),

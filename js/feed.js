@@ -13,7 +13,7 @@ import { mapPoll, pollHTML, votePoll } from "./polls.js";
 import { openLightbox, lbSync, SOUND_ON_SVG, SOUND_OFF_SVG } from "./lightbox.js";
 import { AD_EVERY, adsEnabled, adSlotHTML, reportAdLayout, initAds } from "./ads.js";
 
-export const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id), poll_options(*, poll_votes(user_id)), membership_proposals(resolved)";
+export const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id), poll_options(*, poll_votes(user_id)), membership_proposals(resolved), saved_posts(user_id)";
 
 export function mapComment(c){
   if(c.author_profile) registerProfile(c.author_profile);
@@ -47,6 +47,7 @@ export function mapPost(row){
     video: row.video_path ? { src: imgUrl(row.video_path) } : undefined,
     liked: !!(me && likes.some(function(l){ return l.user_id === me.id; })),
     likeCount: likes.length,
+    saved: !!(me && (row.saved_posts || []).some(function(sp){ return sp.user_id === me.id; })),
     feed: row.feed_id || undefined,
     poll: mapPoll(row) || undefined,
     cmts: cmts
@@ -114,8 +115,54 @@ function actionsHTML(p){
       '<button class="share-btn" data-id="'+p.id+'" aria-label="'+t("aria.share")+'">'+
         '<svg viewBox="0 0 24 24"><path class="stroke" d="M21.5 2.5 10.8 13.2M21.5 2.5l-6.8 19-3.9-8.3-8.3-3.9Z"/></svg>'+
       '</button>'+
+      (p.kind === "memory"
+        ? '<button class="save-btn'+(p.saved ? " on" : "")+'" data-id="'+p.id+'" aria-pressed="'+(!!p.saved)+'" aria-label="'+t("aria.save")+'">'+SAVE_SVG+'</button>'
+        : '')+
     '</div>'
   );
+}
+/* Gem-ikonet (bogmærke) — kun på minder; Instagram-agtigt yderst til højre */
+const SAVE_SVG = '<svg viewBox="0 0 24 24"><path class="stroke" d="M7 3.8h10a1 1 0 0 1 1 1v15.4l-6-4.1-6 4.1V4.8a1 1 0 0 1 1-1Z"/></svg>';
+function applySaveUI(id, on){
+  document.querySelectorAll('.post[data-id="'+id+'"] .save-btn').forEach(function(b){
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", on);
+  });
+}
+/* Gem/fjern et minde (privat — ingen tællere eller notifikationer). Holder også
+   profilens Gemte-liste (state.savedPosts) opdateret lokalt. */
+export async function toggleSave(id){
+  if(!me) return;
+  const objs = findPostAll(id);
+  if(!objs.length) return;
+  const on = !objs[0].saved;
+  objs.forEach(function(p){ p.saved = on; });
+  applySaveUI(id, on);
+  if(on){
+    if(!state.savedPosts.some(function(x){ return Number(x.id) === Number(id); })) state.savedPosts.unshift(objs[0]);
+  } else {
+    state.savedPosts = state.savedPosts.filter(function(x){ return Number(x.id) !== Number(id); });
+  }
+  if(el("view-profil").classList.contains("active")) renderMyPosts();
+  let error = null;
+  if(on){
+    const r = await sb.from("saved_posts").insert({ post_id: Number(id), user_id: me.id });
+    error = (r.error && r.error.code !== "23505") ? r.error : null;
+  } else {
+    const r = await sb.from("saved_posts").delete().eq("post_id", Number(id)).eq("user_id", me.id);
+    error = r.error;
+  }
+  if(error){
+    console.error(error);
+    objs.forEach(function(p){ p.saved = !on; });
+    applySaveUI(id, !on);
+    if(!on) state.savedPosts.unshift(objs[0]);
+    else state.savedPosts = state.savedPosts.filter(function(x){ return Number(x.id) !== Number(id); });
+    if(el("view-profil").classList.contains("active")) renderMyPosts();
+    toast(t("err.generic"));
+    return;
+  }
+  toast(t(on ? "save.saved" : "save.removed"));
 }
 const DOTS_SVG = '<svg viewBox="0 0 24 24"><g class="fillic"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></g></svg>';
 /* Kreds-mærke på opslag i "Hele kredsen": lille pille med kreds-ikon + kredsens navn.
@@ -372,7 +419,7 @@ function advancePostSeen(){
 let lastFeedSig = "";
 function feedSig(){
   const posts = state.posts.map(function(p){
-    return [p.id, p.created, p.text || "", p.likeCount, p.liked ? 1 : 0, p.isNew ? 1 : 0,
+    return [p.id, p.created, p.text || "", p.likeCount, p.liked ? 1 : 0, p.isNew ? 1 : 0, p.saved ? 1 : 0,
             (p.img && p.img.src) || "", (p.video && p.video.src) || "",
             p.poll ? JSON.stringify(p.poll) : 0,
             p.cmts.map(function(c){ return [c.id, c.text || "", c.likeCount, c.liked ? 1 : 0, c.img || ""]; })];
@@ -815,7 +862,7 @@ function moveTabIndicator(name, tries){
 window.addEventListener("resize", function(){ moveTabIndicator(tabIndName); });
 
 /* ================= Likes ================= */
-export function allPostArrays(){ return [state.posts, state.wholePosts, pv.posts]; }
+export function allPostArrays(){ return [state.posts, state.wholePosts, pv.posts, state.savedPosts]; }
 export function findPost(id){
   id = Number(id);
   const arrs = allPostArrays();
@@ -1178,6 +1225,8 @@ function timelineClick(e){
   if(vs){ toggleFeedSound(vs.dataset.id); return; }
   const like = e.target.closest(".like-btn");
   if(like){ setLike(like.dataset.id); return; }
+  const svb = e.target.closest(".save-btn");
+  if(svb){ toggleSave(svb.dataset.id); return; }
   const vt = e.target.closest("[data-vote]");
   if(vt){ votePoll(vt.dataset.pid, vt.dataset.vote); return; }
   const lk = e.target.closest(".likec");
