@@ -38,6 +38,7 @@ final class EsheetModel: ObservableObject {
     @Published var policyLabel = ""
     var policyUrl = "" // sat af apply(); ikke UI-bundet
     @Published var saveLabel = ""
+    @Published var useLabel = ""       // "Brug"-knappen i beskærings-fladen
     @Published var deleteOpenLabel = ""
     @Published var delSure = ""
     @Published var delText = ""
@@ -94,6 +95,7 @@ final class EsheetModel: ObservableObject {
         adsLimitedLabel = str(dict, "adsLimitedLabel"); policyLabel = str(dict, "policyLabel")
         policyUrl = str(dict, "policyUrl") // absolut URL fra web (sprogafhængig); tom på ældre web → fallback
         saveLabel = str(dict, "saveLabel"); deleteOpenLabel = str(dict, "deleteOpenLabel")
+        useLabel = str(dict, "useLabel").isEmpty ? "OK" : str(dict, "useLabel") // ældre web → fallback
         delSure = str(dict, "delSure"); delText = str(dict, "delText"); delBtn = str(dict, "delBtn"); cancelLabel = str(dict, "cancelLabel")
         nameMaxLength = (dict["nameMaxLength"] as? Int) ?? 40
         bioMaxLength = (dict["bioMaxLength"] as? Int) ?? 160
@@ -150,6 +152,19 @@ final class EsheetModel: ObservableObject {
     }
 }
 
+/// Downscale a picked image so the crop view and renderer work on a manageable size.
+func vfDownscaled(_ image: UIImage, maxEdge: CGFloat) -> UIImage {
+    let w = image.size.width, h = image.size.height
+    guard w > 0, h > 0, max(w, h) > maxEdge else { return image }
+    let scale = maxEdge / max(w, h)
+    let size = CGSize(width: w * scale, height: h * scale)
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    return UIGraphicsImageRenderer(size: size, format: format).image { _ in
+        image.draw(in: CGRect(origin: .zero, size: size))
+    }
+}
+
 /// Scale a picked image to a data URL small enough to cross the JS bridge (the web re-crops to 512²).
 func vfImageDataURL(_ image: UIImage, maxEdge: CGFloat = 1024, quality: CGFloat = 0.82) -> String? {
     let w = image.size.width, h = image.size.height
@@ -165,6 +180,8 @@ struct EditProfilePage: View {
     @ObservedObject private var model = EsheetModel.shared
     @State private var pickerItem: PhotosPickerItem?
     @State private var bannerItem: PhotosPickerItem?
+    @State private var cropImage: UIImage? = nil   // valgt billede der afventer beskæring
+    @State private var cropIsBanner = false
     @State private var slet = ""
     @FocusState private var nameFocused: Bool
     @State private var dragX: CGFloat = 0
@@ -182,17 +199,44 @@ struct EditProfilePage: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            if model.deleteStep { deleteConfirm } else { form }
+        ZStack {
+            VStack(spacing: 0) {
+                header
+                if model.deleteStep { deleteConfirm } else { form }
+            }
+            // Beskærings-trin: vælg selv hvilket udsnit af billedet der bruges
+            if let ci = cropImage {
+                VFCropView(
+                    image: ci,
+                    aspect: cropIsBanner ? 1280.0 / 432.0 : 1,
+                    circular: !cropIsBanner,
+                    title: cropIsBanner ? model.bannerLabel : model.picLabel,
+                    cancelLabel: model.cancelLabel,
+                    useLabel: model.useLabel,
+                    onCancel: { cropImage = nil; pickerItem = nil; bannerItem = nil },
+                    onDone: { cropped in
+                        if cropIsBanner {
+                            if let dataURL = vfImageDataURL(cropped, maxEdge: 1600) {
+                                model.stagePickedBanner(cropped, dataURL: dataURL)
+                            }
+                        } else if let dataURL = vfImageDataURL(cropped) {
+                            model.stagePickedImage(cropped, dataURL: dataURL)
+                        }
+                        cropImage = nil; pickerItem = nil; bannerItem = nil
+                    }
+                )
+                .transition(.opacity)
+            }
         }
         .background(Color(uiColor: .systemBackground))
         .ignoresSafeArea(.container) // kun skærm-kanterne — tastaturet skubber stadig felterne op
         .offset(x: max(0, dragX))
-        // Swipe mod højre hvor som helst → tilbage (samme gestus som opslags-siden)
+        // Swipe mod højre hvor som helst → tilbage (samme gestus som opslags-siden).
+        // Deaktiveret mens beskærings-trinnet er åbent — dér panorerer trækket billedet.
         .simultaneousGesture(
             DragGesture(minimumDistance: 18)
                 .onChanged { v in
+                    guard cropImage == nil else { return }
                     let w = v.translation.width, h = v.translation.height
                     if dragging || (w > 0 && abs(w) > abs(h) * 1.4) {
                         dragging = true
@@ -200,6 +244,7 @@ struct EditProfilePage: View {
                     }
                 }
                 .onEnded { v in
+                    guard cropImage == nil else { dragging = false; return }
                     let flick = v.predictedEndTranslation.width > 240
                     if dragging && (dragX > 90 || flick) {
                         withAnimation(.easeOut(duration: 0.2)) { dragX = UIScreen.main.bounds.width }
@@ -210,7 +255,7 @@ struct EditProfilePage: View {
                     dragging = false
                 }
         )
-        .onAppear { dragX = 0; dragging = false }
+        .onAppear { dragX = 0; dragging = false; cropImage = nil }
         .onChange(of: pickerItem) { _, item in loadPicked(item) }
         .onChange(of: bannerItem) { _, item in loadPickedBanner(item) }
     }
@@ -452,12 +497,14 @@ struct EditProfilePage: View {
         }.padding(.horizontal, 16)
     }
 
+    /// Valgt foto → beskærings-trinnet (nedskaleret til håndterbar størrelse først).
+    /// Selve stagingen sker i onDone med det FÆRDIGT beskårne billede.
     private func loadPicked(_ item: PhotosPickerItem?) {
         guard let item else { return }
         Task {
-            if let data = try? await item.loadTransferable(type: Data.self), let img = UIImage(data: data),
-               let dataURL = vfImageDataURL(img) {
-                await MainActor.run { model.stagePickedImage(img, dataURL: dataURL) }
+            if let data = try? await item.loadTransferable(type: Data.self), let img = UIImage(data: data) {
+                let small = vfDownscaled(img, maxEdge: 2400)
+                await MainActor.run { cropIsBanner = false; cropImage = small }
             }
         }
     }
@@ -465,9 +512,9 @@ struct EditProfilePage: View {
     private func loadPickedBanner(_ item: PhotosPickerItem?) {
         guard let item else { return }
         Task {
-            if let data = try? await item.loadTransferable(type: Data.self), let img = UIImage(data: data),
-               let dataURL = vfImageDataURL(img, maxEdge: 1600) {
-                await MainActor.run { model.stagePickedBanner(img, dataURL: dataURL) }
+            if let data = try? await item.loadTransferable(type: Data.self), let img = UIImage(data: data) {
+                let small = vfDownscaled(img, maxEdge: 2400)
+                await MainActor.run { cropIsBanner = true; cropImage = small }
             }
         }
     }
