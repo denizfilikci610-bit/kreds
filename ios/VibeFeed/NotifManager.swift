@@ -85,6 +85,10 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
             // The native Instagram-style comment bottom sheet for memory posts — real Liquid Glass,
             // web-driven. Native renders the thread + emoji bar + input; the web runs all the logic.
             Task { @MainActor in CommentsModel.shared.apply(dict) }
+        case "postpage":
+            // The native full-screen post detail page for thought posts (post on top, thread
+            // below, swipe-back) — web-driven like the comment sheet.
+            Task { @MainActor in PostPageModel.shared.apply(dict) }
         case "logout":
             UserDefaults.standard.removeObject(forKey: secretKey)
             UserDefaults.standard.removeObject(forKey: lastCheckKey)
