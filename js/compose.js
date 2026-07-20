@@ -82,10 +82,11 @@ export function resetPoll(){
 }
 /* To opslagstyper: 'thought' (tanke, tekst i fokus) og 'memory' (minde, medie i fokus). */
 let composeKind = "thought";
+let destOverride = null; // sat af openMemoryFor: minde-flow åbnet FRA en kreds-tråd
 export function getComposeKind(){ return composeKind; }
 function openComposeWith(kind){
   composeKind = (kind === "memory") ? "memory" : "thought";
-  composeDest = state.currentFeed;
+  composeDest = destOverride || state.currentFeed;
   clearPendingImg();          // frisk medie hver gang (vælgeren sidder nu FØR compose)
   ta.value = ""; updateRing();
   el("compose").classList.toggle("memory", composeKind === "memory");
@@ -122,6 +123,13 @@ export function openMemory(){
   if(window.__vfPhotoLib){ postMemoryGallery(); return; } // native Instagram-galleri
   openComposeWith("memory");                               // web-fallback (nægtet/ingen bro)
 }
+/* Minde-flow åbnet fra en KREDS-TRÅDS plus-knap: destinationen er forudindstillet til
+   kredsen, så mindet lander i kredsen og dermed (via delings-triggeren) i tråden. */
+export function openMemoryFor(feedId){
+  destOverride = feedId;
+  openMemory();
+  destOverride = null; // flowet er åbnet synkront; dest er allerede afleveret
+}
 
 /* ---- Native kamera/galleri (app'en) ---- */
 function vfmh(){ return window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed; }
@@ -134,7 +142,8 @@ function openPhotoLib(purpose, start){
   const mentionables = { all: mentionCards("all") };
   state.feeds.forEach(function(f){ mentionables[f.id] = mentionCards(f.id); });
   mh.postMessage({
-    type: "photolib", open: true, purpose: purpose, start: start || "camera", dest: state.currentFeed || "all",
+    type: "photolib", open: true, purpose: purpose, start: start || "camera",
+    dest: destOverride || state.currentFeed || "all",
     feeds: state.feeds.map(function(f){ return { id: f.id, name: f.name }; }),
     mentionables: mentionables,
     labels: {

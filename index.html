@@ -285,15 +285,12 @@
     <div class="pv-body" id="cv-body"></div>
     <!-- "X skriver ..." (realtime broadcast, ingen database) -->
     <div class="cv-typing" id="cv-typing" hidden></div>
-    <!-- Valgt billede klar til afsendelse -->
-    <div class="cv-imgprev" id="cv-imgprev" hidden></div>
     <!-- Svar-kontekst: minde/citat/redigering (fyldes af JS) -->
     <div class="cv-ctx" id="cv-ctx" hidden></div>
     <div class="cv-composer">
-      <button id="cv-photo" aria-label="Vedhæft billede" data-i18n-aria="chat.attach">
-        <svg viewBox="0 0 24 24"><g class="stroke"><rect x="3.5" y="5.5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10.3" r="1.6"/><path d="M4.5 17.5 9.8 12.6l3.1 2.9 3.4-3.3 3.2 3.1"/></g></svg>
+      <button id="cv-plus" aria-label="Del et minde" data-i18n-aria="chat.plus">
+        <svg viewBox="0 0 24 24"><g class="stroke"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></g></svg>
       </button>
-      <input type="file" id="cv-file" accept="image/*" hidden>
       <input id="cv-input" placeholder="Skriv en besked ..." data-i18n-ph="chat.ph" maxlength="500" autocomplete="off">
       <button id="cv-send" aria-label="Send" data-i18n-aria="chat.send">
         <svg viewBox="0 0 24 24"><path class="stroke" d="M21.5 2.5 10.8 13.2M21.5 2.5l-6.8 19-3.9-8.3-8.3-3.9Z"/></svg>

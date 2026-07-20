@@ -1272,6 +1272,9 @@
   .chat-search{padding:0 16px 8px}
   /* Tråd-siden: under minde-siden (z-90), så et delt minde kan åbnes ovenpå */
   .chatview{z-index:85}
+  /* En åben tråd er sin EGEN side: alt bagved skjules helt, så hverken feedet eller
+     besked-listen skinner igennem mens tastaturet åbner/lukker */
+  body.chat-open .app{visibility:hidden}
   .chatview .pv-body{padding:12px 12px 6px;display:flex;flex-direction:column}
   .cv-msg{display:flex;gap:8px;align-items:flex-end;max-width:86%;margin-top:2px}
   .cv-msg.first{margin-top:12px}
@@ -1320,11 +1323,39 @@
   /* Beskedens eget billede/video: uden boble-baggrund når det står alene */
   .cv-mimg{max-width:210px;max-height:280px;border-radius:14px;display:block}
   .cv-bubble.cv-bare{background:none;padding:0}
-  /* Besked-menuen: emoji-rækken (reaktioner) øverst */
-  .cm-emojis{display:flex;justify-content:space-around;padding:6px 8px}
-  .cm-emoji{font-size:24px;padding:8px 6px;border-radius:12px;line-height:1}
+  /* ---- Besked-menuen (iMessage-anatomi): forankret ved boblen ---- */
+  #cmenu.anchor{padding:0}
+  #cmenu.anchor.on{display:block}
+  #cmenu.anchor .modal-card{
+    max-width:none;width:100%;height:100%;
+    position:relative;display:block;gap:0;
+  }
+  .cmenu-pos{position:absolute;display:flex;flex-direction:column;gap:10px;max-width:280px}
+  .cmenu-pos.mine{align-items:flex-end}
+  /* Emoji-pillen (reaktioner) lige over boblen */
+  .cm-emojis{
+    display:flex;gap:2px;width:max-content;
+    background:var(--bg);border-radius:999px;padding:6px 9px;
+    box-shadow:0 10px 32px rgba(0,0,0,.18);
+  }
+  .cm-emoji{font-size:23px;padding:5px 6px;border-radius:50%;line-height:1}
   .cm-emoji.on{background:var(--tab-hi)}
-  .cm-emoji:active{transform:scale(1.25)}
+  .cm-emoji:active{transform:scale(1.3)}
+  /* Det hvide handlings-kort med ikon-rækker */
+  .cm-card{
+    background:var(--bg);border-radius:16px;overflow:hidden;
+    min-width:225px;
+    box-shadow:0 14px 44px rgba(0,0,0,.22);
+  }
+  .cm-row{
+    display:flex;align-items:center;gap:13px;width:100%;
+    padding:12.5px 16px;font-size:15.5px;color:var(--ink);text-align:left;
+    border-top:1px solid var(--line);
+  }
+  .cm-row:first-child{border-top:none}
+  .cm-row svg{width:19px;height:19px;flex:0 0 auto}
+  .cm-row.danger{color:var(--red)}
+  .cm-row:active{background:var(--chip)}
   /* Set-kvitteringer: små avatarer under den sidste besked hvert medlem har læst */
   .cv-reads{display:flex;justify-content:flex-end;gap:3px;padding:3px 2px 0}
   .cv-read{display:flex}
@@ -1370,14 +1401,12 @@
   /* "X skriver ..." over composeren */
   .cv-typing{flex:0 0 auto;padding:2px 16px 5px;font-size:12px;color:var(--gray)}
   .cv-typing[hidden]{display:none}
-  /* Valgt billede klar til afsendelse */
-  .cv-imgprev{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--chip)}
-  .cv-imgprev[hidden]{display:none}
-  .cv-imgprev img{width:56px;height:56px;object-fit:cover;border-radius:10px}
-  /* Foto-knappen i composeren */
-  #cv-photo{flex:0 0 auto;color:var(--red);padding:8px 2px;display:flex}
-  #cv-photo svg{width:23px;height:23px}
-  #cv-photo:active{opacity:.6}
+  /* Plus-knappen: åbner minde-flowet i en kreds-tråd; dæmpet i en privat tråd
+     (medier deles kun gennem en kreds) */
+  #cv-plus{flex:0 0 auto;color:var(--red);padding:8px 2px;display:flex}
+  #cv-plus svg{width:24px;height:24px}
+  #cv-plus:active{opacity:.6}
+  .chatview.dm #cv-plus{opacity:.3}
   .cv-composer input{
     flex:1;min-width:0;
     background:var(--chip);color:var(--ink);

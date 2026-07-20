@@ -1,10 +1,11 @@
 import { sb } from "./config.js";
 import { me, state, ID2H } from "./store.js";
-import { el, esc, avaHTML, user, toast, fmtTime, imgUrl, registerProfile, uuid } from "./helpers.js";
+import { el, esc, avaHTML, user, toast, fmtTime, imgUrl, registerProfile } from "./helpers.js";
 import { t } from "./i18n.js";
 import { feedById, findPost, postQuery, mapPost, switchTab, loadFeeds } from "./feed.js";
 import { openPostView, openProfile, closeProfile, doBlockUser } from "./profile.js";
 import { openMemberSheet } from "./kredse.js";
+import { openMemoryFor } from "./compose.js";
 
 /* ================= Kreds-chat (Messenger-agtig: hver kreds er en gruppetråd) =================
    Beskeder-fanen (#view-chat) viser en tråd pr. kreds med seneste besked som preview.
@@ -30,7 +31,6 @@ let myReadsOk = false; // om myReads er hentet — ellers vises ingen ulæst-pri
 let pendingShare = null; // { feed, post }: minde der sendes med som kontekst på næste besked
 let pendingReply = null; // { id, u, text, media }: besked der citeres i næste besked
 let editingMsg = null;   // besked-id under redigering (composeren sender da en UPDATE)
-let cvImg = null;        // { blob, url }: valgt billede klar til afsendelse
 let prefs = {};          // feed_id -> { pinned, muted, markedUnread, clearedAt } (kun MINE)
 let searchQ = "";        // aktiv søgning i Beskeder-listen
 let searchTimer = 0;
@@ -54,7 +54,8 @@ function mapMsg(r){
     edited: !!r.edited_at,
     replyTo: rp ? {
       id: rp.id,
-      u: rp.author_profile ? rp.author_profile.handle : (ID2H[rp.author] || "?"),
+      author: rp.author,
+      u: rp.author_profile ? rp.author_profile.handle : (ID2H[rp.author] || null),
       text: rp.text || "",
       media: !!(rp.post_id || rp.image_path || rp.video_path)
     } : null,
@@ -204,7 +205,13 @@ export async function openKredsChat(feedId){
   renderCtxBar();
   joinTyping(feedId);
   el("cv-body").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
+  // Plus-knappen: i en kreds åbner den minde-flowet; i en privat tråd er den dæmpet
+  // (medier deles gennem en kreds — det er hele modellen)
+  el("chatview").classList.toggle("dm", !!f.isDm);
   el("chatview").classList.add("on");
+  // Tråden er sin egen side: alt bagved (feedet/besked-listen) skjules helt, så intet
+  // skinner igennem, heller ikke mens tastaturet åbner/lukker
+  document.body.classList.add("chat-open");
   const seq = ++chatSeq;
   // Beskeder + set-kvitteringer hentes parallelt. Kvitteringerne er fail-soft: findes
   // tabellen ikke endnu (migrationen kreds_chat_reads), vises tråden bare uden dem.
@@ -291,22 +298,6 @@ function clearCtx(){
   pendingReply = null; pendingShare = null; editingMsg = null;
   renderCtxBar();
 }
-/* Valgt billede (komprimeret til 1080px JPEG som kommentarer) klar over composeren */
-function renderImgPrev(){
-  const box = el("cv-imgprev");
-  if(!cvImg){ box.hidden = true; box.innerHTML = ""; return; }
-  box.innerHTML = '<img src="'+esc(cvImg.url)+'" alt="">'+
-    '<button class="cv-ctxx" aria-label="'+t("chat.ctx_close")+'">'+
-      '<svg viewBox="0 0 24 24"><path class="stroke" d="M6 6l12 12M18 6 6 18"/></svg>'+
-    '</button>';
-  box.hidden = false;
-}
-function clearImg(){
-  if(cvImg && cvImg.url) URL.revokeObjectURL(cvImg.url);
-  cvImg = null;
-  renderImgPrev();
-}
-
 /* ---- "X skriver ..." via realtime broadcast (flygtigt, ingen database) ---- */
 let typingCh = null, typingHideTimer = 0, typingSentAt = 0;
 function joinTyping(feedId){
@@ -387,11 +378,11 @@ export function closeKredsChat(){
   chatFeed = null;
   pendingShare = null; pendingReply = null; editingMsg = null;
   renderCtxBar();
-  clearImg();
   leaveTyping();
   el("cv-input").blur();
   unpinChat();
   el("chatview").classList.remove("on");
+  document.body.classList.remove("chat-open");
   el("cv-body").innerHTML = "";
 }
 
@@ -439,7 +430,6 @@ export function resetChat(){
   reads = {}; readsOk = false; unreadAtId = null; myReadSent = 0;
   myReads = {}; myReadsOk = false; pendingShare = null; pendingReply = null; editingMsg = null;
   prefs = {}; searchQ = "";
-  clearImg();
   el("chat-list").innerHTML = "";
   el("cv-input").value = "";
   el("cv-search").value = "";
@@ -509,10 +499,19 @@ function readsHTML(handles){
 
 /* ---- Besked-menuen (long-press/højreklik på en boble): reager, svar, kopiér,
    rediger (egen, < 15 min), fjern (egen), anmeld/blokér (andres — Apple 1.2) ---- */
-const EMOJIS = ["❤️", "😂", "👍", "😮", "😢", "🙏"];
+const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 let menuMsg = null;   // beskeden menuen er åben for
 let confirmDo = null; // handlingen bag bekræftelses-trinnet
-function openMsgMenu(mid){
+/* iMessage-anatomi: emoji-pille øverst + hvidt kort m. ikon-rækker, forankret ved boblen */
+const CM_IC = {
+  reply: '<svg viewBox="0 0 24 24"><path class="stroke" d="M9.5 7 4.5 12l5 5M4.5 12H14a5.5 5.5 0 0 1 5.5 5.5v1"/></svg>',
+  copy: '<svg viewBox="0 0 24 24"><g class="stroke"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 5.5v-.5a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 5v8A1.5 1.5 0 0 0 6 14.5h.5"/></g></svg>',
+  edit: '<svg viewBox="0 0 24 24"><path class="stroke" d="M4.5 19.5h4L20 8a2.1 2.1 0 0 0-3-3L5.5 16.5Zm9.5-12 3 3"/></svg>',
+  trash: '<svg viewBox="0 0 24 24"><g class="stroke"><path d="M4.5 6.5h15M9.5 6V4.5h5V6M6.5 6.5l1 13h9l1-13M10 10.5v6M14 10.5v6"/></g></svg>',
+  flag: '<svg viewBox="0 0 24 24"><path class="stroke" d="M6 21V4.5M6 5h11.5l-2.5 3.5 2.5 3.5H6"/></svg>',
+  block: '<svg viewBox="0 0 24 24"><g class="stroke"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></g></svg>'
+};
+function openMsgMenu(mid, anchorEl){
   const m = msgs.find(function(x){ return x.id === mid; });
   if(!m || !me) return;
   menuMsg = mid;
@@ -520,25 +519,53 @@ function openMsgMenu(mid){
   const myReact = (m.reacts || []).find(function(r){ return r.user_id === me.id; });
   const canEdit = mine && m.text && !m.postId &&
     Date.now() - new Date(m.created).getTime() < 15 * 60 * 1000;
-  el("cmenu-card").innerHTML = '<div class="mstep">'+
-    '<div class="mgroup cm-emojis">'+EMOJIS.map(function(e2){
+  const rows =
+    '<button class="cm-row" data-act="reply">'+CM_IC.reply+'<span>'+t("chat.menu_reply")+'</span></button>'+
+    (m.text ? '<button class="cm-row" data-act="copy">'+CM_IC.copy+'<span>'+t("chat.copy")+'</span></button>' : '')+
+    (canEdit ? '<button class="cm-row" data-act="edit">'+CM_IC.edit+'<span>'+t("chat.edit")+'</span></button>' : '')+
+    (mine ? '<button class="cm-row danger" data-act="remove">'+CM_IC.trash+'<span>'+t("chat.remove")+'</span></button>' : '')+
+    (!mine ? '<button class="cm-row danger" data-act="report">'+CM_IC.flag+'<span>'+t("chat.report")+'</span></button>' : '')+
+    (!mine ? '<button class="cm-row danger" data-act="block">'+CM_IC.block+'<span>'+t("rm.block")+'</span></button>' : '');
+  el("cmenu-card").innerHTML = '<div class="cmenu-pos'+(mine ? " mine" : "")+'" id="cmenu-pos">'+
+    '<div class="cm-emojis">'+EMOJIS.map(function(e2){
       return '<button class="cm-emoji'+(myReact && myReact.emoji === e2 ? " on" : "")+'" data-e="'+esc(e2)+'">'+e2+'</button>';
     }).join("")+'</div>'+
-    '<div class="mgroup">'+
-      '<button class="mrow" data-act="reply">'+t("chat.menu_reply")+'</button>'+
-      (m.text ? '<button class="mrow" data-act="copy">'+t("chat.copy")+'</button>' : '')+
-      (canEdit ? '<button class="mrow" data-act="edit">'+t("chat.edit")+'</button>' : '')+
-      (mine ? '<button class="mrow danger" data-act="remove">'+t("chat.remove")+'</button>' : '')+
-      (!mine ? '<button class="mrow danger" data-act="report">'+t("chat.report")+'</button>' : '')+
-      (!mine ? '<button class="mrow danger" data-act="block">'+t("rm.block")+'</button>' : '')+
-    '</div>'+
-    '<button class="mrow mcancel" data-act="cancel">'+t("common.cancel")+'</button>'+
+    '<div class="cm-card">'+rows+'</div>'+
   '</div>';
+  el("cmenu").classList.add("anchor");
   el("cmenu").classList.add("on");
+  placeMsgMenu(anchorEl, mine);
 }
-function closeMsgMenu(){ el("cmenu").classList.remove("on"); menuMsg = null; confirmDo = null; }
+/* Placér menuen ved den holdte boble (emoji-rækken lige over), klemt inden for skærmen */
+function placeMsgMenu(anchorEl, mine){
+  const pos = el("cmenu-pos");
+  const phoneEl = document.querySelector(".phone");
+  if(!pos || !phoneEl) return;
+  const phone = phoneEl.getBoundingClientRect();
+  let top = 110;
+  let side = 12;
+  if(anchorEl){
+    const b = anchorEl.querySelector(".cv-bubble") || anchorEl;
+    const r = b.getBoundingClientRect();
+    top = r.top - phone.top - 62; // emoji-pillen lige over boblen
+    side = mine ? Math.max(10, phone.right - r.right) : Math.max(10, r.left - phone.left);
+  }
+  const card = pos.querySelector(".cm-card");
+  const total = 54 + 10 + (card ? card.childElementCount * 47 : 200) + 8;
+  top = Math.max(64, Math.min(top, phone.height - total - 14));
+  pos.style.top = top + "px";
+  if(mine){ pos.style.right = side + "px"; pos.style.left = "auto"; }
+  else { pos.style.left = side + "px"; pos.style.right = "auto"; }
+}
+function closeMsgMenu(){
+  el("cmenu").classList.remove("on");
+  el("cmenu").classList.remove("anchor");
+  menuMsg = null; confirmDo = null;
+}
+/* Bekræftelses-trin (Fjern/Anmeld/Blokér/Ryd): klassisk centreret glas-kort */
 function confirmStep(title, note, btnLabel, onDo){
   confirmDo = onDo;
+  el("cmenu").classList.remove("anchor");
   el("cmenu-card").innerHTML = '<div class="mstep">'+
     '<div class="mgroup"><div class="mtitle">'+title+'</div>'+
     (note ? '<p class="mtext">'+note+'</p>' : '')+
@@ -650,8 +677,17 @@ function refreshLastFromThread(){
   else delete lastByFeed[chatFeed];
   if(el("view-chat").classList.contains("active")) renderChatList(false);
 }
+/* En slettet besked må ikke efterlade citat-spøgelser: svar der pegede på den mister
+   citatet (matcher databasens reply_to ON DELETE SET NULL) */
+function stripReplyRefs(deletedId){
+  msgs = msgs.map(function(x){
+    return x.replyTo && x.replyTo.id === deletedId
+      ? Object.assign({}, x, { replyTo: null }) : x;
+  });
+}
 async function doDeleteMsg(m){
   msgs = msgs.filter(function(x){ return x.id !== m.id; });
+  stripReplyRefs(m.id);
   renderThread(false);
   refreshLastFromThread();
   const { error } = await sb.from("kreds_messages").delete().eq("id", Number(m.id));
@@ -684,13 +720,20 @@ function msgHTML(m, first, last){
     ? '<video class="cv-mimg" src="'+esc(m.mvideo)+'" controls playsinline preload="metadata"></video>'
     : '';
   const bare = media && !m.text && !share;
-  // Citat-svar: den citerede besked som lille blok bag/over boblen — tap hopper derop
-  const quote = m.replyTo
-    ? '<button class="cv-quote" data-q="'+esc(m.replyTo.id)+'">'+
-        '<b>'+esc((user(m.replyTo.u).name || m.replyTo.u).split(/\s+/)[0])+'</b> '+
-        esc(snip(m.replyTo.text, 64) || (m.replyTo.media ? t("chat.q_media") : ""))+
-      '</button>'
-    : '';
+  // Citat-svar: den citerede besked som lille blok over boblen — tap hopper derop.
+  // Robust: uden kendt afsender vises kun indholdet, og et helt tomt citat (fx efter
+  // en slettet besked) vises slet ikke — aldrig et "?".
+  let quote = "";
+  if(m.replyTo){
+    const rh = m.replyTo.u || ID2H[m.replyTo.author] || null;
+    const rname = rh ? esc((user(rh).name || rh).split(/\s+/)[0]) : "";
+    const rtxt = esc(snip(m.replyTo.text, 64) || (m.replyTo.media ? t("chat.q_media") : ""));
+    if(rname || rtxt){
+      quote = '<button class="cv-quote" data-q="'+esc(m.replyTo.id)+'">'+
+        (rname ? '<b>'+rname+'</b> ' : '')+rtxt+
+      '</button>';
+    }
+  }
   // Reaktioner: grupperet pille under boblens hjørne
   const counts = {};
   (m.reacts || []).forEach(function(r){ counts[r.emoji] = (counts[r.emoji] || 0) + 1; });
@@ -742,57 +785,38 @@ async function sendChatMsg(){
     renderThread(false);
     return;
   }
-  if(!text && !cvImg) return;
+  if(!text) return;
   inp.value = "";
   const feedId = chatFeed;
-  // Kontekst: et minde (post_id), et citat-svar (reply_to) og/eller et billede
+  // Kontekst: et minde (post_id) eller et citat-svar (reply_to)
   const share = (pendingShare && pendingShare.feed === feedId) ? pendingShare : null;
   const reply = pendingReply;
-  const img = cvImg;
-  if(img){ cvImg = null; renderImgPrev(); }
   const sp = share ? findPost(share.post) : null;
   // Optimistisk: vis beskeden med det samme, byt til den rigtige række fra serveren
   const temp = { id: "tmp-" + Date.now(), feed: feedId, u: me.handle, authorId: me.id,
                  text: text, postId: share ? share.post : null,
                  thumb: sp && sp.img ? sp.img.src : "",
                  thumbVideo: sp && !sp.img && sp.video ? sp.video.src : "",
-                 mimg: img ? img.url : "", mvideo: "", edited: false, reacts: [],
+                 mimg: "", mvideo: "", edited: false, reacts: [],
                  replyTo: reply || null,
                  t: fmtTime(new Date().toISOString()), created: new Date().toISOString() };
   msgs.push(temp);
   renderThread(true);
-  // Fejl-oprydning: giv tekst OG billede tilbage, så intet mistes
-  const fail = function(uploadedPath){
-    msgs = msgs.filter(function(x){ return x.id !== temp.id; });
-    renderThread(false);
-    inp.value = text;
-    if(img){ cvImg = img; renderImgPrev(); }
-    if(uploadedPath) sb.storage.from("post-images").remove([uploadedPath]).catch(function(){});
-    toast(t("err.generic"));
-  };
-  let imgPath = null;
-  if(img){
-    imgPath = me.id + "/" + uuid() + ".jpg";
-    const up = await sb.storage.from("post-images").upload(imgPath, img.blob, { contentType: "image/jpeg" });
-    if(chatFeed !== feedId) return;
-    if(up.error){ console.error(up.error); fail(null); return; }
-    if(up.data && up.data.path) imgPath = up.data.path;
-  }
   const { data, error } = await sb.from("kreds_messages")
-    .insert({ feed_id: feedId, author: me.id, text: text || null,
+    .insert({ feed_id: feedId, author: me.id, text: text,
               post_id: share ? Number(share.post) : null,
-              reply_to: reply ? Number(reply.id) : null,
-              image_path: imgPath })
+              reply_to: reply ? Number(reply.id) : null })
     .select(MSG_SELECT)
     .single();
   if(chatFeed !== feedId) return; // tråden blev lukket/skiftet imens
+  msgs = msgs.filter(function(x){ return x.id !== temp.id; });
   if(error){
     console.error(error);
-    fail(imgPath);
+    renderThread(false);
+    inp.value = text; // giv teksten tilbage, så intet mistes
+    toast(t("err.generic"));
     return;
   }
-  msgs = msgs.filter(function(x){ return x.id !== temp.id; });
-  if(img && img.url) URL.revokeObjectURL(img.url);
   const real = mapMsg(data);
   if(share && pendingShare === share) pendingShare = null; // konteksten er afleveret
   if(reply && pendingReply === reply) pendingReply = null;
@@ -824,6 +848,7 @@ export function chatRealtime(payload){
     if(oldId == null) return;
     if(msgs.some(function(x){ return x.id === oldId; })){
       msgs = msgs.filter(function(x){ return x.id !== oldId; });
+      stripReplyRefs(oldId);
       if(el("chatview").classList.contains("on")) renderThread(false);
       refreshLastFromThread();
       return;
@@ -919,34 +944,15 @@ export function initChat(){
     // Krydset fortryder konteksten (minde/citat/redigering)
     if(e.target.closest(".cv-ctxx")) clearCtx();
   });
-  el("cv-imgprev").addEventListener("click", function(e){
-    if(e.target.closest(".cv-ctxx")) clearImg();
-  });
-  // Vedhæft billede: komprimeres til 1080px JPEG (samme flow som kommentar-billeder)
-  el("cv-photo").addEventListener("click", function(){ el("cv-file").click(); });
-  el("cv-file").addEventListener("change", function(){
-    const file = this.files && this.files[0];
-    this.value = "";
-    if(!file || chatFeed == null) return;
-    const im = new Image();
-    const url = URL.createObjectURL(file);
-    im.onload = function(){
-      const max = 1080;
-      const s = Math.min(1, max / Math.max(im.width, im.height));
-      const c = document.createElement("canvas");
-      c.width = Math.max(1, Math.round(im.width * s));
-      c.height = Math.max(1, Math.round(im.height * s));
-      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      c.toBlob(function(blob){
-        if(!blob){ toast(t("img.read_failed")); return; }
-        if(cvImg && cvImg.url) URL.revokeObjectURL(cvImg.url);
-        cvImg = { blob: blob, url: URL.createObjectURL(blob) };
-        renderImgPrev();
-      }, "image/jpeg", 0.85);
-    };
-    im.onerror = function(){ URL.revokeObjectURL(url); toast(t("img.read_failed")); };
-    im.src = url;
+  // Plus-knappen: i en KREDS-tråd åbner den minde-flowet (galleriet fra feedet) med
+  // kredsen som destination — mindet postes i kredsen og lander i tråden som deling.
+  // I en PRIVAT tråd er knappen dæmpet: medier deles kun gennem en kreds.
+  el("cv-plus").addEventListener("click", function(){
+    if(chatFeed == null) return;
+    const f = threadById(chatFeed);
+    if(!f) return;
+    if(f.isDm){ toast(t("chat.media_dm")); return; }
+    openMemoryFor(chatFeed);
   });
   el("cv-send").addEventListener("click", sendChatMsg);
   el("cv-input").addEventListener("input", sendTyping);
@@ -1033,7 +1039,7 @@ export function initChat(){
     swipeEl = msgEl; swipeMid = Number(msgEl.dataset.mid);
     lpTimer = setTimeout(function(){
       lpFired = true; swipeEl = null;
-      openMsgMenu(swipeMid);
+      openMsgMenu(swipeMid, msgEl);
     }, 420);
   }, { passive: true });
   body.addEventListener("touchmove", function(e){
@@ -1071,7 +1077,7 @@ export function initChat(){
     const msgEl = e.target.closest(".cv-msg");
     if(!msgEl) return;
     e.preventDefault();
-    openMsgMenu(Number(msgEl.dataset.mid));
+    openMsgMenu(Number(msgEl.dataset.mid), msgEl);
   });
 
   /* Besked-menuens valg (inkl. bekræftelses-trin for Fjern/Anmeld/Blokér) */
@@ -1081,7 +1087,12 @@ export function initChat(){
     const tr = e.target.closest("[data-tact]");
     if(tr){ threadMenuAct(tr.dataset.tact); return; }
     const row = e.target.closest("[data-act]");
-    if(!row){ if(e.target === el("cmenu")) closeMsgMenu(); return; }
+    if(!row){
+      // Tap uden for kortet/emoji-pillen lukker (også i den forankrede tilstand)
+      if(!e.target.closest(".cm-card") && !e.target.closest(".cm-emojis") &&
+         !e.target.closest(".mgroup")) closeMsgMenu();
+      return;
+    }
     const act = row.dataset.act;
     if(act === "cancel"){ closeMsgMenu(); return; }
     if(act === "__do"){ const f = confirmDo; closeMsgMenu(); if(f) f(); return; }
