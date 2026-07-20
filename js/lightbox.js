@@ -1,8 +1,9 @@
 import { el, esc, user, avaHTML, HEART_SVG, BADGE } from "./helpers.js";
 import { me, expandedCmts } from "./store.js";
 import { t } from "./i18n.js";
-import { findPost, setLike, sharePost, openPostMenu, openReportMenu, muteFeedSound } from "./feed.js";
-import { openNativeComments, openNativePostPage, rerenderPostCmts } from "./comments.js";
+import { findPost, setLike, sharePost, openPostMenu, openReportMenu, muteFeedSound, switchTab } from "./feed.js";
+import { openNativePostPage, rerenderPostCmts } from "./comments.js";
+import { openKredsChat, openDmWith } from "./chat.js";
 import { openPostView } from "./profile.js";
 
 /* ================= Fuldskærms-lightbox (billede + video) =================
@@ -189,7 +190,15 @@ export function lbSync(){
 function openLbComments(){
   const p = findPost(lbPid);
   if(!p) return;
-  if(window.__vfNative && window.__vfComments && p.kind === "memory"){ openNativeComments(p.id); return; }
+  // Minder kommenteres i Beskeder-tråden (kreds-tråd eller DM m. forfatteren) — luk
+  // vieweren først, tråden (z-85) ligger under den (z-300)
+  if(p.kind === "memory"){
+    closeLightbox();
+    if(p.feed){ openKredsChat(p.feed); return; }
+    if(me && p.u === me.handle){ switchTab("chat"); return; }
+    openDmWith(user(p.u).id, p.id);
+    return;
+  }
   if(window.__vfNative && window.__vfPostPage && p.kind !== "memory"){ openNativePostPage(p.id); return; }
   closeLightbox();
   expandedCmts.add(Number(p.id));

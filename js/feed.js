@@ -2,8 +2,8 @@ import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, expandedCmts, pv, cstate, curTab, setCurTab, setCfilePid, ID2H, FRIEND_SINCE } from "./store.js";
 import { el, esc, richText, avaHTML, user, grad, toast, fmtTime, fmtDate, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
 import { t, likesLabel } from "./i18n.js";
-import { renderChatList, openKredsChat } from "./chat.js";
-import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, deleteComment, cInput, cKey, clearReply, clearCImg, openNativeComments, pushNativeComments, pushNativePostPage } from "./comments.js";
+import { renderChatList, openKredsChat, openDmWith } from "./chat.js";
+import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, deleteComment, cInput, cKey, clearReply, clearCImg, pushNativeComments, pushNativePostPage } from "./comments.js";
 import { openFeedSheet, openMemberSheet } from "./kredse.js";
 import { openProfile, closeProfile, closeMemView, renderMyPosts, renderStories, refreshPv, doBlockUser, openPostView } from "./profile.js";
 import { loadStories } from "./stories.js";
@@ -110,7 +110,7 @@ function actionsHTML(p){
     '<div class="pactions">'+
       '<button class="cmt-btn" data-id="'+p.id+'" aria-label="'+t("aria.comments")+'">'+
         '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>'+
-        cntHTML(p.kind === "memory" && p.feed ? 0 : p.cmts.length)+
+        cntHTML(p.kind === "memory" ? 0 : p.cmts.length)+ /* minder tæller i tråden, ikke her */
       '</button>'+
       '<button class="like-btn'+(p.liked ? " on" : "")+'" data-id="'+p.id+'" aria-pressed="'+p.liked+'" aria-label="'+t("aria.like")+'">'+
         HEART_SVG+
@@ -211,9 +211,6 @@ function memoryHTML(p, inner){
         '<button class="cap-more" data-id="'+p.id+'">'+t(openCap ? "memory.less" : "memory.more")+'</button>'+
       '</div>'
     : '';
-  // Kreds-minder har INGEN kommentar-sektion (kommentarer bor i kredsens chat);
-  // venne-minder: native sheet ejer kommentarerne i app'en, browser beholder inline
-  const nativeCmts = (window.__vfNative && window.__vfComments) || !!p.feed;
   return (
     '<article class="post memory" data-id="'+p.id+'">'+
       '<div class="mhead">'+
@@ -231,8 +228,7 @@ function memoryHTML(p, inner){
       '<div class="mbelow">'+
         actionsHTML(p)+
         kredsChipRow(p)+ /* på et minde står kreds-mærket UNDER handlingsrækken (ejer-ønske) */
-        cap+
-        (nativeCmts ? '' : cmtSectionHTML(p))+
+        cap+ /* ingen kommentar-sektion på minder: samtalen bor i Beskeder-tråden */
       '</div>'+
     '</article>'
   );
@@ -536,7 +532,7 @@ export async function loadFeeds(){
     // joinedAt = MIT medlemskabs starttidspunkt — notifikationer viser kun opslag NYERE end det
     const mine = (f.feed_members||[]).find(function(m){ return me && m.user_id === me.id; });
     return { id:f.id, name:f.name, owner:f.owner, governance:f.governance || "vote", created:f.created_at,
-             joinedAt: mine ? mine.created_at : null,
+             isDm: !!f.is_dm, joinedAt: mine ? mine.created_at : null,
              memberIds:(f.feed_members||[]).map(function(m){ return m.user_id; }) };
   });
   feeds.sort(function(a,b){ return new Date(a.created) - new Date(b.created); });
@@ -553,7 +549,10 @@ export async function loadFeeds(){
   feeds.forEach(function(f){
     f.members = f.memberIds.map(function(id){ return ID2H[id]; }).filter(Boolean);
   });
-  state.feeds = feeds;
+  // DM-tråde (is_dm) er KUN samtaler: de bor i Beskeder (state.dms) og må aldrig dukke
+  // op i kreds-UI'et (feedbar, compose-destinationer, stats, medlems-sheets ...)
+  state.feeds = feeds.filter(function(f){ return !f.isDm; });
+  state.dms = feeds.filter(function(f){ return f.isDm; });
   await refreshUnseen(); // ulæste-prikker på kreds-pillerne følger med hver feeds-hentning
 }
 
@@ -1247,15 +1246,16 @@ function timelineClick(e){
   const cmt = e.target.closest(".cmt-btn");
   if(cmt){
     const cp = findPost(cmt.dataset.id);
-    // KREDS-minder kommenteres i kredsens CHAT (Messenger-tråden) — ikke i kommentarer
-    if(cp && cp.kind === "memory" && cp.feed){
+    // ALLE minder kommenteres i Beskeder (Messenger-tråde) — ikke i kommentar-sektioner:
+    // et KREDS-minde åbner kredsens tråd; et HELE KREDSEN-minde åbner tråden med
+    // forfatteren (eksisterende 2-personers kreds, ellers en DM) med mindet som kontekst
+    // på det første svar. Ens eget hele kredsen-minde: svarene bor i flere tråde →
+    // Beskeder-listen.
+    if(cp && cp.kind === "memory"){
       if(el("memview").classList.contains("on")) closeMemView();
-      openKredsChat(cp.feed);
-      return;
-    }
-    // I app'en åbner et VENNE-minde sine kommentarer i det native Liquid Glass-sheet
-    if(window.__vfNative && window.__vfComments && cp && cp.kind === "memory"){
-      openNativeComments(cp.id);
+      if(cp.feed){ openKredsChat(cp.feed); return; }
+      if(me && cp.u === me.handle){ closeProfile(); switchTab("chat"); return; }
+      openDmWith(user(cp.u).id, cp.id);
       return;
     }
     // En tanke åbner sin detalje-side (native i appen, web-siden ellers) — men står vi

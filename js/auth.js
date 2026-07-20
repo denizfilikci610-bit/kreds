@@ -183,6 +183,7 @@ export function resetApp(){
   state.savedPosts = [];
   resetSaved(); // Gemte-fanen henter friskt for næste konto
   state.feeds = [];
+  state.dms = [];
   state.currentFeed = "all";
   try{ sessionStorage.setItem("vf_cur_feed", "all"); }catch(_e){} // ryd valgt kreds ved logout
   pv.u = null;

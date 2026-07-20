@@ -1228,6 +1228,11 @@
   .chatrow{display:flex;align-items:center;gap:12px;width:100%;padding:9px 16px;text-align:left}
   .chatrow:active{background:var(--chip)}
   .chatrow .lnm{font-size:16px}
+  .chatrow .lcol{flex:1}
+  /* Ulæst tråd: fed tekst + rød prik yderst til højre (Messenger-agtigt) */
+  .chatrow.unread .lnm{font-weight:800}
+  .chatrow.unread .lh{color:var(--ink);font-weight:600}
+  .cv-udot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:var(--red)}
   /* Kredsens "ansigt": én avatar, eller to stablede for grupper (Messenger-agtigt) */
   .chatava{position:relative;flex:0 0 auto;display:flex;align-items:center;justify-content:center}
   .chatava2 > :first-child{position:absolute;top:0;right:0}

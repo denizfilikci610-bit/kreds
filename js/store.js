@@ -18,6 +18,7 @@ export const state = {
   posts: [],              // posts in current view (view-model shape)
   wholePosts: [],         // alle opslag brugeren må se (venner + egne kredse — RLS afgør)
   feeds: [],              // { id, name, memberIds:[uuid], members:[handle] }
+  dms: [],                // DM-tråde (feeds m. is_dm) — KUN Beskeder kender dem, aldrig kreds-UI
   currentFeed: "all",
   savedPosts: [],         // mine gemte opslag (kun minder i UI'et; privat, saved_posts-tabellen)
   storyGroups: []         // [{ author:{id,handle,name,avatar_path}, items:[{id,url,isVideo,seen}], allSeen, isMe }]
