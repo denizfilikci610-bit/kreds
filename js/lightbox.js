@@ -1,7 +1,7 @@
 import { el, esc, user, avaHTML, HEART_SVG, BADGE } from "./helpers.js";
 import { me, expandedCmts } from "./store.js";
 import { t } from "./i18n.js";
-import { findPost, setLike, sharePost, openPostMenu, openReportMenu } from "./feed.js";
+import { findPost, setLike, sharePost, openPostMenu, openReportMenu, muteFeedSound } from "./feed.js";
 import { openNativeComments, openNativePostPage, rerenderPostCmts } from "./comments.js";
 import { openPostView } from "./profile.js";
 
@@ -134,8 +134,8 @@ function onPointerUp(e){
 
 /* ---- Lyd i video-vieweren (til som standard; valget huskes til næste video i sessionen) ---- */
 let lbSoundOn = true;
-const SOUND_ON_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><path d="M4.5 9.5v5h3.2l4.6 4v-13l-4.6 4Z"/><path d="M15.3 9.2a4.4 4.4 0 0 1 0 5.6"/><path d="M17.8 6.8a8 8 0 0 1 0 10.4"/></g></svg>';
-const SOUND_OFF_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><path d="M4.5 9.5v5h3.2l4.6 4v-13l-4.6 4Z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></g></svg>';
+export const SOUND_ON_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><path d="M4.5 9.5v5h3.2l4.6 4v-13l-4.6 4Z"/><path d="M15.3 9.2a4.4 4.4 0 0 1 0 5.6"/><path d="M17.8 6.8a8 8 0 0 1 0 10.4"/></g></svg>';
+export const SOUND_OFF_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><path d="M4.5 9.5v5h3.2l4.6 4v-13l-4.6 4Z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></g></svg>';
 function syncSoundIcon(){
   el("lb-sound").innerHTML = lbSoundOn ? SOUND_ON_SVG : SOUND_OFF_SVG;
 }
@@ -210,6 +210,7 @@ function lbMenu(){
 export function openLightbox(kind, src, pid){
   const st = stage();
   lbPid = pid != null ? Number(pid) : null;
+  muteFeedSound(); // vieweren ejer lyden — en feed-video med lyd bagved ville give dobbelt-lyd
   renderLbInfo();
   pointers.clear(); pinch = null; pan = null; lastTapT = 0; moved = false;
   scale = 1; tx = 0; ty = 0;

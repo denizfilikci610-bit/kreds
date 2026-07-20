@@ -10,7 +10,7 @@ import { renderSearch } from "./search.js";
 import { loadNotifs, setNotifDot } from "./notifications.js";
 import { scheduleRefetch } from "./realtime.js";
 import { mapPoll, pollHTML, votePoll } from "./polls.js";
-import { openLightbox, lbSync } from "./lightbox.js";
+import { openLightbox, lbSync, SOUND_ON_SVG, SOUND_OFF_SVG } from "./lightbox.js";
 import { AD_EVERY, adsEnabled, adSlotHTML, reportAdLayout, initAds } from "./ads.js";
 
 export const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id), poll_options(*, poll_votes(user_id)), membership_proposals(resolved)";
@@ -186,7 +186,7 @@ function memoryHTML(p, inner){
 }
 export function postHTML(p){
   const inner = p.video
-    ? '<video src="'+esc(p.video.src)+'" playsinline muted loop autoplay preload="metadata"></video>'
+    ? '<video src="'+esc(p.video.src)+'" playsinline muted loop autoplay preload="metadata"></video>'+vsoundHTML(p)
     : p.img
     ? '<img src="'+esc(p.img.src)+'" alt="'+esc(p.img.alt||"")+'" draggable="false">'
     : '';
@@ -214,8 +214,50 @@ export function postHTML(p){
   );
 }
 
+/* ================= Lyd-prik på feed-videoer (Instagram-agtigt) =================
+   Videoer i timelinen starter lydløst, men har en lille rund lyd-knap i hjørnet.
+   KUN ÉN video ad gangen har lyd (soundPid), og kun kopien i den synlige kontekst
+   (detalje-siden hvis åben, ellers den aktive fane) — skjulte views spiller ellers
+   lyd i baggrunden, og samme opslag kan være renderet flere steder (ekko). */
+let soundPid = null; // opslags-id med lyd lige nu (null = alt lydløst)
+function vsoundHTML(p){
+  return '<button class="vsound" data-id="'+p.id+'" aria-label="'+t("lb.sound")+'">'+
+    (soundPid != null && Number(soundPid) === Number(p.id) ? SOUND_ON_SVG : SOUND_OFF_SVG)+'</button>';
+}
+function soundTarget(){
+  if(soundPid == null) return null;
+  const sel = '.pmedia[data-id="'+soundPid+'"] video';
+  if(el("memview").classList.contains("on")){
+    const v = el("mv-body").querySelector(sel);
+    if(v) return v;
+  }
+  const av = document.querySelector(".view.active");
+  return av ? av.querySelector(sel) : null;
+}
+/* Anvend lyd-tilstanden på alle renderede videoer (kaldes efter hver re-render
+   og ved kontekst-skift: faneskift, detalje-side åbnes/lukkes). */
+export function applyFeedSound(){
+  const target = soundTarget();
+  document.querySelectorAll(".pmedia video").forEach(function(v){ v.muted = v !== target; });
+  if(target) target.play().catch(function(){});
+}
+/* Vieweren (lightboxen) ejer lyden mens den er åben — sluk feed-lyden helt */
+export function muteFeedSound(){
+  if(soundPid == null) return;
+  soundPid = null;
+  document.querySelectorAll(".vsound").forEach(function(b){ b.innerHTML = SOUND_OFF_SVG; });
+  applyFeedSound();
+}
+function toggleFeedSound(id){
+  soundPid = (soundPid != null && Number(soundPid) === Number(id)) ? null : Number(id);
+  document.querySelectorAll(".vsound").forEach(function(b){
+    b.innerHTML = (soundPid != null && Number(soundPid) === Number(b.dataset.id)) ? SOUND_ON_SVG : SOUND_OFF_SVG;
+  });
+  applyFeedSound();
+}
+
 /* Bevar video-position hen over re-render af timeline-HTML
-   (feed-videoer er altid lydløse — lyd hører til i lightboxen) */
+   (feed-videoer starter lydløst — fuld lyd hører til i vieweren) */
 export function snapVideos(container){
   const snap = new Map();
   container.querySelectorAll(".pmedia video").forEach(function(vid){
@@ -262,6 +304,7 @@ export function renderFeed(){
   const vsnap = snapVideos(el("feed"));
   el("feed").innerHTML = html;
   restoreVideos(el("feed"), vsnap);
+  applyFeedSound(); // gen-render nulstiller muted-attributten — genanvend lyd-valget
   clampMemCaps(el("feed")); // vis "Se mere" kun hvor minde-billedteksten løber over
   pushNativeComments();     // hold et evt. åbent native kommentar-sheet i sync (realtime)
   pushNativePostPage();     // …og den native opslags-side
@@ -721,6 +764,7 @@ export function switchTab(name){
   if(name === "search") renderSearch();
   if(name === "akt"){ loadNotifs(); setNotifDot(false); }
   if(name === "profil") renderMyPosts();
+  applyFeedSound(); // lyden følger den synlige kontekst — skjulte views skal være lydløse
   el("app").scrollTop = 0;
   resetBarHide();
 }
@@ -1118,6 +1162,9 @@ function timelineClick(e){
     setFeed(kc.dataset.feed);
     return;
   }
+  // Lyd-prikken i hjørnet af en feed-video (skal fanges FØR .pmedia-grenen nedenfor)
+  const vs = e.target.closest(".vsound");
+  if(vs){ toggleFeedSound(vs.dataset.id); return; }
   const like = e.target.closest(".like-btn");
   if(like){ setLike(like.dataset.id); return; }
   const vt = e.target.closest("[data-vote]");

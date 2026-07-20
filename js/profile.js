@@ -2,7 +2,7 @@ import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab, expandedCmts } from "./store.js";
 import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConsent, setConsent, imgUrl, ini } from "./helpers.js";
 import { t, setLang, getLang, policyURL } from "./i18n.js";
-import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps } from "./feed.js";
+import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps, applyFeedSound } from "./feed.js";
 import { openNativePostPage, rerenderPostCmts } from "./comments.js";
 import { openCompose, openStoryCamera } from "./compose.js";
 import { openStoryViewer } from "./stories.js";
@@ -71,6 +71,7 @@ function openMemView(p){
   el("mv-title").textContent = t(p.kind === "memory" ? "memview.title" : "postview.title");
   el("mv-body").innerHTML = postHTML(p);
   clampMemCaps(el("mv-body"));
+  applyFeedSound(); // lyd-prioriteten flytter til detalje-sidens kopi af videoen
   el("mv-body").scrollTop = 0;
   el("memview").classList.add("on");
 }
@@ -99,6 +100,7 @@ export function closeMemView(){
       rerenderPostCmts(pid);
     }
   }
+  applyFeedSound(); // lyd-prioriteten tilbage til den aktive fanes kopi
 }
 
 export async function renderMyPosts(){
@@ -111,6 +113,7 @@ export async function renderMyPosts(){
   const vsnap = snapVideos(el("myposts"));
   el("myposts").innerHTML = timelineHTML(mine, myTab, '<div class="emptynote">'+t("myposts.empty")+'</div>');
   restoreVideos(el("myposts"), vsnap);
+  applyFeedSound();
   clampMemCaps(el("myposts"));
   loadQuota();
   const r = await sb.from("posts").select("id", { count:"exact", head:true }).eq("author", me.id).is("feed_id", null);
@@ -540,6 +543,7 @@ export async function loadPvPosts(){
   const vsnap = snapVideos(el("pv-posts"));
   el("pv-posts").innerHTML = timelineHTML(pv.posts, pvTab, pvEmptyNote(h)); // RLS giver tom liste for ikke-venner
   restoreVideos(el("pv-posts"), vsnap);
+  applyFeedSound();
   clampMemCaps(el("pv-posts"));
 }
 export function closeProfile(){
@@ -552,6 +556,7 @@ export function refreshPv(){
     const vsnap = snapVideos(el("pv-posts"));
     el("pv-posts").innerHTML = timelineHTML(pv.posts, pvTab, pvEmptyNote(pv.u));
     restoreVideos(el("pv-posts"), vsnap);
+    applyFeedSound();
     clampMemCaps(el("pv-posts"));
     el("pv-ava").innerHTML = avaHTML(pv.u, 86);
   }
