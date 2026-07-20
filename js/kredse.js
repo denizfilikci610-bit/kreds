@@ -2,8 +2,20 @@ import { sb } from "./config.js";
 import { me, state, ID2H } from "./store.js";
 import { el, esc, avaHTML, user, toast, ini, imgUrl } from "./helpers.js";
 import { t } from "./i18n.js";
-import { loadFeeds, loadPosts, setFeed, feedById, renderFeedbar, renderKredshead } from "./feed.js";
+import { loadFeeds, loadPosts, setFeed, feedById, renderFeedbar, renderKredshead, switchTab } from "./feed.js";
 import { renderComposeDest } from "./compose.js";
+import { openProfile } from "./profile.js";
+import { closeKredsChat } from "./chat.js";
+
+/* Tap på en person i medlems-arket: luk arket (og en evt. åben tråd, som profilen
+   ellers ville ligge UNDER) og åbn profil-SIDEN med den normale tilbage-pil */
+function openMemberProfile(h){
+  if(!h) return;
+  closeMemberSheet();
+  if(el("chatview").classList.contains("on")) closeKredsChat();
+  if(me && h === me.handle) switchTab("profil");
+  else openProfile(h);
+}
 
 /* ================= Native glas-sheets (app'en) — fælles ================= */
 /* Kort-data om en ven til de native glas-sheets (rå tekst; native tegner). */
@@ -227,7 +239,7 @@ function renderMemberSheet(){
     const btn = (id !== me.id && canManage)
       ? '<button class="ms-btn" data-rm="'+esc(id)+'">'+t("ms.remove")+'</button>'
       : '';
-    return '<div class="listrow">'+
+    return '<div class="listrow tap" data-h="'+esc(h)+'">'+
       avaHTML(h, 44)+
       '<div class="grow"><div class="l1">'+esc(user(h).name)+ownerTag+'</div><div class="l2">@'+esc(h)+'</div></div>'+
       btn+
@@ -253,7 +265,7 @@ function renderMemberSheet(){
         } else {
           action = '<button class="ms-btn add" data-add="'+esc(uid)+'">'+t("ms.invite")+'</button>';
         }
-        return '<div class="listrow">'+
+        return '<div class="listrow tap" data-h="'+esc(h)+'">'+
           avaHTML(h, 44)+
           '<div class="grow"><div class="l1">'+esc(user(h).name)+'</div><div class="l2">@'+esc(h)+'</div></div>'+
           action+
@@ -345,6 +357,7 @@ export function nativeMemberAction(obj){
   if(!obj) return;
   if(obj.feedId != null && msFeedId != null && String(msFeedId) !== String(obj.feedId)) return; // forældet
   switch(obj.kind){
+    case "profile": openMemberProfile(obj.h); break;
     case "remove": doMsRemove(obj.uid); break;
     case "invite": doMsAdd(obj.uid); break;
     case "cancelInvite": doMsCancel(obj.uid); break;
@@ -409,6 +422,9 @@ el("msheet").addEventListener("click", function(e){
   if(ad){ msAdd(ad); return; }
   const cx = e.target.closest(".ms-btn[data-cancel]");
   if(cx){ msCancel(cx); return; }
+  // Tap på selve personen (ikke en knap) → profil-siden
+  const row = e.target.closest(".listrow[data-h]");
+  if(row) openMemberProfile(row.dataset.h);
 });
 el("ms-leave").addEventListener("click", function(){
   el("ms-leave").style.display = "none";
