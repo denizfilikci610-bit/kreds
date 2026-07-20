@@ -739,38 +739,6 @@ export function nativeKredsState(){
   return { items: items };
 }
 
-/* ================= Like-saldo (chip + profil, én datakilde) ================= */
-export async function fetchLikeBalance(){
-  if(!me) return null;
-  const res = await Promise.all([
-    sb.from("likes").select("*", { count:"exact", head:true }).eq("user_id", me.id),
-    sb.from("likes").select("*, posts!inner(author)", { count:"exact", head:true }).eq("posts.author", me.id),
-    sb.rpc("my_like_bonus")   // video-tjent ekstra kapacitet (+20 pr. video)
-  ]);
-  for(const r of res){ if(r.error) throw r.error; }
-  const given = res[0].count || 0;
-  const received = res[1].count || 0;
-  const bonus = res[2].data || 0;
-  return { given: given, received: received, bonus: bonus,
-           room: Math.max(0, given + 1 + bonus - received) };
-}
-let quotaSeq = 0;
-export async function loadQuota(){
-  if(!me){ el("qchip").classList.remove("on"); return; }
-  const seq = ++quotaSeq;
-  try{
-    const b = await fetchLikeBalance();
-    if(seq !== quotaSeq || !me || !b) return;
-    el("qchip-n").textContent = b.room;
-    el("qchip").classList.add("on");
-    el("nik-saldo").innerHTML =
-      '<div class="nik1">'+t("quota.line1", { given:b.given, received:b.received, room:b.room })+'</div>'+
-      '<div class="nik2">'+t("quota.line2")+'</div>';
-  }catch(err){
-    console.error(err);
-  }
-}
-
 /* ================= Skjul topbar ved scroll ned (vis igen ved scroll op / nær toppen) ================= */
 let barHidden = false, barLastY = 0, barDownAcc = 0, barUpAcc = 0;
 export function resetBarHide(){
@@ -923,14 +891,8 @@ export async function setLike(id, force){
     applyLikeUI(id, cur);
     pushNativePostPage(); // rul like tilbage på den native opslags-side
     lbSync();             // …og i viewerens overlay
-    if(on && String(error.message || "").indexOf("like_quota") >= 0){
-      const fname = (user(objs[0].u).name || objs[0].u).trim().split(/\s+/)[0];
-      toast(t("like.quota", { name: fname }));
-    } else {
-      toast(t("err.generic"));
-    }
+    toast(t("err.generic"));
   }
-  loadQuota();
 }
 
 /* ================= Egne opslag: menu, rediger, slet ================= */
@@ -1397,7 +1359,6 @@ el("feedbar").addEventListener("input", function(e){
     if(fp) fp.innerHTML = fbPillsHTML();
   }
 });
-/* Hjerte-chippens klik håndteres i rewarded.js (video-genvej i appen, saldo-toast i browseren). */
 ["feed","myposts","pv-posts","mv-body"].forEach(function(id){
   el(id).addEventListener("click", timelineClick);
   el(id).addEventListener("input", cInput);

@@ -36,7 +36,6 @@ export function initPullRefresh(){
     return refreshing ||
       (scrim && scrim.classList.contains("on")) ||         // et ark/modal er åbent
       document.body.classList.contains("lb-lock") ||        // lightbox
-      !!document.querySelector("#rwd-pop.on") ||             // rewarded-pop-up
       !!(document.activeElement && /^(input|textarea)$/i.test(document.activeElement.tagName));
   }
 

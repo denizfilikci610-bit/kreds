@@ -130,17 +130,6 @@
   .nosparkle{padding:6px 2px;color:var(--ink)}
   .nosparkle svg{width:23px;height:23px;display:block}
   .tright{display:flex;align-items:center;gap:10px}
-  .qchip{
-    display:none;align-items:center;gap:5px;
-    background:var(--chip);
-    border-radius:999px;
-    padding:5px 10px;
-    font-size:12px;font-weight:700;color:var(--ink);
-  }
-  .qchip.on{display:flex}
-  .qchip svg{width:13px;height:13px;display:block}
-  .qchip svg path{fill:var(--red);stroke:none}
-  .qchip:active{opacity:.65}
 
   /* ================= Stories ================= */
   .stories{
@@ -336,33 +325,6 @@
   }
   @keyframes adshimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   @media (prefers-reduced-motion: reduce){.adskel{animation:none}}
-
-  /* ===== Rewarded-video pop-up (se en video → +20 like-plads) ===== */
-  .rwdpop{
-    position:fixed;inset:0;z-index:200;
-    display:flex;align-items:center;justify-content:center;padding:24px;
-    background:var(--scrim);
-    opacity:0;visibility:hidden;transition:opacity .18s ease;
-  }
-  .rwdpop.on{opacity:1;visibility:visible}
-  .rwdcard{
-    width:100%;max-width:320px;
-    background:var(--surface);border-radius:18px;padding:24px 22px;text-align:center;
-    box-shadow:0 12px 40px rgba(0,0,0,.3);
-    transform:translateY(8px) scale(.98);transition:transform .18s ease;
-  }
-  .rwdpop.on .rwdcard{transform:none}
-  .rwdheart{
-    width:60px;height:60px;margin:0 auto 12px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;background:var(--red);color:#fff;
-  }
-  .rwdtitle{font-size:18px;font-weight:800;color:var(--ink);margin-bottom:6px}
-  .rwdsub{font-size:14px;color:var(--gray);line-height:1.4;margin-bottom:6px}
-  .rwdhow{font-size:12px;color:var(--gray);opacity:.8;line-height:1.4;margin-bottom:18px}
-  .rwdgo{width:100%;padding:13px;border-radius:12px;background:var(--red);color:#fff;font-size:15px;font-weight:700}
-  .rwdgo:active{opacity:.85}
-  .rwdno{width:100%;padding:11px;margin-top:8px;color:var(--gray);font-size:14px;font-weight:600}
-  .rwdno:active{opacity:.6}
 
   .phead{display:flex;align-items:center;gap:5px;min-width:0}
   .phead .nm{font-weight:700;font-size:14.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0}
@@ -828,10 +790,6 @@
     text-align:left;
   }
   .pv-unfriend:active{opacity:.6}
-  .niksaldo{margin-top:8px}
-  .niksaldo .nik1{font-size:14px;color:var(--ink)}
-  .niksaldo .nik1 b{font-weight:700}
-  .niksaldo .nik2{font-size:12.5px;color:var(--gray);margin-top:2px}
   .pbtns{display:flex;gap:8px;padding:0 16px 14px}
   .chipbtn{
     flex:1;

@@ -2,7 +2,7 @@ import { sb, recoveryMode, recoveryLinkError } from "./config.js";
 import { me, curTab } from "./store.js";
 import { el, toast } from "./helpers.js";
 import { t, initI18n, setLang, hasStoredLang } from "./i18n.js";
-import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, loadQuota, setFeed, nativeKredsState } from "./feed.js";
+import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, setFeed, nativeKredsState } from "./feed.js";
 import { initComments, nativeCommentsAction, nativePostPageAction } from "./comments.js";
 import { initKredse, closeFeedSheet, closeMemberSheet, openFeedSheet, nativeFsheetAction, nativeMemberAction } from "./kredse.js";
 import { initCompose, renderComposeDest, openCompose, openThought, openMemory, nativeMemoryPost, openMemoryFallback, nativeMemoryUploaded, nativeMemoryUploadFailed } from "./compose.js";
@@ -13,7 +13,6 @@ import { initLightbox } from "./lightbox.js";
 import { initStories } from "./stories.js";
 import { initRealtime, scheduleRefetch } from "./realtime.js";
 import { initAuth, boot, showAuth, showRecovery, setAuthMode, refreshAuthMode, pushNativeCreds } from "./auth.js";
-import { initRewarded } from "./rewarded.js";
 import { initPullRefresh } from "./pullrefresh.js";
 import { initPinchZoom } from "./pinchzoom.js";
 import { initMentions } from "./mentions.js";
@@ -29,7 +28,6 @@ initI18n(function(){
   renderStories();
   renderFeed();
   renderComposeDest();
-  loadQuota();
   if(curTab === "akt") loadNotifs();
   if(curTab === "profil") renderMyPosts();
   if(el("view-search").classList.contains("active")) renderSearch();
@@ -51,7 +49,6 @@ initStories();
 initRealtime();
 initMentions();
 initAuth();
-initRewarded(); // rewarded-video-genvej + belønnings-bro (no-op i browsere)
 initPullRefresh(); // ren pull-to-refresh for hele appen (erstatter native webview-bounce)
 initPinchZoom();   // live pinch-zoom på minde-billeder direkte i feedet (Instagram-agtigt)
 
@@ -164,7 +161,7 @@ if(window.__vfNative){
     const compact = document.body.classList.contains("hidebar");
     // Skjul barerne når noget ligger ovenpå ELLER vi ikke er på hoved-appen (boot-splash, login, gates)
     const blocked = nativeSheetOpen || !!document.querySelector(
-        "#scrim.on, .compose.on, .profileview.on, .postview.on, #lightbox.on, #rwd-pop.on, #authview.on, #langview.on, #consentview.on"
+        "#scrim.on, .compose.on, .profileview.on, .postview.on, #lightbox.on, #authview.on, #langview.on, #consentview.on"
       ) || document.body.classList.contains("lb-lock")
       || !!(el("splash") && !el("splash").classList.contains("gone"));
     const visible = !blocked;

@@ -1,7 +1,7 @@
 import { sb } from "./config.js";
 import { me, pv } from "./store.js";
 import { el } from "./helpers.js";
-import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, loadQuota, markFeedUnseenRT } from "./feed.js";
+import { loadFriends, loadFeeds, loadPosts, renderFeedbar, renderKredshead, markFeedUnseenRT } from "./feed.js";
 import { renderComposeDest } from "./compose.js";
 import { refreshMemberSheet } from "./kredse.js";
 import { loadPvPosts } from "./profile.js";
@@ -47,7 +47,6 @@ async function doRefetch(){
   renderComposeDest();
   if(el("view-search").classList.contains("active")) renderSearch();
   if(el("profileview").classList.contains("on") && pv.u) await loadPvPosts();
-  loadQuota();
 }
 export function subscribeRealtime(){
   if(channel) return;

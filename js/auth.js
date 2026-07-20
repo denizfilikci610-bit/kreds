@@ -2,7 +2,7 @@ import { sb, recoveryMode, setRecoveryMode } from "./config.js";
 import { t, getLang, setLang, policyURL, termsURL } from "./i18n.js";
 import { me, setMe, state, FRIEND_SINCE, pv, expandedCmts, clearComposers, setCfilePid } from "./store.js";
 import { el, registerProfile, toast, getConsent, showConsentGate } from "./helpers.js";
-import { loadFriends, loadFeeds, loadPosts, feedById, renderFeedbar, renderKredshead, renderFeed, switchTab, loadQuota, closePostEdit, closePostMenu, closeReportMenu, resetFeedbarSearch, resetTapState, resetBarHide, clearUnseenFeeds } from "./feed.js";
+import { loadFriends, loadFeeds, loadPosts, feedById, renderFeedbar, renderKredshead, renderFeed, switchTab, closePostEdit, closePostMenu, closeReportMenu, resetFeedbarSearch, resetTapState, resetBarHide, clearUnseenFeeds } from "./feed.js";
 import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPost, resetPoll } from "./compose.js";
 import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet, closeListSheet, closeNativeListPage, resetSaved, closeUnfriendMenu, closeBlockMenu } from "./profile.js";
 import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
@@ -154,7 +154,6 @@ export async function boot(session){
   let savedTab; try{ savedTab = sessionStorage.getItem("vf_cur_tab"); }catch(_e){}
   switchTab(["feed", "search", "akt", "profil"].includes(savedTab) ? savedTab : "feed");
   subscribeRealtime();
-  loadQuota();
   refreshNotifDot(); // tænd hjerte-prikken hvis nogen reagerede mens jeg var væk/logget ud
   hideAuth();
   hideSplash(); // appen står nu færdig på rette fane + kreds → fad splashen væk
@@ -191,8 +190,6 @@ export function resetApp(){
   clearComposers();
   setCfilePid(null);
   el("cfile").value = "";
-  el("qchip").classList.remove("on");
-  el("qchip-n").textContent = "0";
   resetDeleteUI();
   closeFeedSheet();
   closeMemberSheet();
@@ -223,7 +220,6 @@ export function resetApp(){
   el("search-list").innerHTML = "";
   el("search-input").value = "";
   el("myposts").innerHTML = "";
-  el("nik-saldo").innerHTML = "";
   el("stat-posts").textContent = "0";
   el("stat-friends").textContent = "0";
   el("stat-kredse").textContent = "0";

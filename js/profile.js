@@ -2,7 +2,7 @@ import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab, expandedCmts } from "./store.js";
 import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConsent, setConsent, imgUrl, ini } from "./helpers.js";
 import { t, setLang, getLang, policyURL } from "./i18n.js";
-import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps, applyFeedSound, switchTab, setFeed, feedById, POST_SELECT } from "./feed.js";
+import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps, applyFeedSound, switchTab, setFeed, feedById, POST_SELECT } from "./feed.js";
 import { openNativePostPage, rerenderPostCmts } from "./comments.js";
 import { openCompose, openStoryCamera } from "./compose.js";
 import { openStoryViewer } from "./stories.js";
@@ -141,7 +141,6 @@ export async function renderMyPosts(){
   restoreVideos(el("myposts"), vsnap);
   applyFeedSound();
   clampMemCaps(el("myposts"));
-  loadQuota();
   const r = await sb.from("posts").select("id", { count:"exact", head:true }).eq("author", me.id).is("feed_id", null);
   if(!r.error && r.count != null && me) el("stat-posts").textContent = r.count;
 }
