@@ -14,9 +14,11 @@ import { openMemoryFor } from "./compose.js";
    indsætter DB-triggeren automatisk en delings-besked (post_id) — den vises med en
    miniature af billedet og åbner opslaget ved tap. Realtime-INSERTs appendes live. */
 
+/* OBS: citatet (reply_to) indlejres BEVIDST IKKE — PostgREST's selv-reference-embed
+   opløses upålideligt (gav tomme/omvendte citater). Citatet slås op LOKALT i den
+   indlæste tråd ved rendering i stedet: altid friskt, og en slettet kilde forsvinder
+   af sig selv. */
 const MSG_SELECT = "*, author_profile:profiles!author(*), post:posts(id, image_path, video_path), " +
-  "reply:kreds_messages!reply_to(id, author, text, post_id, image_path, video_path, " +
-    "author_profile:profiles!author(handle, name), post:posts(id, image_path, video_path)), " +
   "reactions:kreds_message_reactions(user_id, emoji)";
 
 let chatFeed = null;   // åben tråds feed_id (null = lukket)
@@ -39,7 +41,6 @@ let searchTimer = 0;
 function mapMsg(r){
   if(r.author_profile) registerProfile(r.author_profile);
   const post = r.post || null;
-  const rp = r.reply || null;
   return {
     id: r.id,
     feed: r.feed_id,
@@ -53,17 +54,7 @@ function mapMsg(r){
     mimgPath: r.image_path || null,                        // rå sti (storage-oprydning)
     mvideo: r.video_path ? imgUrl(r.video_path) : "",
     edited: !!r.edited_at,
-    replyTo: rp ? {
-      id: rp.id,
-      author: rp.author,
-      u: rp.author_profile ? rp.author_profile.handle : (ID2H[rp.author] || null),
-      text: rp.text || "",
-      media: !!(rp.post_id || rp.image_path || rp.video_path),
-      thumb: rp.image_path ? imgUrl(rp.image_path)
-        : (rp.post && rp.post.image_path ? imgUrl(rp.post.image_path) : ""),
-      vthumb: (!rp.image_path && rp.video_path) ? imgUrl(rp.video_path)
-        : (rp.post && !rp.post.image_path && rp.post.video_path ? imgUrl(rp.post.video_path) : "")
-    } : null,
+    replyToId: r.reply_to != null ? r.reply_to : null,
     reacts: r.reactions || [],                             // [{user_id, emoji}]
     t: fmtTime(r.created_at),
     created: r.created_at
@@ -816,18 +807,9 @@ function refreshLastFromThread(){
   else delete lastByFeed[chatFeed];
   if(el("view-chat").classList.contains("active")) renderChatList(false);
 }
-/* En slettet besked må ikke efterlade citat-spøgelser: svar der pegede på den mister
-   citatet (matcher databasens reply_to ON DELETE SET NULL) */
-function stripReplyRefs(deletedId){
-  msgs = msgs.map(function(x){
-    return x.replyTo && x.replyTo.id === deletedId
-      ? Object.assign({}, x, { replyTo: null }) : x;
-  });
-}
 async function doDeleteMsg(m){
   msgs = msgs.filter(function(x){ return x.id !== m.id; });
-  stripReplyRefs(m.id);
-  renderThread(false);
+  renderThread(false); // citater slås op lokalt, så en slettet kilde forsvinder af sig selv
   refreshLastFromThread();
   const { error } = await sb.from("kreds_messages").delete().eq("id", Number(m.id));
   if(error){ console.error(error); toast(t("err.generic")); return; }
@@ -860,28 +842,33 @@ function msgHTML(m, first, last){
     : '';
   const bare = media && !m.text && !share;
   // Citat-svar (Messenger-agtigt): etiket "Svar til Navn" + den citerede besked som
-  // tydelig chip m. evt. miniature — tap hopper til beskeden. Robust: uden kendt
-  // afsender vises kun indholdet, og et helt tomt citat (slettet besked) vises ikke.
+  // tydelig chip m. evt. miniature — tap hopper til beskeden. Kilden slås op LOKALT i
+  // tråden (rm), så citatet altid er friskt, og en slettet kilde forsvinder af sig selv.
   let quote = "";
-  if(m.replyTo){
-    const rh = m.replyTo.u || ID2H[m.replyTo.author] || null;
-    const rname = rh ? esc((user(rh).name || rh).split(/\s+/)[0]) : "";
-    const rthumb = m.replyTo.thumb
-      ? '<img class="cv-qthumb" src="'+esc(m.replyTo.thumb)+'" alt="">'
-      : m.replyTo.vthumb
-      ? '<video class="cv-qthumb" src="'+esc(m.replyTo.vthumb)+'#t=0.1" muted playsinline preload="metadata"></video>'
-      : '';
-    const rtxt = esc(snip(m.replyTo.text, 64) || (m.replyTo.media && !rthumb ? t("chat.q_media") : ""));
-    if(rname || rtxt || rthumb){
-      quote = '<div class="cv-qwrap">'+
-        '<span class="cv-qlabel">'+
-          '<svg viewBox="0 0 24 24"><path class="stroke" d="M9.5 7 4.5 12l5 5M4.5 12H14a5.5 5.5 0 0 1 5.5 5.5v1"/></svg>'+
-          (rname ? t("chat.replying_to", { n: rname }) : t("chat.menu_reply"))+
-        '</span>'+
-        '<button class="cv-quote" data-q="'+esc(m.replyTo.id)+'">'+
-          rthumb+(rtxt ? '<span class="cv-qtxt">'+rtxt+'</span>' : '')+
-        '</button>'+
-      '</div>';
+  if(m.replyToId != null){
+    const rm = msgs.find(function(x){ return x.id === m.replyToId; });
+    if(rm){
+      const rname = esc((user(rm.u).name || rm.u).split(/\s+/)[0]);
+      const rimg = rm.mimg || rm.thumb;
+      const rvid = rimg ? "" : (rm.mvideo || rm.thumbVideo);
+      const rthumb = rimg
+        ? '<img class="cv-qthumb" src="'+esc(rimg)+'" alt="">'
+        : rvid
+        ? '<video class="cv-qthumb" src="'+esc(rvid)+'#t=0.1" muted playsinline preload="metadata"></video>'
+        : '';
+      const rtxt = esc(snip(rm.text, 64) ||
+        (!rthumb && (rm.postId || rm.mimg || rm.mvideo) ? t("chat.q_media") : ""));
+      if(rname || rtxt || rthumb){
+        quote = '<div class="cv-qwrap">'+
+          '<span class="cv-qlabel">'+
+            '<svg viewBox="0 0 24 24"><path class="stroke" d="M9.5 7 4.5 12l5 5M4.5 12H14a5.5 5.5 0 0 1 5.5 5.5v1"/></svg>'+
+            t("chat.replying_to", { n: rname })+
+          '</span>'+
+          '<button class="cv-quote" data-q="'+esc(m.replyToId)+'">'+
+            rthumb+(rtxt ? '<span class="cv-qtxt">'+rtxt+'</span>' : '')+
+          '</button>'+
+        '</div>';
+      }
     }
   }
   // Reaktioner: grupperet pille under boblens hjørne
@@ -948,7 +935,7 @@ async function sendChatMsg(){
                  thumb: sp && sp.img ? sp.img.src : "",
                  thumbVideo: sp && !sp.img && sp.video ? sp.video.src : "",
                  mimg: "", mvideo: "", edited: false, reacts: [],
-                 replyTo: reply || null,
+                 replyToId: reply ? reply.id : null,
                  t: fmtTime(new Date().toISOString()), created: new Date().toISOString() };
   msgs.push(temp);
   renderThread(true);
@@ -998,7 +985,6 @@ export function chatRealtime(payload){
     if(oldId == null) return;
     if(msgs.some(function(x){ return x.id === oldId; })){
       msgs = msgs.filter(function(x){ return x.id !== oldId; });
-      stripReplyRefs(oldId);
       if(el("chatview").classList.contains("on")) renderThread(false);
       refreshLastFromThread();
       return;
@@ -1199,8 +1185,7 @@ export function initChat(){
   }, { passive: true });
   body.addEventListener("touchmove", function(e){
     const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
-    // Swipe NED i tråden mens tastaturet er åbent → gem tastaturet (Messenger-adfærd)
-    if(kbOpen && dy > 30 && dy > Math.abs(dx) * 1.4) el("cv-input").blur();
+    // (swipe-ned-for-tastatur håndteres globalt i main.js — gælder hele appen)
     if(lpTimer && (Math.abs(dx) > 8 || Math.abs(dy) > 8)){ clearTimeout(lpTimer); lpTimer = 0; }
     if(!swipeEl) return;
     const dir = swipeEl.classList.contains("mine") ? -1 : 1; // træk mod midten

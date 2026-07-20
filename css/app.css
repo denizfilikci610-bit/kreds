@@ -1294,7 +1294,9 @@
   /* Avataren flugter med BOBLENS underkant, ikke med tids-linjen under den
      (rækken er align-items:flex-end, og tiden fylder ~18px i bunden af kolonnen) */
   .cv-msg .pavab.cv-ava{margin-bottom:18px}
-  .cv-col{display:flex;flex-direction:column;min-width:0}
+  /* align-items er BÆRENDE: uden den strækkes boblen til kolonnens bredeste element
+     (fx afsender-navnet), så boblen bliver længere end teksten */
+  .cv-col{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
   .cv-msg.mine .cv-col{align-items:flex-end}
   .cv-nm{font-size:11.5px;font-weight:700;color:var(--gray);margin:0 0 2px 12px}
   .cv-bubble{

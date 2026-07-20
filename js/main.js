@@ -194,6 +194,24 @@ if(window.__vfNative){
 window.addEventListener("hashchange", function(){
   if(/type=recovery|error_code=|access_token=/.test(location.hash)) location.reload();
 });
+
+/* Swipe NED hvor som helst i appen mens tastaturet er åbent → gem tastaturet
+   (Messenger-adfærd). Træk I SELVE feltet (fx scroll i en textarea) er undtaget. */
+(function(){
+  let ksY = 0, ksX = 0;
+  document.addEventListener("touchstart", function(e){
+    if(e.touches.length !== 1) return;
+    ksY = e.touches[0].clientY;
+    ksX = e.touches[0].clientX;
+  }, { passive: true, capture: true });
+  document.addEventListener("touchmove", function(e){
+    const ae = document.activeElement;
+    if(!ae || (ae.tagName !== "INPUT" && ae.tagName !== "TEXTAREA")) return;
+    if(ae === e.target || (ae.contains && ae.contains(e.target))) return;
+    const dy = e.touches[0].clientY - ksY, dx = e.touches[0].clientX - ksX;
+    if(dy > 32 && dy > Math.abs(dx) * 1.4) ae.blur();
+  }, { passive: true, capture: true });
+})();
 setTabIcons("feed");
 (async function init(){
   // Sproget gættes fra enheden (dansk enhed → dansk, ellers engelsk) — ingen gate-side.
