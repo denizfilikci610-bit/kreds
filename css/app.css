@@ -1237,7 +1237,11 @@
   .pv-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 
   /* ================= Beskeder (kreds-chat, Messenger-agtig) ================= */
-  .chatrow{display:flex;align-items:center;gap:12px;width:100%;padding:9px 16px;text-align:left}
+  .chatrow{
+    display:flex;align-items:center;gap:12px;width:100%;padding:9px 16px;text-align:left;
+    /* long-press åbner tråd-menuen — iOS må ikke markere teksten imens */
+    -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
+  }
   .chatrow:active{background:var(--chip)}
   .chatrow .lnm{font-size:16px}
   .chatrow .lcol{flex:1}
@@ -1332,9 +1336,6 @@
   /* Beskedens eget billede/video: uden boble-baggrund når det står alene */
   .cv-mimg{max-width:210px;max-height:280px;border-radius:14px;display:block}
   .cv-bubble.cv-bare{background:none;padding:0}
-  /* Tråd-menu-række med ikon (fx klokken på Slå lyd fra/til) */
-  .mrow-ic{display:flex;align-items:center;gap:11px}
-  .mrow-ic svg{width:18px;height:18px;flex:0 0 auto}
   /* ---- Besked-menuen (iMessage-anatomi): forankret ved boblen ---- */
   #cmenu.anchor{padding:0}
   #cmenu.anchor.on{display:block}

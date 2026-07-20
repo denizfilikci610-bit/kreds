@@ -514,11 +514,61 @@ const CM_IC = {
 function openMsgMenu(mid, anchorEl){
   const m = msgs.find(function(x){ return x.id === mid; });
   if(!m || !me) return;
-  menuMsg = mid;
   const mine = m.authorId === me.id;
   const myReact = (m.reacts || []).find(function(r){ return r.user_id === me.id; });
   const canEdit = mine && m.text && !m.postId &&
     Date.now() - new Date(m.created).getTime() < 15 * 60 * 1000;
+  // I appen: det ÆGTE native Liquid Glass-kort m. emoji-række (builds m. __vfSheetEmojis)
+  if(window.__vfGlassCard && window.__vfSheetPost && window.__vfSheetEmojis){
+    const buttons = [{ label: t("chat.menu_reply"), action: "reply" }];
+    if(m.text) buttons.push({ label: t("chat.copy"), action: "copy" });
+    if(canEdit) buttons.push({ label: t("chat.edit"), action: "edit" });
+    if(mine) buttons.push({ label: t("chat.remove"), action: "remove", role: "destructive" });
+    if(!mine){
+      buttons.push({ label: t("chat.report"), action: "report", role: "destructive" });
+      buttons.push({ label: t("rm.block"), action: "block", role: "destructive" });
+    }
+    buttons.push({ label: t("common.cancel"), action: "__cancel", role: "cancel" });
+    window.__vfSheetPost({
+      emojis: EMOJIS, selected: myReact ? myReact.emoji : "", buttons: buttons
+    }, function(a){
+      if(a && a.indexOf("emoji:") === 0){ setReaction(m.id, a.slice(6)); return; }
+      if(a === "reply"){ startReply(m); return; }
+      if(a === "copy"){
+        try{ navigator.clipboard.writeText(m.text); toast(t("chat.copied")); }catch(_e){}
+        return;
+      }
+      if(a === "edit"){
+        editingMsg = m.id; pendingReply = null; pendingShare = null;
+        el("cv-input").value = m.text;
+        renderCtxBar();
+        el("cv-input").focus();
+        return;
+      }
+      if(a === "remove"){
+        window.__vfSheetPost({ title: t("chat.remove_confirm"), buttons: [
+          { label: t("chat.remove"), action: "do", role: "destructive" },
+          { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+        ]}, function(b){ if(b === "do") doDeleteMsg(m); });
+        return;
+      }
+      if(a === "report"){
+        window.__vfSheetPost({ title: t("chat.report_confirm"), message: t("chat.report_note"), buttons: [
+          { label: t("chat.report"), action: "do", role: "destructive" },
+          { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+        ]}, function(b){ if(b === "do") doReportMsg(m); });
+        return;
+      }
+      if(a === "block"){
+        window.__vfSheetPost({ title: t("rm.block") + " @" + m.u + "?", message: t("block.note"), buttons: [
+          { label: t("block.do"), action: "do", role: "destructive" },
+          { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+        ]}, function(b){ if(b === "do"){ closeKredsChat(); doBlockUser(m.u); } });
+      }
+    });
+    return;
+  }
+  menuMsg = mid;
   const rows =
     '<button class="cm-row" data-act="reply">'+CM_IC.reply+'<span>'+t("chat.menu_reply")+'</span></button>'+
     (m.text ? '<button class="cm-row" data-act="copy">'+CM_IC.copy+'<span>'+t("chat.copy")+'</span></button>' : '')+
@@ -625,22 +675,80 @@ function renderSearchResults(q, msgRows){
 /* ---- Tråd-menuen (⋯ i headeren eller long-press på en liste-række):
    medlemmer, fastgør, mute, markér som ulæst, ryd/slet, blokér (DM) ---- */
 let threadMenuFeed = null;
+/* Handlinger delt mellem web-menuen og det native glas-kort */
+function threadMenuDirect(fid, act){
+  const f = threadById(fid);
+  if(!f) return;
+  const pf = prefs[fid] || {};
+  if(act === "members"){ openMemberSheet(fid); return; }
+  if(act === "pin"){ setPref(fid, { pinned: !pf.pinned }); renderChatList(false); return; }
+  if(act === "mute"){
+    const nowMuted = !pf.muted;
+    setPref(fid, { muted: nowMuted });
+    renderChatList(false);
+    toast(t(nowMuted ? "chat.muted_toast" : "chat.unmuted_toast")); // gør resultatet utvetydigt
+    return;
+  }
+  if(act === "unreadmark"){ setPref(fid, { markedUnread: true }); renderChatList(false); }
+}
+function doClearThread(f){
+  setPref(f.id, { clearedAt: new Date().toISOString(), markedUnread: false });
+  if(chatFeed === f.id){
+    if(f.isDm) closeKredsChat();
+    else { msgs = []; renderThread(false); }
+  }
+  renderChatList(false);
+}
 function openThreadMenu(feedId){
   const f = threadById(feedId);
   if(!f || !me) return;
-  threadMenuFeed = feedId;
-  menuMsg = null; // menuen genbruger #cmenu-kortet
   const pf = prefs[feedId] || {};
   const other = f.isDm ? f.members.filter(function(h){ return h !== me.handle; })[0] : null;
+  // I appen: det ÆGTE native Liquid Glass-kort (samme som opslags-menuerne)
+  if(window.__vfGlassCard && window.__vfSheetPost){
+    const buttons = [];
+    if(!f.isDm) buttons.push({ label: t("chat.members"), action: "members" });
+    buttons.push({ label: t(pf.pinned ? "chat.unpin" : "chat.pin"), action: "pin" });
+    buttons.push({ label: t(pf.muted ? "chat.unmute" : "chat.mute"), action: "mute" });
+    buttons.push({ label: t("chat.mark_unread"), action: "unreadmark" });
+    buttons.push({ label: t(f.isDm ? "chat.del_thread" : "chat.clear_thread"), action: "clear", role: "destructive" });
+    if(other) buttons.push({ label: t("rm.block"), action: "block", role: "destructive" });
+    buttons.push({ label: t("common.cancel"), action: "__cancel", role: "cancel" });
+    window.__vfSheetPost({ buttons: buttons }, function(a){
+      if(a === "clear"){
+        window.__vfSheetPost({
+          title: t(f.isDm ? "chat.del_confirm" : "chat.clear_confirm"),
+          message: t("chat.clear_note"),
+          buttons: [
+            { label: t(f.isDm ? "chat.do_del" : "chat.do_clear"), action: "do", role: "destructive" },
+            { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+          ]
+        }, function(b){ if(b === "do") doClearThread(f); });
+        return;
+      }
+      if(a === "block" && other){
+        window.__vfSheetPost({
+          title: t("rm.block") + " @" + other + "?",
+          message: t("block.note"),
+          buttons: [
+            { label: t("block.do"), action: "do", role: "destructive" },
+            { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+          ]
+        }, function(b){ if(b === "do"){ closeKredsChat(); doBlockUser(other); } });
+        return;
+      }
+      threadMenuDirect(feedId, a);
+    });
+    return;
+  }
+  // Browser-fallback: web-glas-arket (ens, centrerede rækker)
+  threadMenuFeed = feedId;
+  menuMsg = null; // menuen genbruger #cmenu-kortet
   el("cmenu-card").innerHTML = '<div class="mstep">'+
     '<div class="mgroup">'+
       (!f.isDm ? '<button class="mrow" data-tact="members">'+t("chat.members")+'</button>' : '')+
       '<button class="mrow" data-tact="pin">'+t(pf.pinned ? "chat.unpin" : "chat.pin")+'</button>'+
-      '<button class="mrow mrow-ic" data-tact="mute">'+
-        (pf.muted
-          ? '<svg viewBox="0 0 24 24"><g class="stroke"><path d="M18 13.5V10a6 6 0 0 0-12 0v3.5L4 17h16ZM10 20a2.4 2.4 0 0 0 4 0"/></g></svg>'+t("chat.unmute")
-          : MUTE_SVG+t("chat.mute"))+
-      '</button>'+
+      '<button class="mrow" data-tact="mute">'+t(pf.muted ? "chat.unmute" : "chat.mute")+'</button>'+
       '<button class="mrow" data-tact="unreadmark">'+t("chat.mark_unread")+'</button>'+
       '<button class="mrow danger" data-tact="clear">'+t(f.isDm ? "chat.del_thread" : "chat.clear_thread")+'</button>'+
       (other ? '<button class="mrow danger" data-tact="block">'+t("rm.block")+'</button>' : '')+
@@ -654,28 +762,9 @@ function threadMenuAct(act){
   const f = threadById(fid);
   threadMenuFeed = null;
   if(!f) { closeMsgMenu(); return; }
-  const pf = prefs[fid] || {};
-  if(act === "members"){ closeMsgMenu(); openMemberSheet(fid); return; }
-  if(act === "pin"){ closeMsgMenu(); setPref(fid, { pinned: !pf.pinned }); renderChatList(false); return; }
-  if(act === "mute"){
-    closeMsgMenu();
-    const nowMuted = !pf.muted;
-    setPref(fid, { muted: nowMuted });
-    renderChatList(false);
-    toast(t(nowMuted ? "chat.muted_toast" : "chat.unmuted_toast")); // gør resultatet utvetydigt
-    return;
-  }
-  if(act === "unreadmark"){ closeMsgMenu(); setPref(fid, { markedUnread: true }); renderChatList(false); return; }
   if(act === "clear"){
     confirmStep(t(f.isDm ? "chat.del_confirm" : "chat.clear_confirm"), t("chat.clear_note"),
-      t(f.isDm ? "chat.do_del" : "chat.do_clear"), function(){
-        setPref(fid, { clearedAt: new Date().toISOString(), markedUnread: false });
-        if(chatFeed === fid){
-          if(f.isDm) closeKredsChat();
-          else { msgs = []; renderThread(false); }
-        }
-        renderChatList(false);
-      });
+      t(f.isDm ? "chat.do_del" : "chat.do_clear"), function(){ doClearThread(f); });
     return;
   }
   if(act === "block"){
@@ -684,7 +773,10 @@ function threadMenuAct(act){
       closeKredsChat();
       doBlockUser(other);
     });
+    return;
   }
+  closeMsgMenu();
+  threadMenuDirect(fid, act);
 }
 
 /* Reaktion: én pr. bruger — samme emoji fjerner, ny erstatter (optimistisk + realtime) */
@@ -1070,10 +1162,11 @@ export function initChat(){
   const body = el("cv-body");
   let lpTimer = 0, sx = 0, sy = 0, swipeEl = null, swipeMid = 0, swiping = false, lpFired = false;
   body.addEventListener("touchstart", function(e){
-    const msgEl = e.target.closest(".cv-msg");
     lpFired = false; swiping = false; swipeEl = null;
-    if(!msgEl || e.touches.length !== 1) return;
+    if(e.touches.length !== 1) return;
     sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    const msgEl = e.target.closest(".cv-msg");
+    if(!msgEl) return;
     swipeEl = msgEl; swipeMid = Number(msgEl.dataset.mid);
     lpTimer = setTimeout(function(){
       lpFired = true; swipeEl = null;
@@ -1082,6 +1175,8 @@ export function initChat(){
   }, { passive: true });
   body.addEventListener("touchmove", function(e){
     const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
+    // Swipe NED i tråden mens tastaturet er åbent → gem tastaturet (Messenger-adfærd)
+    if(kbOpen && dy > 30 && dy > Math.abs(dx) * 1.4) el("cv-input").blur();
     if(lpTimer && (Math.abs(dx) > 8 || Math.abs(dy) > 8)){ clearTimeout(lpTimer); lpTimer = 0; }
     if(!swipeEl) return;
     const dir = swipeEl.classList.contains("mine") ? -1 : 1; // træk mod midten
