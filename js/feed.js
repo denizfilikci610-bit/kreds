@@ -176,8 +176,8 @@ function memoryHTML(p, inner){
       '</div>'+
       '<div class="mmedia pmedia" data-id="'+p.id+'">'+inner+BIGHEART+'</div>'+
       '<div class="mbelow">'+
-        kredsChipRow(p)+
         actionsHTML(p)+
+        kredsChipRow(p)+ /* på et minde står kreds-mærket UNDER handlingsrækken (ejer-ønske) */
         cap+
         (nativeCmts ? '' : cmtSectionHTML(p))+
       '</div>'+

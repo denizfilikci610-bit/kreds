@@ -392,9 +392,10 @@
   .kchip svg{width:12px;height:12px;flex:0 0 auto}
   .kchip span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
   .kchip:active{opacity:.6}
-  /* Egen række lige over handlingsrækken (kommentar/like/del) — ude af den klemte header */
+  /* Egen række ved handlingsrækken (kommentar/like/del) — ude af den klemte header.
+     Tanker: lige OVER rækken. Minder: lige UNDER den (ejer-ønske). */
   .kchiprow{display:flex;padding:9px 0 0}
-  .post.memory .mbelow .kchiprow{padding:0 0 8px}
+  .post.memory .mbelow .kchiprow{padding:10px 0 0}
 
   .ptext{padding:1px 0 0;font-size:14px;color:var(--ink);white-space:pre-wrap;overflow-wrap:break-word}
 
