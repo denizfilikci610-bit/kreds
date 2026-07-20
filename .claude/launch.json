@@ -4,8 +4,11 @@
     {
       "name": "vibefeed-static",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8742"],
-      "port": 8742
+      "runtimeArgs": [
+        "-c",
+        "import http.server\nclass H(http.server.SimpleHTTPRequestHandler):\n    def end_headers(self):\n        self.send_header('Cache-Control', 'no-store')\n        super().end_headers()\nhttp.server.ThreadingHTTPServer(('', 8744), H).serve_forever()"
+      ],
+      "port": 8744
     }
   ]
 }
