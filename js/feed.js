@@ -235,11 +235,22 @@ function soundTarget(){
   return av ? av.querySelector(sel) : null;
 }
 /* Anvend lyd-tilstanden på alle renderede videoer (kaldes efter hver re-render
-   og ved kontekst-skift: faneskift, detalje-side åbnes/lukkes). */
+   og ved kontekst-skift: faneskift, detalje-side åbnes/lukkes). Genstarter samtidig
+   pausede videoer, så feedet ALTID looper — autoplay kan være blevet afbrudt. */
 export function applyFeedSound(){
   const target = soundTarget();
-  document.querySelectorAll(".pmedia video").forEach(function(v){ v.muted = v !== target; });
-  if(target) target.play().catch(function(){});
+  document.querySelectorAll(".pmedia video").forEach(function(v){
+    v.muted = v !== target;
+    if(v.paused) v.play().catch(function(){});
+  });
+}
+/* Feed-videoer skal ALTID spille i loop. Autoplay kan blive afbrudt af iOS (app i
+   baggrund, afbrudt AVAudioSession, strømsparetilstand) uden at komme i gang igen af
+   sig selv — genstart derfor pausede videoer når appen bliver synlig igen og ved
+   berøring (berørings-kaldet kører i gesture-kontekst, hvor play() også får lov i
+   strømsparetilstand). Grid-miniaturer (.pgrid-item) er bevidst pausede og røres ikke. */
+function ensureFeedVideos(){
+  applyFeedSound();
 }
 /* Vieweren (lightboxen) ejer lyden mens den er åben — sluk feed-lyden helt */
 export function muteFeedSound(){
@@ -1302,6 +1313,11 @@ function timelineClick(e){
 
 export function initFeed(){
 el("app").addEventListener("scroll", appScrolled, { passive:true });
+/* Hold feed-videoer kørende i loop: genstart pausede videoer når appen/fanen bliver
+   synlig igen (retur fra baggrund) og ved hver berøring (gesture-kontekst). */
+document.addEventListener("visibilitychange", function(){ if(!document.hidden) ensureFeedVideos(); });
+window.addEventListener("pageshow", function(){ ensureFeedVideos(); });
+document.addEventListener("touchend", function(){ ensureFeedVideos(); }, { passive:true });
 initAds(); // reklamer i feedet (no-op uden for iOS-appen)
 el("feedbar").addEventListener("click", function(e){
   if(e.target.closest(".fbseek")){
