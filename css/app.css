@@ -1247,6 +1247,17 @@
   .cv-udot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:var(--red)}
   /* Kredsens "ansigt": én avatar, eller to stablede for grupper (Messenger-agtigt) */
   .chatava{position:relative;flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+  /* Privat tråd: lille lås-badge på avataren (kan aldrig få flere medlemmer) */
+  .chatlock{
+    position:absolute;right:-3px;bottom:-3px;
+    width:17px;height:17px;border-radius:50%;
+    background:var(--chip);color:var(--gray);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 2px var(--bg);
+  }
+  .chatlock svg{width:10px;height:10px}
+  .cv-hava .chatlock{width:14px;height:14px;right:-2px;bottom:-2px}
+  .cv-hava .chatlock svg{width:8px;height:8px}
   .chatava2 > :first-child{position:absolute;top:0;right:0}
   .chatava2 > :last-child{position:absolute;bottom:0;left:0;border-radius:50%;box-shadow:0 0 0 2px var(--bg)}
   .cv-hava{flex:0 0 auto;display:flex;margin-left:-6px}

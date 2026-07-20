@@ -150,6 +150,9 @@ const DA = {
   "chat.notread": "Ikke læst",
   "chat.replying": "Du svarer på et minde fra {n}",
   "chat.ctx_close": "Fjern",
+  "chat.only_two": "Kun jer to",
+  "chat.kreds_sub": "Kreds · {n} medlemmer",
+  "chat.kreds_sub_one": "Kreds · 1 medlem",
   "aria.private_comment": "Kommentér privat",
 
   /* Notifikationer */
@@ -592,6 +595,9 @@ const EN = {
   "chat.notread": "Not read",
   "chat.replying": "Replying to a memory from {n}",
   "chat.ctx_close": "Remove",
+  "chat.only_two": "Just you two",
+  "chat.kreds_sub": "Circle · {n} members",
+  "chat.kreds_sub_one": "Circle · 1 member",
   "aria.private_comment": "Comment privately",
 
   /* Notifications */

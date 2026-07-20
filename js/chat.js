@@ -92,11 +92,15 @@ export async function renderChatList(fetchLasts){
   });
   box.innerHTML = feeds.map(chatRowHTML).join("");
 }
-/* Kredsens "ansigt" (Messenger-agtigt): én andens avatar, eller to stablede for grupper */
+/* Kredsens "ansigt" (Messenger-agtigt): én andens avatar, eller to stablede for grupper.
+   Private tråde (DM) får en lille lås på avataren, så man altid kan SE at tråden er
+   låst til jer to og aldrig kan få flere medlemmer. */
+const LOCK_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7"/></g></svg>';
 function chatAvaHTML(f, size){
+  const lock = f.isDm ? '<span class="chatlock" aria-hidden="true">'+LOCK_SVG+'</span>' : '';
   const others = f.members.filter(function(h){ return !me || h !== me.handle; });
-  if(others.length === 0) return '<span class="chatava">'+avaHTML(me ? me.handle : "?", size)+'</span>';
-  if(others.length === 1) return '<span class="chatava">'+avaHTML(others[0], size)+'</span>';
+  if(others.length === 0) return '<span class="chatava">'+avaHTML(me ? me.handle : "?", size)+lock+'</span>';
+  if(others.length === 1) return '<span class="chatava">'+avaHTML(others[0], size)+lock+'</span>';
   const s2 = Math.round(size * 0.72);
   return '<span class="chatava chatava2" style="width:'+size+'px;height:'+size+'px">'+
     avaHTML(others[0], s2)+avaHTML(others[1], s2)+'</span>';
@@ -129,9 +133,10 @@ export async function openKredsChat(feedId){
   chatFeed = feedId;
   el("cv-ava").innerHTML = chatAvaHTML(f, 36);
   el("cv-title").textContent = threadName(f);
+  // Undertitlen gør trådens natur tydelig: privat (kan aldrig vokse) eller kreds
   el("cv-sub").textContent = f.isDm
-    ? "@" + (f.members.filter(function(h){ return h !== me.handle; })[0] || "")
-    : (f.members.length === 1 ? t("list.member_one") : t("list.member_count", { n: f.members.length }));
+    ? t("chat.only_two")
+    : (f.members.length === 1 ? t("chat.kreds_sub_one") : t("chat.kreds_sub", { n: f.members.length }));
   renderCtxBar();
   el("cv-body").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
   el("chatview").classList.add("on");
@@ -201,9 +206,10 @@ export function openThreadWithPost(feedId, postId){
    post_id på beskeden), som når man svarer på en story i Messenger. */
 export async function openDmWith(otherId, postId){
   if(!me || !otherId){ toast(t("err.generic")); return; }
-  const f = allThreads().find(function(x){
-    return x.memberIds.length === 2 &&
-           x.memberIds.indexOf(me.id) >= 0 && x.memberIds.indexOf(otherId) >= 0;
+  // KUN den låste DM-tråd tæller — aldrig en rigtig 2-personers kreds, for den kan
+  // vokse senere, og så kunne et "privat" svar ende for øjnene af en tredje (ejer-krav)
+  const f = (state.dms || []).find(function(x){
+    return x.memberIds.indexOf(me.id) >= 0 && x.memberIds.indexOf(otherId) >= 0;
   });
   let fid = f ? f.id : null;
   if(!fid){
