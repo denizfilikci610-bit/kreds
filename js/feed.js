@@ -1343,8 +1343,11 @@ function timelineClick(e){
       clearTimeout(tapTimer);
       tapTimer = setTimeout(function(){
         tapTimer = null;
+        const mp = findPost(id);
+        // Minde-BILLEDER åbner ikke vieweren — de pinch-zoomes live direkte i feedet
+        // (js/pinchzoom.js). Videoer og tanke-billeder beholder fuldskærms-vieweren.
         if(vid) openLightbox("video", vid.currentSrc || vid.src, id);
-        else if(img) openLightbox("img", img.currentSrc || img.src, id);
+        else if(img && !(mp && mp.kind === "memory" && mp.img)) openLightbox("img", img.currentSrc || img.src, id);
       }, 330);
     }
     return;
