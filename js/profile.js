@@ -40,6 +40,7 @@ const P_GRID_ICON = '<svg viewBox="0 0 24 24" width="17" height="17"><g fill="cu
 const P_LIST_ICON = '<svg viewBox="0 0 24 24" width="17" height="17"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></g></svg>';
 /* Et minde åbnes nu i en dedikeret fuldskærms-side (#memview), ikke inline i profilen. */
 const P_SAVE_ICON = '<svg viewBox="0 0 24 24" width="17" height="17"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M7 3.8h10a1 1 0 0 1 1 1v15.4l-6-4.1-6 4.1V4.8a1 1 0 0 1 1-1Z"/></svg>';
+const P_LOCK_ICON = '<svg viewBox="0 0 24 24"><g fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7"/></g></svg>';
 function gridHTML(posts, emptyText){
   const mems = posts.filter(function(p){ return p.kind === "memory" && (p.img || p.video); });
   return mems.length
@@ -47,7 +48,10 @@ function gridHTML(posts, emptyText){
         const m = p.video
           ? '<video src="'+esc(p.video.src)+'#t=0.1" muted playsinline preload="metadata"></video>'
           : '<img src="'+esc(p.img.src)+'" alt="" loading="lazy" draggable="false">';
-        return '<button class="pgrid-item" data-mem="'+esc(p.id)+'">'+m+(p.video ? '<span class="pgrid-play"></span>' : '')+'</button>';
+        return '<button class="pgrid-item" data-mem="'+esc(p.id)+'">'+m+
+          (p.feed ? '<span class="pgrid-lock">'+P_LOCK_ICON+'</span>' : '')+ /* kreds-minde = lille lås */
+          (p.video ? '<span class="pgrid-play"></span>' : '')+
+        '</button>';
       }).join("")+'</div>'
     : '<div class="emptynote">'+emptyText+'</div>';
 }
@@ -127,8 +131,8 @@ export function closeMemView(){
 
 export async function renderMyPosts(){
   if(!me) return;
-  // Kun venne-opslag (feed_id null) — kreds-opslag hører til i kredsen, ikke på profilen
-  const mine = state.wholePosts.filter(function(p){ return p.u === me.handle && !p.feed; });
+  // ALT man selv har postet — også kreds-opslag (kreds-minder får en lille lås i grid'et)
+  const mine = state.wholePosts.filter(function(p){ return p.u === me.handle; });
   el("stat-posts").textContent = mine.length;
   el("stat-friends").textContent = state.humanFriends.length;
   el("stat-kredse").textContent = state.feeds.length;
@@ -141,7 +145,7 @@ export async function renderMyPosts(){
   restoreVideos(el("myposts"), vsnap);
   applyFeedSound();
   clampMemCaps(el("myposts"));
-  const r = await sb.from("posts").select("id", { count:"exact", head:true }).eq("author", me.id).is("feed_id", null);
+  const r = await sb.from("posts").select("id", { count:"exact", head:true }).eq("author", me.id);
   if(!r.error && r.count != null && me) el("stat-posts").textContent = r.count;
 }
 
@@ -824,7 +828,9 @@ export async function loadPvPosts(){
   const h = pv.u;
   if(!h || !user(h).id) return;
   pvTab = "list"; // frisk profil starter på Tanker
-  const { data, error } = await postQuery().eq("author", user(h).id).is("feed_id", null);
+  // ALLE opslag den besøgende har ADGANG til (RLS afgør: venne-opslag + opslag i
+  // fælles kredse) — kreds-minder vises med lås i grid'et
+  const { data, error } = await postQuery().eq("author", user(h).id);
   if(pv.u !== h) return;
   if(error){
     console.error(error);
@@ -874,7 +880,7 @@ function profTimelineClick(e, isPv){
     const id = gi.dataset.mem;
     const list = isPv ? pv.posts
       : (myTab === "saved" ? state.savedPosts
-         : state.wholePosts.filter(function(p){ return p.u === me.handle && !p.feed; }));
+         : state.wholePosts.filter(function(p){ return p.u === me.handle; }));
     const p = list.find(function(x){ return String(x.id) === String(id); });
     if(p) openMemView(p);
   }
