@@ -505,7 +505,7 @@ export async function loadNotifs(){
    selve kommentar-rækken; et minde i app'en åbner det native kommentar-sheet fokuseret
    på kommentaren (inline-kommentarer findes ikke for minder dér). Mangler kommentaren
    (slettet), lander vi blot på opslaget som før. */
-async function openNotifPost(pid, isCmt, cid){
+export async function openNotifPost(pid, isCmt, cid){
   const { data, error } = await sb.from("posts").select("id, feed_id").eq("id", pid).maybeSingle();
   if(error){ console.error(error); toast(t("err.generic")); return false; }
   if(!data){ toast(t("notif.post_gone")); return false; }

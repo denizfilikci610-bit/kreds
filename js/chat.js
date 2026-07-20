@@ -2,8 +2,9 @@ import { sb } from "./config.js";
 import { me, state, ID2H } from "./store.js";
 import { el, esc, avaHTML, user, toast, fmtTime, imgUrl, registerProfile } from "./helpers.js";
 import { t } from "./i18n.js";
-import { feedById, findPost, postQuery, mapPost, switchTab, loadFeeds } from "./feed.js";
-import { openPostView, openProfile, closeProfile, doBlockUser } from "./profile.js";
+import { feedById, findPost, switchTab, loadFeeds } from "./feed.js";
+import { openProfile, closeProfile, doBlockUser } from "./profile.js";
+import { openNotifPost } from "./notifications.js";
 import { openMemberSheet } from "./kredse.js";
 import { openMemoryFor } from "./compose.js";
 
@@ -1008,15 +1009,12 @@ async function sendChatMsg(){
   markThreadRead();
 }
 
-/* Delings-besked → åbn selve opslaget (hent det hvis det ikke er i de lokale arrays) */
+/* Delings-besked → åbn opslaget I SELVE FEEDET (ejer-ønske): tråden lukkes, feedet
+   skifter til opslagets kreds (eller Hele kredsen), og opslaget hoppes til + fremhæves —
+   samme landing som push-notifikationernes deep-link. */
 async function openSharedPost(pid){
-  let p = findPost(pid);
-  if(!p){
-    const { data, error } = await postQuery().eq("id", Number(pid));
-    if(error || !data || !data.length){ toast(t("notif.post_gone")); return; }
-    p = mapPost(data[0]);
-  }
-  openPostView(p); // minde-siden (z-90) lægger sig OVER chatten (z-85)
+  closeKredsChat();
+  await openNotifPost(Number(pid), false, null); // toaster selv hvis opslaget er væk
 }
 
 /* Realtime på beskeder: INSERT appender, UPDATE (redigering) bytter rækken ud, DELETE
