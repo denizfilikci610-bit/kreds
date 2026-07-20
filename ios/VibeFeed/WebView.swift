@@ -71,7 +71,8 @@ struct WebView: UIViewRepresentable {
             WKUserScript(source: "window.__vfNative = true; window.__vfGlassCard = true;"
                          + " window.__vfFsheet = true; window.__vfMemberSheet = true; window.__vfEsheet = true;"
                          + " window.__vfPhotoLib = true; window.__vfComments = true; window.__vfComposeCamera = true;"
-                         + " window.__vfPostPage = true; window.__vfListPage = true;",
+                         + " window.__vfPostPage = true; window.__vfListPage = true;"
+                         + " window.__vfSheetEmojis = true;",
                          injectionTime: .atDocumentStart, forMainFrameOnly: true)
         )
 

@@ -32,6 +32,9 @@ struct SheetRequest: Equatable {
     let message: String
     let preview: SheetPreview?
     let buttons: [SheetButton]
+    /// Chat: emoji-reaktionsrække over kortet ("emoji:❤️" sendes tilbage ved tap).
+    let emojis: [String]
+    let selected: String
 }
 
 final class SheetModel: ObservableObject {
@@ -64,7 +67,9 @@ final class SheetModel: ObservableObject {
                                title: (dict["title"] as? String) ?? "",
                                message: (dict["message"] as? String) ?? "",
                                preview: preview,
-                               buttons: buttons)
+                               buttons: buttons,
+                               emojis: (dict["emojis"] as? [String]) ?? [],
+                               selected: (dict["selected"] as? String) ?? "")
     }
 }
 
@@ -96,6 +101,9 @@ private struct GlassSheetCard: View {
 
     var body: some View {
         VStack(spacing: 10) {
+            if !req.emojis.isEmpty {
+                emojiRow
+            }
             VStack(spacing: 0) {
                 if let p = req.preview {
                     previewHeader(p)
@@ -119,6 +127,30 @@ private struct GlassSheetCard: View {
 
     private var hairline: some View {
         Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 0.5)
+    }
+
+    /// Chat: emoji-reaktioner i sin egen glas-pille over kortet (én pr. bruger — den
+    /// valgte fremhæves; samme emoji igen fjerner reaktionen i web-laget).
+    private var emojiRow: some View {
+        HStack(spacing: 2) {
+            ForEach(req.emojis, id: \.self) { e in
+                Button {
+                    onAction("emoji:\(e)")
+                } label: {
+                    Text(e)
+                        .font(.system(size: 27))
+                        .padding(7)
+                        .background(
+                            Circle().fill(e == req.selected ? Color.primary.opacity(0.14) : Color.clear)
+                        )
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 4)
+        .modifier(GlassPillBG())
     }
 
     private func rowButton(_ btn: SheetButton) -> some View {
