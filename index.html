@@ -267,6 +267,7 @@
       <button class="back" id="cv-back" aria-label="Tilbage" data-i18n-aria="common.back">
         <svg viewBox="0 0 24 24"><path class="stroke" d="M15 5l-7 7 7 7"/></svg>
       </button>
+      <span class="cv-hava" id="cv-ava"></span>
       <div>
         <div class="t1" id="cv-title"></div>
         <div class="t2" id="cv-sub"></div>
@@ -275,7 +276,9 @@
     <div class="pv-body" id="cv-body"></div>
     <div class="cv-composer">
       <input id="cv-input" placeholder="Skriv en besked ..." data-i18n-ph="chat.ph" maxlength="500" autocomplete="off">
-      <button id="cv-send" data-i18n="chat.send">Send</button>
+      <button id="cv-send" aria-label="Send" data-i18n-aria="chat.send">
+        <svg viewBox="0 0 24 24"><path class="stroke" d="M21.5 2.5 10.8 13.2M21.5 2.5l-6.8 19-3.9-8.3-8.3-3.9Z"/></svg>
+      </button>
     </div>
   </div>
 

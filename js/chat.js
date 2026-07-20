@@ -64,21 +64,28 @@ export async function renderChatList(fetchLasts){
   });
   box.innerHTML = feeds.map(chatRowHTML).join("");
 }
-const CHAT_KREDS_SVG = '<svg viewBox="0 0 24 24"><circle class="stroke" cx="12" cy="12" r="7.3"/><g class="fillic"><circle cx="12" cy="4.7" r="2.1"/><circle cx="5.7" cy="15.7" r="2.1"/><circle cx="18.3" cy="15.7" r="2.1"/></g></svg>';
+/* Kredsens "ansigt" (Messenger-agtigt): én andens avatar, eller to stablede for grupper */
+function chatAvaHTML(f, size){
+  const others = f.members.filter(function(h){ return !me || h !== me.handle; });
+  if(others.length === 0) return '<span class="chatava">'+avaHTML(me ? me.handle : "?", size)+'</span>';
+  if(others.length === 1) return '<span class="chatava">'+avaHTML(others[0], size)+'</span>';
+  const s2 = Math.round(size * 0.72);
+  return '<span class="chatava chatava2" style="width:'+size+'px;height:'+size+'px">'+
+    avaHTML(others[0], s2)+avaHTML(others[1], s2)+'</span>';
+}
 function chatRowHTML(f){
   const m = lastByFeed[f.id];
-  let prev = t("chat.say_hi");
+  let sub = t("chat.say_hi");
   if(m){
     const who = (me && m.authorId === me.id) ? t("chat.you") : (user(m.u).name || m.u).split(/\s+/)[0];
-    prev = esc(who) + ": " + (m.postId ? "📷 " + t("chat.shared_memory") : esc(m.text));
+    sub = esc(who) + ": " + (m.postId ? "📷 " + t("chat.shared_memory") : esc(m.text)) + " · " + esc(m.t);
   }
   return '<button class="chatrow" data-feed="'+esc(f.id)+'">'+
-    '<span class="lki">'+CHAT_KREDS_SVG+'</span>'+
+    chatAvaHTML(f, 52)+
     '<span class="lcol">'+
       '<span class="lnm">'+esc(f.name)+'</span>'+
-      '<span class="lh">'+prev+'</span>'+
+      '<span class="lh">'+sub+'</span>'+
     '</span>'+
-    (m ? '<span class="chattime">'+esc(m.t)+'</span>' : '')+
   '</button>';
 }
 
@@ -87,6 +94,7 @@ export async function openKredsChat(feedId){
   const f = feedById(feedId);
   if(!f || !me){ toast(t("err.generic")); return; }
   chatFeed = feedId;
+  el("cv-ava").innerHTML = chatAvaHTML(f, 36);
   el("cv-title").textContent = f.name;
   el("cv-sub").textContent = f.members.length === 1 ? t("list.member_one") : t("list.member_count", { n: f.members.length });
   el("cv-body").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
@@ -121,12 +129,18 @@ export function resetChat(){
 
 function renderThread(scrollBottom){
   const box = el("cv-body");
+  // Messenger-agtig gruppering: beskeder i træk fra samme afsender klumpes — navn kun
+  // øverst i gruppen, avatar og tid kun ved gruppens sidste boble
   box.innerHTML = msgs.length
-    ? msgs.map(msgHTML).join("")
+    ? msgs.map(function(m, i){
+        const first = i === 0 || msgs[i - 1].authorId !== m.authorId;
+        const last = i === msgs.length - 1 || msgs[i + 1].authorId !== m.authorId;
+        return msgHTML(m, first, last);
+      }).join("")
     : '<div class="emptynote">'+t("chat.no_messages")+'</div>';
   if(scrollBottom) box.scrollTop = box.scrollHeight;
 }
-function msgHTML(m){
+function msgHTML(m, first, last){
   const mine = !!(me && m.authorId === me.id);
   const share = m.postId
     ? '<button class="cv-share" data-post="'+esc(m.postId)+'">'+
@@ -136,12 +150,16 @@ function msgHTML(m){
         '<span class="cv-sharetxt">'+t("chat.shared_memory")+'</span>'+
       '</button>'
     : '';
-  return '<div class="cv-msg'+(mine ? " mine" : "")+'" data-mid="'+esc(m.id)+'">'+
-    (mine ? '' : '<button class="pavab cv-ava" data-u="'+esc(m.u)+'" aria-label="'+t("aria.profile")+'">'+avaHTML(m.u, 28)+'</button>')+
+  const avaCell = mine ? ''
+    : (last
+        ? '<button class="pavab cv-ava" data-u="'+esc(m.u)+'" aria-label="'+t("aria.profile")+'">'+avaHTML(m.u, 28)+'</button>'
+        : '<span class="cv-avasp"></span>');
+  return '<div class="cv-msg'+(mine ? " mine" : "")+(first ? " first" : "")+'" data-mid="'+esc(m.id)+'">'+
+    avaCell+
     '<div class="cv-col">'+
-      (mine ? '' : '<span class="cv-nm">'+esc(user(m.u).name)+'</span>')+
+      (!mine && first ? '<span class="cv-nm">'+esc(user(m.u).name)+'</span>' : '')+
       '<div class="cv-bubble">'+share+(m.text ? '<span class="cv-text">'+esc(m.text)+'</span>' : '')+'</div>'+
-      '<span class="cv-time">'+esc(m.t)+'</span>'+
+      (last ? '<span class="cv-time">'+esc(m.t)+'</span>' : '')+
     '</div>'+
   '</div>';
 }
