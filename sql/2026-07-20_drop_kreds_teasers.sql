@@ -1,0 +1,33 @@
+-- 2026-07-20: Drop kreds_teasers-RPC'en (teaser-featuren er fjernet fra web-appen).
+--
+-- Baggrund: "Hele kredsen" viser nu alle opslag brugeren må se direkte (én
+-- posts-forespørgsel uden feed_id-filter; RLS posts_select afgør synlighed).
+-- De slørede teaser-kort er fjernet fra web-koden, men kravet er at INGEN
+-- længere kan se, at der postes i kredse de ikke er medlem af — og RPC'en
+-- lækker netop den metadata (forfatter, kreds-navn, tidspunkt) til ikke-
+-- medlemmer. Derfor skal funktionen droppes i databasen, ikke kun i UI'et.
+--
+-- TRIN 1 (tjek før drop): find den præcise signatur og eventuelle afhængigheder.
+-- Alle tre tjek forventes at returnere 0 rækker (udover selve funktionen i 1a):
+--
+-- 1a. Signatur (forventet: kreds_teasers() uden argumenter):
+--   select oid::regprocedure from pg_proc where proname = 'kreds_teasers';
+--
+-- 1b. Andre funktioner der refererer den i deres krop:
+--   select proname from pg_proc
+--   where prosrc ilike '%kreds_teasers%' and proname <> 'kreds_teasers';
+--
+-- 1c. Policies eller views der refererer den:
+--   select schemaname, tablename, policyname from pg_policies
+--   where qual ilike '%kreds_teasers%' or with_check ilike '%kreds_teasers%';
+--   select schemaname, viewname from pg_views where definition ilike '%kreds_teasers%';
+--
+-- TRIN 2: selve droppet (grants forsvinder automatisk med funktionen):
+
+drop function if exists public.kreds_teasers();
+
+-- Bemærk: request_join_kreds() og cancel_join_request() beholdes bevidst.
+-- De lækker intet (de OPRETTER/sletter kun en kreds_request for brugeren selv),
+-- og eksisterende afventende anmodninger skal stadig kunne godkendes/afvises af
+-- kreds-ejeren i notifikationslisten. Web-koden kalder dem dog ikke længere
+-- (teaser-knappen var eneste indgang), så de kan ryddes op senere hvis ønsket.
