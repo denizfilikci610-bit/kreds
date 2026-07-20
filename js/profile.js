@@ -3,7 +3,7 @@ import { me, state, FRIEND_SINCE, pv, curTab, expandedCmts } from "./store.js";
 import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConsent, setConsent, imgUrl, ini } from "./helpers.js";
 import { t, setLang, getLang, policyURL } from "./i18n.js";
 import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps } from "./feed.js";
-import { openNativePostPage } from "./comments.js";
+import { openNativePostPage, rerenderPostCmts } from "./comments.js";
 import { openCompose, openStoryCamera } from "./compose.js";
 import { openStoryViewer } from "./stories.js";
 import { renderSearch, refreshSearchAfterFriendAdd } from "./search.js";
@@ -87,8 +87,18 @@ export function openPostView(p){
   openMemView(p);
 }
 export function closeMemView(){
+  // Detalje-sidens udfoldede tråd deler expandedCmts med feedet (samme pid) — klap den
+  // sammen igen ved luk, ellers stod hele tråden pludselig fremme i feedet bagved.
+  const node = el("mv-body").querySelector(".post[data-id]");
   el("memview").classList.remove("on");
   el("mv-body").innerHTML = ""; // stop evt. videoafspilning + frigiv
+  if(node){
+    const pid = Number(node.dataset.id);
+    if(expandedCmts.has(pid)){
+      expandedCmts.delete(pid);
+      rerenderPostCmts(pid);
+    }
+  }
 }
 
 export async function renderMyPosts(){

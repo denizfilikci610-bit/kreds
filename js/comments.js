@@ -62,9 +62,9 @@ export function threadHTML(p){
 }
 function cmtSectionInner(p){
   const n = p.cmts.length;
-  if(!expandedCmts.has(Number(p.id))){
-    return n > 0 ? '<button class="cmt-toggle" data-id="'+p.id+'">'+t("cmt.show", { n:n })+'</button>' : '';
-  }
+  // Sammenklappet = HELT tom: kommentarer ses først når opslaget åbnes (detalje-siden/
+  // sheetet). Antallet står ved kommentar-ikonet (cntHTML), så intet "Vis kommentarer".
+  if(!expandedCmts.has(Number(p.id))) return '';
   return (n > 0
       ? '<button class="cmt-toggle" data-id="'+p.id+'">'+t("cmt.hide")+'</button>'+threadHTML(p)
       : '')+
