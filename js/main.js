@@ -7,7 +7,7 @@ import { initComments, nativeCommentsAction, nativePostPageAction } from "./comm
 import { initKredse, closeFeedSheet, closeMemberSheet, openFeedSheet, nativeFsheetAction, nativeMemberAction } from "./kredse.js";
 import { initCompose, renderComposeDest, openCompose, openThought, openMemory, nativeMemoryPost, openMemoryFallback, nativeMemoryUploaded, nativeMemoryUploadFailed } from "./compose.js";
 import { initSearch, renderSearch } from "./search.js";
-import { initProfile, closeEditSheet, closeActivitySheet, renderStories, renderMyPosts, refreshPv, nativeEsheetAction, avatarStage, bannerStage } from "./profile.js";
+import { initProfile, closeEditSheet, closeActivitySheet, closeListSheet, renderStories, renderMyPosts, refreshPv, nativeEsheetAction, avatarStage, bannerStage } from "./profile.js";
 import { initNotifs, loadNotifs, openFromPush } from "./notifications.js";
 import { initLightbox } from "./lightbox.js";
 import { initStories } from "./stories.js";
@@ -53,7 +53,7 @@ initAuth();
 initRewarded(); // rewarded-video-genvej + belønnings-bro (no-op i browsere)
 initPullRefresh(); // ren pull-to-refresh for hele appen (erstatter native webview-bounce)
 
-el("scrim").addEventListener("click", function(){ closeFeedSheet(); closeMemberSheet(); closeEditSheet(); closeActivitySheet(); closePostEdit(); });
+el("scrim").addEventListener("click", function(){ closeFeedSheet(); closeMemberSheet(); closeEditSheet(); closeActivitySheet(); closeListSheet(); closePostEdit(); });
 
 document.querySelectorAll(".tabbar [data-view]").forEach(function(tab){
   tab.addEventListener("click", function(){ switchTab(tab.dataset.view); });

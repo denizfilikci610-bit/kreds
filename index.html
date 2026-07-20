@@ -72,10 +72,10 @@
       <div class="pbanner" id="own-banner"></div>
       <div class="phead-own">
         <div id="own-ava" style="display:flex;flex:0 0 auto"></div>
-        <div class="pstats">
+        <div class="pstats" id="own-stats">
           <div class="stat"><b id="stat-posts">0</b><span data-i18n="stats.posts">Opslag</span></div>
-          <div class="stat"><b id="stat-friends">0</b><span data-i18n="stats.friends">Venner</span></div>
-          <div class="stat"><b id="stat-kredse">0</b><span data-i18n="stats.kredse">Kredse</span></div>
+          <div class="stat" data-l="friends"><b id="stat-friends">0</b><span data-i18n="stats.friends">Venner</span></div>
+          <div class="stat" data-l="kredse"><b id="stat-kredse">0</b><span data-i18n="stats.kredse">Kredse</span></div>
         </div>
       </div>
       <div class="pinfo">
@@ -224,10 +224,10 @@
       <div class="pbanner" id="pv-banner"></div>
       <div class="phead-own">
         <span id="pv-ava" style="display:flex;flex:0 0 auto"></span>
-        <div class="pstats">
+        <div class="pstats" id="pv-stats">
           <div class="stat"><b id="pv-stat-posts">0</b><span data-i18n="stats.posts">Opslag</span></div>
-          <div class="stat"><b id="pv-stat-friends">0</b><span data-i18n="stats.friends">Venner</span></div>
-          <div class="stat"><b id="pv-stat-kredse">–</b><span data-i18n="stats.kredse">Kredse</span></div>
+          <div class="stat" data-l="friends"><b id="pv-stat-friends">0</b><span data-i18n="stats.friends">Venner</span></div>
+          <div class="stat" data-l="kredse"><b id="pv-stat-kredse">–</b><span data-i18n="stats.kredse">Kredse</span></div>
         </div>
       </div>
       <div class="pinfo">
@@ -354,6 +354,13 @@
     <div class="cmt-grab"></div>
     <div class="cmt-title" id="as-title"></div>
     <div class="ep-scroll" id="as-list" style="flex:1;overflow-y:auto;min-height:120px"></div>
+  </div>
+
+  <!-- Venne-/kreds-liste (tap på tallene på en profil) -->
+  <div class="fsheet" id="lsheet" role="dialog" aria-label="Liste" data-i18n-aria="stats.friends">
+    <div class="cmt-grab"></div>
+    <div class="cmt-title" id="ls-title"></div>
+    <div class="ep-scroll" id="ls-list" style="flex:1;overflow-y:auto;min-height:120px"></div>
   </div>
 
   <!-- Opslag-menu (egne opslag) -->

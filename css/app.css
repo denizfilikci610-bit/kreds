@@ -760,6 +760,18 @@
   .ep-banwrap .pic{font-size:14px;font-weight:700;color:var(--red);padding:4px 0}
 
   .phead-own{display:flex;align-items:center;gap:16px;padding:16px 16px 10px}
+  /* Venner/Kredse-tallene er tap-bare (åbner liste-sheetet) */
+  .stat[data-l]{cursor:pointer}
+  .stat[data-l]:active{opacity:.6}
+  /* ---- Liste-sheet: venner/kredse ---- */
+  .lrow{display:flex;align-items:center;gap:12px;width:100%;padding:10px 16px;text-align:left}
+  .lrow:active{background:var(--chip)}
+  .lcol{display:flex;flex-direction:column;min-width:0}
+  .lnm{font-size:15px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lh{font-size:13px;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lki{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:var(--chip);color:var(--gray);flex:0 0 auto}
+  .lki svg{width:20px;height:20px}
+  .lnote{padding:2px 16px 8px;font-size:12.5px;color:var(--gray)}
   .pstats{display:flex;flex:1;min-width:0;gap:4px;justify-content:space-around;text-align:center}
   .pstats .stat{flex:1;min-width:0}
   .pstats .stat b{display:block;font-size:18px;font-weight:800;color:var(--ink);line-height:1.2}

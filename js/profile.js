@@ -2,7 +2,7 @@ import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab, expandedCmts } from "./store.js";
 import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConsent, setConsent, imgUrl, ini } from "./helpers.js";
 import { t, setLang, getLang, policyURL } from "./i18n.js";
-import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps, applyFeedSound } from "./feed.js";
+import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps, applyFeedSound, switchTab, setFeed } from "./feed.js";
 import { openNativePostPage, rerenderPostCmts } from "./comments.js";
 import { openCompose, openStoryCamera } from "./compose.js";
 import { openStoryViewer } from "./stories.js";
@@ -359,6 +359,70 @@ async function openActivitySheet(h){
     : '<div class="emptynote">'+t("act.empty")+'</div>';
 }
 
+/* ================= Venne- og kreds-lister (tap på tallene på en profil) =================
+   Egen profil: alle venner og alle kredse (client-side). Andres profil: vennelisten via
+   friends_of-RPC'en (blokerings-hygiejne i DB), og kredse viser KUN de kredse man deler,
+   private kredses eksistens må aldrig lækkes (samme princip som teaser-fjernelsen). */
+export function closeListSheet(){
+  el("lsheet").classList.remove("on");
+  if(!el("fsheet").classList.contains("on") && !el("esheet").classList.contains("on") &&
+     !el("edsheet").classList.contains("on") && !el("msheet").classList.contains("on") &&
+     !el("asheet").classList.contains("on"))
+    el("scrim").classList.remove("on");
+}
+const LIST_KREDS_SVG = '<svg viewBox="0 0 24 24"><circle class="stroke" cx="12" cy="12" r="7.3"/><g class="fillic"><circle cx="12" cy="4.7" r="2.1"/><circle cx="5.7" cy="15.7" r="2.1"/><circle cx="18.3" cy="15.7" r="2.1"/></g></svg>';
+function listRowFriend(h){
+  const u = user(h);
+  return '<button class="lrow" data-u="'+esc(h)+'">'+avaHTML(h, 40)+
+    '<span class="lcol"><span class="lnm">'+esc(u.name)+'</span><span class="lh">@'+esc(h)+'</span></span>'+
+  '</button>';
+}
+function listRowKreds(f){
+  return '<button class="lrow" data-feed="'+esc(f.id)+'">'+
+    '<span class="lki">'+LIST_KREDS_SVG+'</span>'+
+    '<span class="lcol"><span class="lnm">'+esc(f.name)+'</span><span class="lh">'+t("list.member_count", { n: f.members.length })+'</span></span>'+
+  '</button>';
+}
+function showListSheet(title){
+  el("ls-title").textContent = title;
+  el("ls-list").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
+  el("scrim").classList.add("on");
+  el("lsheet").classList.add("on");
+}
+async function openFriendsList(h){
+  showListSheet(t("list.friends"));
+  if(me && h === me.handle){
+    const hs = state.humanFriends;
+    el("ls-list").innerHTML = hs.length ? hs.map(listRowFriend).join("") : '<div class="emptynote">'+t("list.empty_friends")+'</div>';
+    return;
+  }
+  const uid = user(h).id;
+  if(!uid){ el("ls-list").innerHTML = '<div class="emptynote">'+t("err.generic")+'</div>'; return; }
+  const { data, error } = await sb.rpc("friends_of", { u: uid });
+  if(!el("lsheet").classList.contains("on")) return; // lukket imens
+  if(error){
+    console.error(error);
+    el("ls-list").innerHTML = '<div class="emptynote">'+t("act.load_failed")+'</div>';
+    return;
+  }
+  (data || []).forEach(registerProfile);
+  const hs = (data || []).map(function(pr){ return pr.handle; })
+    .filter(function(x){ return x && x !== OFFICIAL_HANDLE; })
+    .sort();
+  el("ls-list").innerHTML = hs.length ? hs.map(listRowFriend).join("") : '<div class="emptynote">'+t("list.empty_friends")+'</div>';
+}
+function openKredsList(h){
+  const own = !!(me && h === me.handle);
+  showListSheet(own ? t("list.kredse") : t("list.shared_kredse"));
+  const uid = user(h).id;
+  const feeds = own ? state.feeds : state.feeds.filter(function(f){ return uid && f.memberIds.indexOf(uid) >= 0; });
+  let html = own ? "" : '<div class="lnote">'+t("list.shared_note")+'</div>';
+  html += feeds.length
+    ? feeds.map(listRowKreds).join("")
+    : '<div class="emptynote">'+t(own ? "list.empty_kredse" : "list.empty_shared")+'</div>';
+  el("ls-list").innerHTML = html;
+}
+
 /* ---- Slet konto (popup) ---- */
 export function resetDeleteUI(){
   el("delmodal").classList.remove("on");
@@ -630,6 +694,33 @@ function profTimelineClick(e, isPv){
     if(p) openMemView(p);
   }
 }
+/* ---- Tap på Venner/Kredse-tallene -> liste-sheetet ---- */
+function statTap(e, h){
+  if(!h) return;
+  const st = e.target.closest(".stat[data-l]");
+  if(!st) return;
+  if(st.dataset.l === "friends") openFriendsList(h);
+  else openKredsList(h);
+}
+el("own-stats").addEventListener("click", function(e){ statTap(e, me ? me.handle : null); });
+el("pv-stats").addEventListener("click", function(e){ statTap(e, pv.u); });
+el("ls-list").addEventListener("click", function(e){
+  const fr = e.target.closest(".lrow[data-u]");
+  if(fr){
+    closeListSheet();
+    const h = fr.dataset.u;
+    if(me && h === me.handle){ closeProfile(); switchTab("profil"); }
+    else openProfile(h);
+    return;
+  }
+  const kr = e.target.closest(".lrow[data-feed]");
+  if(kr){
+    closeListSheet();
+    closeProfile();
+    switchTab("feed");
+    setFeed(kr.dataset.feed);
+  }
+});
 el("myposts").addEventListener("click", function(e){ profTimelineClick(e, false); });
 el("pv-posts").addEventListener("click", function(e){ profTimelineClick(e, true); });
 el("editprof").addEventListener("click", function(){
