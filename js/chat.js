@@ -574,13 +574,36 @@ function confirmStep(title, note, btnLabel, onDo){
   '</div>';
 }
 
-/* Søgeresultater i Beskeder-listen: tråde hvis navn matcher + beskeder der matcher */
+/* Søgeresultater i Beskeder-listen: tråde hvis navn matcher, VENNER der matcher
+   (tap åbner/opretter jeres tråd — som at søge venner på liste-siden), og beskeder
+   hvis indhold matcher */
 function renderSearchResults(q, msgRows){
   const box = el("chat-list");
   const ql = q.toLowerCase();
-  const threadRows = allThreads().filter(function(f){
+  const matched = allThreads().filter(function(f){
     return threadName(f).toLowerCase().indexOf(ql) >= 0;
-  }).map(chatRowHTML).join("");
+  });
+  const threadRows = matched.map(chatRowHTML).join("");
+  // Venner der allerede er dækket af en matchende 2-personers tråd vises ikke dobbelt
+  const covered = new Set();
+  matched.forEach(function(f){
+    if(me && f.memberIds.length === 2){
+      f.memberIds.forEach(function(id){ if(id !== me.id) covered.add(id); });
+    }
+  });
+  const friendRows = (state.humanFriends || []).filter(function(h){
+    const uu = user(h);
+    return ((uu.name || h).toLowerCase().indexOf(ql) >= 0 || h.toLowerCase().indexOf(ql) >= 0)
+      && !covered.has(uu.id);
+  }).map(function(h){
+    return '<button class="chatrow" data-friend="'+esc(h)+'">'+
+      '<span class="chatava">'+avaHTML(h, 52)+'</span>'+
+      '<span class="lcol">'+
+        '<span class="lnm">'+esc(user(h).name || h)+'</span>'+
+        '<span class="lh">@'+esc(h)+'</span>'+
+      '</span>'+
+    '</button>';
+  }).join("");
   const msgsHtml = (msgRows || []).map(function(r){
     const f = threadById(r.feed_id);
     if(!f) return "";
@@ -594,6 +617,7 @@ function renderSearchResults(q, msgRows){
     '</button>';
   }).join("");
   const html = threadRows +
+    (friendRows ? '<div class="sectionlabel">'+t("stats.friends")+'</div>'+friendRows : "") +
     (msgsHtml ? '<div class="sectionlabel">'+t("chat.search_msgs")+'</div>'+msgsHtml : "");
   box.innerHTML = html || '<div class="emptynote">'+t("chat.search_none")+'</div>';
 }
@@ -993,7 +1017,10 @@ export function initChat(){
   el("chat-list").addEventListener("click", function(e){
     if(rowLpFired){ rowLpFired = false; return; }
     const r = e.target.closest(".chatrow");
-    if(r) openKredsChat(r.dataset.feed);
+    if(!r) return;
+    // En ven fra søgningen: åbn (eller opret) jeres tråd
+    if(r.dataset.friend){ openDmWith(user(r.dataset.friend).id); return; }
+    openKredsChat(r.dataset.feed);
   });
   // Søgning: tråd-navne filtreres med det samme, besked-indhold søges i databasen
   el("cv-search").addEventListener("input", function(){

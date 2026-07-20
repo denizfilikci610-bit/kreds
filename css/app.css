@@ -1268,8 +1268,14 @@
   /* Pin/mute-mærker på en liste-række */
   .cv-flag{flex:0 0 auto;display:flex;color:var(--gray)}
   .cv-flag svg{width:15px;height:15px}
-  /* Søgefeltet øverst i Beskeder */
-  .chat-search{padding:0 16px 8px}
+  /* Søgefeltet øverst i Beskeder: samme look som søgningen på liste-siden
+     (Venner/Kredse): stort, blødt gråt felt uden kant */
+  .chat-search{padding:12px 16px 10px}
+  .chat-search .searchbox{
+    background:var(--chip);border:none;border-radius:15px;
+    padding:13px 14px;gap:10px;
+  }
+  .chat-search .searchbox svg{width:19px;height:19px}
   /* Tråd-siden: under minde-siden (z-90), så et delt minde kan åbnes ovenpå */
   .chatview{z-index:85}
   /* En åben tråd er sin EGEN side: alt bagved skjules helt, så hverken feedet eller
