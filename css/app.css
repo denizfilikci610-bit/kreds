@@ -1314,7 +1314,9 @@
   /* Gester: lodret scroll ejes af browseren, vandret swipe (Svar) af JS; ingen
      iOS-callout/markering på long-press — kopiering sker via menuen */
   .cv-msg{touch-action:pan-y;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
-  .cv-msg.flash{animation:postflash 1.4s ease}
+  /* Hop-til-citat: KUN selve boblen lyser op (lysstyrke-puls virker på både grå og rød) */
+  .cv-bubble.flash{animation:bubflash 1.3s ease}
+  @keyframes bubflash{0%,100%{filter:none}30%{filter:brightness(1.35)}60%{filter:brightness(1.12)}}
   /* Citat-svar (Messenger-agtigt): "Svar til Navn"-etiket + tydelig chip m. evt.
      miniature, som svar-boblen overlapper — tap på chippen hopper til beskeden */
   .cv-qwrap{display:flex;flex-direction:column;align-items:flex-start;max-width:100%;margin:0 0 -9px}

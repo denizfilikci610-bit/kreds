@@ -269,8 +269,8 @@ function renderCtxBar(){
       : pendingReply.vthumb
       ? '<video class="cv-ctxthumb" src="'+esc(pendingReply.vthumb)+'#t=0.1" muted playsinline preload="metadata"></video>'
       : '';
-    box.innerHTML = th+'<span class="cv-ctxtxt"><b>'+t("chat.replying_to", { n: esc(user(pendingReply.u).name || pendingReply.u) })+'</b><br>'+
-      esc(snip(pendingReply.text, 70) || (pendingReply.media && !th ? t("chat.q_media") : ""))+'</span>'+closeBtn;
+    box.innerHTML = th+'<span class="cv-ctxtxt"><b>'+t("chat.replying_to", { n: esc(user(pendingReply.u).name || pendingReply.u) })+'</b>'+
+      (th ? '' : '<br>'+esc(snip(pendingReply.text, 70) || (pendingReply.media ? t("chat.q_media") : "")))+'</span>'+closeBtn;
     box.hidden = false;
     return;
   }
@@ -863,8 +863,9 @@ function msgHTML(m, first, last){
         : rvid
         ? '<video class="cv-qthumb" src="'+esc(rvid)+'#t=0.1" muted playsinline preload="metadata"></video>'
         : '';
-      const rtxt = esc(snip(rm.text, 64) ||
-        (!rthumb && (rm.postId || rm.mimg || rm.mvideo) ? t("chat.q_media") : ""));
+      // Med miniature vises KUN billedet — aldrig tekst/billedtekst ved siden af
+      const rtxt = rthumb ? "" : esc(snip(rm.text, 64) ||
+        ((rm.postId || rm.mimg || rm.mvideo) ? t("chat.q_media") : ""));
       if(rname || rtxt || rthumb){
         quote = '<div class="cv-qwrap">'+
           '<span class="cv-qlabel">'+
@@ -1165,8 +1166,9 @@ export function initChat(){
       const tEl = el("cv-body").querySelector('.cv-msg[data-mid="'+q.dataset.q+'"]');
       if(tEl){
         tEl.scrollIntoView({ behavior: "smooth", block: "center" });
-        tEl.classList.add("flash");
-        setTimeout(function(){ tEl.classList.remove("flash"); }, 1400);
+        const bEl = tEl.querySelector(".cv-bubble") || tEl; // kun selve boblen lyser op
+        bEl.classList.add("flash");
+        setTimeout(function(){ bEl.classList.remove("flash"); }, 1300);
       }
       return;
     }
