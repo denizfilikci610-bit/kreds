@@ -423,6 +423,88 @@ function openKredsList(h){
   el("ls-list").innerHTML = html;
 }
 
+/* ---- Native liste-SIDE (kun appen): Instagram-agtig fuldskærms-side med Venner/Kredse-
+   faner, søgefelt og swipe-tilbage (ListPageView.swift). Web bygger snapshotten med BEGGE
+   datasæt (fane-skift er rent nativt) og pusher; andres venneliste hentes async via
+   friends_of og efter-pushes. Browser + ældre builds beholder web-sheetet (#lsheet). ---- */
+let nativeListH = null; // handle for den åbne liste-side (null = lukket)
+function friendCard(h){
+  const u = user(h);
+  return { handle: h, name: u.name || h, avatarUrl: u.avatar_path ? imgUrl(u.avatar_path) : "",
+           initials: ini(h), gradient: u.g || [] };
+}
+function listPageSnapshot(h, tab, friendHandles){
+  const own = !!(me && h === me.handle);
+  const uid = user(h).id;
+  const feeds = own ? state.feeds : state.feeds.filter(function(f){ return uid && f.memberIds.indexOf(uid) >= 0; });
+  return {
+    open: true,
+    title: h,
+    tab: tab === "kredse" ? "kredse" : "friends",
+    friends: friendHandles ? friendHandles.map(friendCard) : null, // null = henter stadig
+    kredse: feeds.map(function(f){ return { id: f.id, name: f.name, members: t("list.member_count", { n: f.members.length }) }; }),
+    sharedNote: own ? "" : t("list.shared_note"),
+    labels: {
+      friendsTab: t("list.friends"),
+      kredseTab: own ? t("list.kredse") : t("list.shared_kredse"),
+      searchPh: t("list.search_ph"),
+      emptyFriends: t("list.empty_friends"),
+      emptyKredse: t(own ? "list.empty_kredse" : "list.empty_shared")
+    }
+  };
+}
+async function openNativeListPage(h, tab){
+  nativeListH = h;
+  const own = !!(me && h === me.handle);
+  if(own){
+    if(window.__vfListPagePush) window.__vfListPagePush(listPageSnapshot(h, tab, state.humanFriends));
+    return;
+  }
+  // Andres profil: vis siden straks (venner spinner), hent så listen og efter-push
+  if(window.__vfListPagePush) window.__vfListPagePush(listPageSnapshot(h, tab, null));
+  const uid = user(h).id;
+  if(!uid) return;
+  const { data, error } = await sb.rpc("friends_of", { u: uid });
+  if(nativeListH !== h) return; // lukket eller skiftet imens
+  if(error){
+    console.error(error);
+    if(window.__vfListPagePush) window.__vfListPagePush(listPageSnapshot(h, tab, []));
+    return;
+  }
+  (data || []).forEach(registerProfile);
+  const hs = (data || []).map(function(pr){ return pr.handle; })
+    .filter(function(x){ return x && x !== OFFICIAL_HANDLE; })
+    .sort();
+  if(window.__vfListPagePush) window.__vfListPagePush(listPageSnapshot(h, tab, hs));
+}
+export function closeNativeListPage(){
+  if(nativeListH == null) return;
+  nativeListH = null;
+  if(window.__vfListPagePush) window.__vfListPagePush({ close: true });
+}
+export function nativeListPageAction(payload){
+  if(!payload) return;
+  if(payload.kind === "dismiss"){
+    nativeListH = null;
+    if(window.__vfListPagePush) window.__vfListPagePush({ close: true });
+    return;
+  }
+  if(payload.kind === "profile"){
+    const h = payload.handle;
+    if(!h) return;
+    closeNativeListPage();
+    if(me && h === me.handle){ closeProfile(); switchTab("profil"); }
+    else openProfile(h);
+    return;
+  }
+  if(payload.kind === "kreds"){
+    closeNativeListPage();
+    closeProfile();
+    switchTab("feed");
+    setFeed(payload.id);
+  }
+}
+
 /* ---- Slet konto (popup) ---- */
 export function resetDeleteUI(){
   el("delmodal").classList.remove("on");
@@ -699,7 +781,9 @@ function statTap(e, h){
   if(!h) return;
   const st = e.target.closest(".stat[data-l]");
   if(!st) return;
-  if(st.dataset.l === "friends") openFriendsList(h);
+  const tab = st.dataset.l === "friends" ? "friends" : "kredse";
+  if(window.__vfNative && window.__vfListPage){ openNativeListPage(h, tab); return; }
+  if(tab === "friends") openFriendsList(h);
   else openKredsList(h);
 }
 el("own-stats").addEventListener("click", function(e){ statTap(e, me ? me.handle : null); });

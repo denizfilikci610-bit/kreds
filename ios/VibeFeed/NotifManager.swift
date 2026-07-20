@@ -89,6 +89,9 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
             // The native full-screen post detail page for thought posts (post on top, thread
             // below, swipe-back) — web-driven like the comment sheet.
             Task { @MainActor in PostPageModel.shared.apply(dict) }
+        case "listpage":
+            // The native full-screen friends/kredse list page (Instagram-style) — web-driven.
+            Task { @MainActor in ListPageModel.shared.apply(dict) }
         case "logout":
             UserDefaults.standard.removeObject(forKey: secretKey)
             UserDefaults.standard.removeObject(forKey: lastCheckKey)

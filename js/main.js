@@ -7,7 +7,7 @@ import { initComments, nativeCommentsAction, nativePostPageAction } from "./comm
 import { initKredse, closeFeedSheet, closeMemberSheet, openFeedSheet, nativeFsheetAction, nativeMemberAction } from "./kredse.js";
 import { initCompose, renderComposeDest, openCompose, openThought, openMemory, nativeMemoryPost, openMemoryFallback, nativeMemoryUploaded, nativeMemoryUploadFailed } from "./compose.js";
 import { initSearch, renderSearch } from "./search.js";
-import { initProfile, closeEditSheet, closeActivitySheet, closeListSheet, renderStories, renderMyPosts, refreshPv, nativeEsheetAction, avatarStage, bannerStage } from "./profile.js";
+import { initProfile, closeEditSheet, closeActivitySheet, closeListSheet, renderStories, renderMyPosts, refreshPv, nativeEsheetAction, nativeListPageAction, avatarStage, bannerStage } from "./profile.js";
 import { initNotifs, loadNotifs, openFromPush } from "./notifications.js";
 import { initLightbox } from "./lightbox.js";
 import { initStories } from "./stories.js";
@@ -146,6 +146,11 @@ if(window.__vfNative){
      tilbage via window.vfPostPage (routes i comments.js → eksisterende funktioner). */
   window.__vfPostPagePush = function(msg){ postPanel("postpage", msg); };
   window.vfPostPage = function(payload){ nativePostPageAction(payload); };
+  /* --- Native LISTE-SIDE (Venner/Kredse på en profil, Instagram-agtig) — web-drevet ---
+     profile.js bygger snapshotten (begge faner) og kalder __vfListPagePush; Swift tegner
+     siden (faner, søgning, swipe-tilbage) og melder handlinger tilbage via vfListPage. */
+  window.__vfListPagePush = function(msg){ postPanel("listpage", msg); };
+  window.vfListPage = function(payload){ nativeListPageAction(payload); };
   /* --- Push-notifikations-tap (native didReceive → vfOpenNotif) — åbn det indholdet handler om.
      Payload {kind,pid,fid} = APNs custom keys (eller poll-notifikationens userInfo). Tom payload
      (ældre pushes uden keys) falder tilbage til akt-fanen; openFromPush venter selv på boot. */

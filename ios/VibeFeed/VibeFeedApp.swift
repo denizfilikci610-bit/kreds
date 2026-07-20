@@ -150,6 +150,8 @@ struct ContentView: View {
         // Native full-screen post detail page for thoughts (post + comment thread, swipe-back),
         // web-driven. Applied FIRST so the glass action cards below present on top of it.
         .modifier(PostPageHost())
+        // Native full-screen friends/kredse list page (Instagram-style), web-driven.
+        .modifier(ListPageHost())
         // Real iOS 26 Liquid Glass action sheets (report / post menu / unfriend),
         // presented on top of everything and driven by the web over the JS bridge.
         .modifier(SheetHost())
@@ -225,6 +227,10 @@ struct ContentView: View {
             // The post detail page sends a JSON object literal (send/like/vote/share/menu/… carry payload).
             PostPageModel.shared.onAction = { json in
                 model.webView?.evaluateJavaScript("window.vfPostPage && window.vfPostPage(\(json))", completionHandler: nil)
+            }
+            // The friends/kredse list page sends a JSON object literal (profile/kreds/dismiss).
+            ListPageModel.shared.onAction = { json in
+                model.webView?.evaluateJavaScript("window.vfListPage && window.vfListPage(\(json))", completionHandler: nil)
             }
             // Notification tap → hand the payload to the web app. Reports whether the web
             // was ready (vfOpenNotif defined); NotifManager retries on a cold start until it is.
