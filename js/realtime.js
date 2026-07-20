@@ -7,7 +7,7 @@ import { refreshMemberSheet } from "./kredse.js";
 import { loadPvPosts } from "./profile.js";
 import { renderSearch } from "./search.js";
 import { realtimeNotify, scheduleNotifDotRefresh } from "./notifications.js";
-import { chatRealtime, chatReadsRealtime } from "./chat.js";
+import { chatRealtime, chatReadsRealtime, chatReactsRealtime } from "./chat.js";
 
 /* ================= Realtime + fokus ================= */
 let channel = null, readsChannel = null, refetchTimer = null, pollTimer = null;
@@ -52,8 +52,11 @@ async function doRefetch(){
 export function subscribeRealtime(){
   if(channel) return;
   channel = sb.channel("db-changes")
-    .on("postgres_changes", { event:"INSERT", schema:"public", table:"kreds_messages" }, function(payload){
-      chatRealtime(payload); // nye chat-beskeder appendes live i en åben tråd + listen
+    .on("postgres_changes", { event:"*", schema:"public", table:"kreds_messages" }, function(payload){
+      chatRealtime(payload); // nye/redigerede/fjernede chat-beskeder følger med live
+    })
+    .on("postgres_changes", { event:"*", schema:"public", table:"kreds_message_reactions" }, function(payload){
+      chatReactsRealtime(payload); // reaktioner flytter sig live i en åben tråd
     })
     .on("postgres_changes", { event:"*", schema:"public", table:"posts" }, function(payload){
       scheduleRefetch();

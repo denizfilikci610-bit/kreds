@@ -3,7 +3,7 @@ import { me, state, ID2H } from "./store.js";
 import { el, esc, avaHTML, user, toast, fmtTime, imgUrl, registerProfile } from "./helpers.js";
 import { t } from "./i18n.js";
 import { feedById, findPost, postQuery, mapPost, switchTab, loadFeeds } from "./feed.js";
-import { openPostView, openProfile, closeProfile } from "./profile.js";
+import { openPostView, openProfile, closeProfile, doBlockUser } from "./profile.js";
 
 /* ================= Kreds-chat (Messenger-agtig: hver kreds er en gruppetråd) =================
    Beskeder-fanen (#view-chat) viser en tråd pr. kreds med seneste besked som preview.
@@ -12,7 +12,9 @@ import { openPostView, openProfile, closeProfile } from "./profile.js";
    indsætter DB-triggeren automatisk en delings-besked (post_id) — den vises med en
    miniature af billedet og åbner opslaget ved tap. Realtime-INSERTs appendes live. */
 
-const MSG_SELECT = "*, author_profile:profiles!author(*), post:posts(id, image_path, video_path)";
+const MSG_SELECT = "*, author_profile:profiles!author(*), post:posts(id, image_path, video_path), " +
+  "reply:kreds_messages!reply_to(id, author, text, post_id, image_path, video_path, author_profile:profiles!author(handle, name)), " +
+  "reactions:kreds_message_reactions(user_id, emoji)";
 
 let chatFeed = null;   // åben tråds feed_id (null = lukket)
 let msgs = [];         // den åbne tråds beskeder (ældste først)
@@ -25,10 +27,13 @@ let myReadSent = 0;    // seneste last_read_at jeg selv har skrevet (ms) — mod
 let myReads = {};      // feed_id -> mit læse-mærke (ms) på tværs af tråde (ulæst-prikker)
 let myReadsOk = false; // om myReads er hentet — ellers vises ingen ulæst-prikker
 let pendingShare = null; // { feed, post }: minde der sendes med som kontekst på næste besked
+let pendingReply = null; // { id, u, text, media }: besked der citeres i næste besked
+let editingMsg = null;   // besked-id under redigering (composeren sender da en UPDATE)
 
 function mapMsg(r){
   if(r.author_profile) registerProfile(r.author_profile);
   const post = r.post || null;
+  const rp = r.reply || null;
   return {
     id: r.id,
     feed: r.feed_id,
@@ -38,6 +43,17 @@ function mapMsg(r){
     postId: r.post_id || null,
     thumb: post && post.image_path ? imgUrl(post.image_path) : "",
     thumbVideo: post && !post.image_path && post.video_path ? imgUrl(post.video_path) : "",
+    mimg: r.image_path ? imgUrl(r.image_path) : "",       // beskedens EGET billede
+    mimgPath: r.image_path || null,                        // rå sti (storage-oprydning)
+    mvideo: r.video_path ? imgUrl(r.video_path) : "",
+    edited: !!r.edited_at,
+    replyTo: rp ? {
+      id: rp.id,
+      u: rp.author_profile ? rp.author_profile.handle : (ID2H[rp.author] || "?"),
+      text: rp.text || "",
+      media: !!(rp.post_id || rp.image_path || rp.video_path)
+    } : null,
+    reacts: r.reactions || [],                             // [{user_id, emoji}]
     t: fmtTime(r.created_at),
     created: r.created_at
   };
@@ -130,6 +146,7 @@ export async function openKredsChat(feedId){
   const f = threadById(feedId);
   if(!f || !me){ toast(t("err.generic")); return; }
   if(pendingShare && pendingShare.feed !== feedId) pendingShare = null; // kontekst følger sin tråd
+  pendingReply = null; editingMsg = null;
   chatFeed = feedId;
   el("cv-ava").innerHTML = chatAvaHTML(f, 36);
   el("cv-title").textContent = threadName(f);
@@ -173,11 +190,24 @@ export async function openKredsChat(feedId){
   markThreadRead();
 }
 
-/* Svar-konteksten over composeren: hvilket minde svarer beskeden på? Vises så snart
-   tråden er åbnet via et kommentar-ikon, og kan fjernes med krydset (så sendes beskeden
-   uden vedhæftet minde). */
+/* Konteksten over composeren: et minde der svares på, en besked der citeres, eller en
+   besked under redigering. Krydset fortryder (beskeden sendes så uden kontekst). */
 function renderCtxBar(){
   const box = el("cv-ctx");
+  const closeBtn = '<button class="cv-ctxx" aria-label="'+t("chat.ctx_close")+'">'+
+    '<svg viewBox="0 0 24 24"><path class="stroke" d="M6 6l12 12M18 6 6 18"/></svg>'+
+  '</button>';
+  if(editingMsg != null){
+    box.innerHTML = '<span class="cv-ctxtxt">'+t("chat.editing")+'</span>'+closeBtn;
+    box.hidden = false;
+    return;
+  }
+  if(pendingReply){
+    box.innerHTML = '<span class="cv-ctxtxt"><b>'+t("chat.replying_to", { n: esc(user(pendingReply.u).name || pendingReply.u) })+'</b><br>'+
+      esc(snip(pendingReply.text, 70) || (pendingReply.media ? t("chat.q_media") : ""))+'</span>'+closeBtn;
+    box.hidden = false;
+    return;
+  }
   const p = (pendingShare && chatFeed === pendingShare.feed) ? findPost(pendingShare.post) : null;
   if(!p){ box.hidden = true; box.innerHTML = ""; return; }
   const thumb = p.img
@@ -187,10 +217,21 @@ function renderCtxBar(){
     : '';
   box.innerHTML = thumb+
     '<span class="cv-ctxtxt">'+t("chat.replying", { n: esc(user(p.u).name || p.u) })+'</span>'+
-    '<button class="cv-ctxx" aria-label="'+t("chat.ctx_close")+'">'+
-      '<svg viewBox="0 0 24 24"><path class="stroke" d="M6 6l12 12M18 6 6 18"/></svg>'+
-    '</button>';
+    closeBtn;
   box.hidden = false;
+}
+/* Swipe/menu-valget "Svar": citér beskeden i den næste */
+function startReply(m){
+  pendingReply = { id: m.id, u: m.u, text: m.text, media: !!(m.postId || m.mimg || m.mvideo) };
+  pendingShare = null;
+  editingMsg = null;
+  renderCtxBar();
+  el("cv-input").focus();
+}
+function clearCtx(){
+  if(editingMsg != null) el("cv-input").value = "";
+  pendingReply = null; pendingShare = null; editingMsg = null;
+  renderCtxBar();
 }
 
 /* Kommentar på et KREDS-minde fra feedet: åbn kredsens tråd med mindet som synlig
@@ -243,7 +284,7 @@ function markThreadRead(){
 }
 export function closeKredsChat(){
   chatFeed = null;
-  pendingShare = null;
+  pendingShare = null; pendingReply = null; editingMsg = null;
   renderCtxBar();
   el("cv-input").blur();
   unpinChat();
@@ -359,6 +400,89 @@ function readsHTML(handles){
     return '<span class="cv-read" title="'+esc(user(h).name || h)+'">'+avaHTML(h, 16)+'</span>';
   }).join("")+'</div>';
 }
+
+/* ---- Besked-menuen (long-press/højreklik på en boble): reager, svar, kopiér,
+   rediger (egen, < 15 min), fjern (egen), anmeld/blokér (andres — Apple 1.2) ---- */
+const EMOJIS = ["❤️", "😂", "👍", "😮", "😢", "🙏"];
+let menuMsg = null;   // beskeden menuen er åben for
+let confirmDo = null; // handlingen bag bekræftelses-trinnet
+function openMsgMenu(mid){
+  const m = msgs.find(function(x){ return x.id === mid; });
+  if(!m || !me) return;
+  menuMsg = mid;
+  const mine = m.authorId === me.id;
+  const myReact = (m.reacts || []).find(function(r){ return r.user_id === me.id; });
+  const canEdit = mine && m.text && !m.postId &&
+    Date.now() - new Date(m.created).getTime() < 15 * 60 * 1000;
+  el("cmenu-card").innerHTML = '<div class="mstep">'+
+    '<div class="mgroup cm-emojis">'+EMOJIS.map(function(e2){
+      return '<button class="cm-emoji'+(myReact && myReact.emoji === e2 ? " on" : "")+'" data-e="'+esc(e2)+'">'+e2+'</button>';
+    }).join("")+'</div>'+
+    '<div class="mgroup">'+
+      '<button class="mrow" data-act="reply">'+t("chat.menu_reply")+'</button>'+
+      (m.text ? '<button class="mrow" data-act="copy">'+t("chat.copy")+'</button>' : '')+
+      (canEdit ? '<button class="mrow" data-act="edit">'+t("chat.edit")+'</button>' : '')+
+      (mine ? '<button class="mrow danger" data-act="remove">'+t("chat.remove")+'</button>' : '')+
+      (!mine ? '<button class="mrow danger" data-act="report">'+t("chat.report")+'</button>' : '')+
+      (!mine ? '<button class="mrow danger" data-act="block">'+t("rm.block")+'</button>' : '')+
+    '</div>'+
+    '<button class="mrow mcancel" data-act="cancel">'+t("common.cancel")+'</button>'+
+  '</div>';
+  el("cmenu").classList.add("on");
+}
+function closeMsgMenu(){ el("cmenu").classList.remove("on"); menuMsg = null; confirmDo = null; }
+function confirmStep(title, note, btnLabel, onDo){
+  confirmDo = onDo;
+  el("cmenu-card").innerHTML = '<div class="mstep">'+
+    '<div class="mgroup"><div class="mtitle">'+title+'</div>'+
+    (note ? '<p class="mtext">'+note+'</p>' : '')+
+    '<button class="mrow danger" data-act="__do">'+btnLabel+'</button></div>'+
+    '<button class="mrow mcancel" data-act="cancel">'+t("common.cancel")+'</button>'+
+  '</div>';
+}
+
+/* Reaktion: én pr. bruger — samme emoji fjerner, ny erstatter (optimistisk + realtime) */
+function setReaction(mid, emoji){
+  const m = msgs.find(function(x){ return x.id === mid; });
+  if(!m || !me) return;
+  const cur = (m.reacts || []).find(function(r){ return r.user_id === me.id; });
+  m.reacts = (m.reacts || []).filter(function(r){ return r.user_id !== me.id; });
+  if(cur && cur.emoji === emoji){
+    sb.from("kreds_message_reactions").delete()
+      .eq("message_id", Number(mid)).eq("user_id", me.id)
+      .then(function(r){ if(r.error) console.error(r.error); }, function(){});
+  } else {
+    m.reacts.push({ user_id: me.id, emoji: emoji });
+    sb.from("kreds_message_reactions").upsert({ message_id: Number(mid), user_id: me.id, emoji: emoji })
+      .then(function(r){ if(r.error) console.error(r.error); }, function(){});
+  }
+  renderThread(false);
+}
+/* Slettes/anmeldes trådens nyeste besked, skal listens preview følge med */
+function refreshLastFromThread(){
+  if(chatFeed == null) return;
+  const real = msgs.filter(function(x){ return String(x.id).indexOf("tmp-") !== 0; });
+  if(real.length) lastByFeed[chatFeed] = real[real.length - 1];
+  else delete lastByFeed[chatFeed];
+  if(el("view-chat").classList.contains("active")) renderChatList(false);
+}
+async function doDeleteMsg(m){
+  msgs = msgs.filter(function(x){ return x.id !== m.id; });
+  renderThread(false);
+  refreshLastFromThread();
+  const { error } = await sb.from("kreds_messages").delete().eq("id", Number(m.id));
+  if(error){ console.error(error); toast(t("err.generic")); return; }
+  if(m.mimgPath) sb.storage.from("post-images").remove([m.mimgPath]).catch(function(){});
+}
+async function doReportMsg(m){
+  const { error } = await sb.from("message_reports").insert({ message_id: Number(m.id), user_id: me.id });
+  if(error){ console.error(error); toast(t("err.generic")); return; }
+  msgs = msgs.filter(function(x){ return x.id !== m.id; }); // skjult for anmelderen (RLS-gate)
+  renderThread(false);
+  refreshLastFromThread();
+  toast(t("chat.reported"));
+}
+function snip(s, n){ return s && s.length > n ? s.slice(0, n - 1) + "…" : (s || ""); }
 function msgHTML(m, first, last){
   const mine = !!(me && m.authorId === me.id);
   const share = m.postId
@@ -369,6 +493,29 @@ function msgHTML(m, first, last){
         '<span class="cv-sharetxt">'+t("chat.shared_memory")+'</span>'+
       '</button>'
     : '';
+  // Beskedens eget billede/video (uden boble-baggrund når det står alene, som Messenger)
+  const media = m.mimg
+    ? '<img class="cv-mimg" src="'+esc(m.mimg)+'" alt="">'
+    : m.mvideo
+    ? '<video class="cv-mimg" src="'+esc(m.mvideo)+'" controls playsinline preload="metadata"></video>'
+    : '';
+  const bare = media && !m.text && !share;
+  // Citat-svar: den citerede besked som lille blok bag/over boblen — tap hopper derop
+  const quote = m.replyTo
+    ? '<button class="cv-quote" data-q="'+esc(m.replyTo.id)+'">'+
+        '<b>'+esc((user(m.replyTo.u).name || m.replyTo.u).split(/\s+/)[0])+'</b> '+
+        esc(snip(m.replyTo.text, 64) || (m.replyTo.media ? t("chat.q_media") : ""))+
+      '</button>'
+    : '';
+  // Reaktioner: grupperet pille under boblens hjørne
+  const counts = {};
+  (m.reacts || []).forEach(function(r){ counts[r.emoji] = (counts[r.emoji] || 0) + 1; });
+  const rkeys = Object.keys(counts);
+  const reacts = rkeys.length
+    ? '<span class="cv-reacts">'+rkeys.map(function(e){
+        return esc(e)+(counts[e] > 1 ? '<b>'+counts[e]+'</b>' : '');
+      }).join("")+'</span>'
+    : '';
   const avaCell = mine ? ''
     : (last
         ? '<button class="pavab cv-ava" data-u="'+esc(m.u)+'" aria-label="'+t("aria.profile")+'">'+avaHTML(m.u, 28)+'</button>'
@@ -377,8 +524,10 @@ function msgHTML(m, first, last){
     avaCell+
     '<div class="cv-col">'+
       (!mine && first ? '<span class="cv-nm">'+esc(user(m.u).name)+'</span>' : '')+
-      '<div class="cv-bubble">'+share+(m.text ? '<span class="cv-text">'+esc(m.text)+'</span>' : '')+'</div>'+
-      (last ? '<span class="cv-time">'+esc(m.t)+'</span>' : '')+
+      quote+
+      '<div class="cv-bubble'+(bare ? " cv-bare" : "")+'">'+share+media+(m.text ? '<span class="cv-text">'+esc(m.text)+'</span>' : '')+'</div>'+
+      reacts+
+      (last ? '<span class="cv-time">'+esc(m.t)+(m.edited ? ' · '+t("chat.edited") : '')+'</span>' : '')+
     '</div>'+
   '</div>';
 }
@@ -388,22 +537,47 @@ async function sendChatMsg(){
   const inp = el("cv-input");
   const text = inp.value.trim();
   if(!text) return;
+  // Redigerings-tilstand: composeren opdaterer den valgte besked i stedet for at sende
+  if(editingMsg != null){
+    const mid = editingMsg;
+    const feedId = chatFeed;
+    editingMsg = null;
+    inp.value = "";
+    renderCtxBar();
+    const { data, error } = await sb.from("kreds_messages")
+      .update({ text: text }).eq("id", mid).select(MSG_SELECT).single();
+    if(chatFeed !== feedId) return;
+    if(error || !data){
+      console.error(error);
+      toast(t("err.generic"));
+      return;
+    }
+    const upd = mapMsg(data);
+    msgs = msgs.map(function(x){ return x.id === upd.id ? upd : x; });
+    if(lastByFeed[feedId] && lastByFeed[feedId].id === upd.id) lastByFeed[feedId] = upd;
+    renderThread(false);
+    return;
+  }
   inp.value = "";
   const feedId = chatFeed;
-  // Svar på et minde: første besked i tråden bærer mindet som kontekst (post_id)
+  // Kontekst: et minde (post_id) eller et citat-svar (reply_to)
   const share = (pendingShare && pendingShare.feed === feedId) ? pendingShare : null;
+  const reply = pendingReply;
   const sp = share ? findPost(share.post) : null;
   // Optimistisk: vis beskeden med det samme, byt til den rigtige række fra serveren
   const temp = { id: "tmp-" + Date.now(), feed: feedId, u: me.handle, authorId: me.id,
                  text: text, postId: share ? share.post : null,
                  thumb: sp && sp.img ? sp.img.src : "",
                  thumbVideo: sp && !sp.img && sp.video ? sp.video.src : "",
+                 mimg: "", mvideo: "", edited: false, reacts: [],
+                 replyTo: reply || null,
                  t: fmtTime(new Date().toISOString()), created: new Date().toISOString() };
   msgs.push(temp);
   renderThread(true);
   const { data, error } = await sb.from("kreds_messages")
     .insert({ feed_id: feedId, author: me.id, text: text,
-              post_id: share ? Number(share.post) : null })
+              post_id: share ? Number(share.post) : null,
+              reply_to: reply ? Number(reply.id) : null })
     .select(MSG_SELECT)
     .single();
   if(chatFeed !== feedId) return; // tråden blev lukket/skiftet imens
@@ -416,7 +590,9 @@ async function sendChatMsg(){
     return;
   }
   const real = mapMsg(data);
-  if(share && pendingShare === share){ pendingShare = null; renderCtxBar(); } // konteksten er afleveret
+  if(share && pendingShare === share) pendingShare = null; // konteksten er afleveret
+  if(reply && pendingReply === reply) pendingReply = null;
+  renderCtxBar();
   if(!msgs.some(function(x){ return x.id === real.id; })) msgs.push(real);
   lastByFeed[feedId] = real;
   renderThread(true);
@@ -434,14 +610,44 @@ async function openSharedPost(pid){
   openPostView(p); // minde-siden (z-90) lægger sig OVER chatten (z-85)
 }
 
-/* Realtime-INSERT: hent den fulde række (payload har ingen joins; RLS afgør synlighed) */
+/* Realtime på beskeder: INSERT appender, UPDATE (redigering) bytter rækken ud, DELETE
+   (fjernet besked) fjerner den. INSERT/UPDATE genhentes m. MSG_SELECT (payload har
+   ingen joins; RLS afgør synlighed); DELETE bærer kun beskedens id. */
 export function chatRealtime(payload){
-  if(!me || !payload || payload.eventType !== "INSERT") return;
+  if(!me || !payload) return;
+  if(payload.eventType === "DELETE"){
+    const oldId = payload.old && payload.old.id;
+    if(oldId == null) return;
+    if(msgs.some(function(x){ return x.id === oldId; })){
+      msgs = msgs.filter(function(x){ return x.id !== oldId; });
+      if(el("chatview").classList.contains("on")) renderThread(false);
+      refreshLastFromThread();
+      return;
+    }
+    // Var den slettede besked et liste-preview, hentes previews friskt
+    let stale = false;
+    Object.keys(lastByFeed).forEach(function(fid){
+      if(lastByFeed[fid] && lastByFeed[fid].id === oldId){ delete lastByFeed[fid]; stale = true; }
+    });
+    if(stale && el("view-chat").classList.contains("active")) renderChatList(true);
+    return;
+  }
   const row = payload.new;
   if(!row || !row.id) return;
   sb.from("kreds_messages").select(MSG_SELECT).eq("id", row.id).maybeSingle().then(function(r){
     if(r.error || !r.data) return;
     const m = mapMsg(r.data);
+    if(payload.eventType === "UPDATE"){
+      if(chatFeed === m.feed && el("chatview").classList.contains("on")){
+        msgs = msgs.map(function(x){ return x.id === m.id ? m : x; });
+        renderThread(false);
+      }
+      if(lastByFeed[m.feed] && lastByFeed[m.feed].id === m.id){
+        lastByFeed[m.feed] = m;
+        if(el("view-chat").classList.contains("active")) renderChatList(false);
+      }
+      return;
+    }
     lastByFeed[m.feed] = m;
     const proceed = function(){
       if(el("view-chat").classList.contains("active")) renderChatList(false);
@@ -458,6 +664,18 @@ export function chatRealtime(payload){
     if(!threadById(m.feed)) loadFeeds().then(proceed, proceed);
     else proceed();
   }, function(){});
+}
+
+/* Realtime på reaktioner: flyt emoji-pillerne live i en åben tråd */
+export function chatReactsRealtime(payload){
+  if(!me || !payload) return;
+  const row = payload.eventType === "DELETE" ? payload.old : payload.new;
+  if(!row || row.message_id == null || !row.user_id) return;
+  const m = msgs.find(function(x){ return x.id === row.message_id; });
+  if(!m || !el("chatview").classList.contains("on")) return;
+  m.reacts = (m.reacts || []).filter(function(r){ return r.user_id !== row.user_id; });
+  if(payload.eventType !== "DELETE" && row.emoji) m.reacts.push({ user_id: row.user_id, emoji: row.emoji });
+  renderThread(false);
 }
 
 /* Realtime på kvitteringer (egen kanal i realtime.js): flyt avatarerne live i en åben tråd */
@@ -494,8 +712,8 @@ export function initChat(){
   });
   el("cv-back").addEventListener("click", closeKredsChat);
   el("cv-ctx").addEventListener("click", function(e){
-    // Krydset fjerner svar-konteksten — beskeden sendes så uden vedhæftet minde
-    if(e.target.closest(".cv-ctxx")){ pendingShare = null; renderCtxBar(); }
+    // Krydset fortryder konteksten (minde/citat/redigering)
+    if(e.target.closest(".cv-ctxx")) clearCtx();
   });
   el("cv-send").addEventListener("click", sendChatMsg);
   el("cv-input").addEventListener("keydown", function(e){
@@ -506,6 +724,18 @@ export function initChat(){
     if(r) openKredsChat(r.dataset.feed);
   });
   el("cv-body").addEventListener("click", function(e){
+    if(lpFired){ lpFired = false; return; } // long-press må ikke også udløse et tap
+    const q = e.target.closest(".cv-quote");
+    if(q){
+      // Tap på citatet hopper til den citerede besked og fremhæver den
+      const tEl = el("cv-body").querySelector('.cv-msg[data-mid="'+q.dataset.q+'"]');
+      if(tEl){
+        tEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        tEl.classList.add("flash");
+        setTimeout(function(){ tEl.classList.remove("flash"); }, 1400);
+      }
+      return;
+    }
     const sh = e.target.closest(".cv-share");
     if(sh){ openSharedPost(sh.dataset.post); return; }
     const av = e.target.closest(".pavab");
@@ -514,6 +744,97 @@ export function initChat(){
       closeKredsChat();
       if(me && av.dataset.u === me.handle){ closeProfile(); switchTab("profil"); }
       else openProfile(av.dataset.u);
+    }
+  });
+
+  /* Long-press åbner besked-menuen; vandret swipe mod midten = Svar (Messenger-gesten).
+     Lodret bevægelse vinder altid (scroll), og en udløst long-press sluger det
+     efterfølgende klik. Højreklik (desktop) åbner også menuen. */
+  const body = el("cv-body");
+  let lpTimer = 0, sx = 0, sy = 0, swipeEl = null, swipeMid = 0, swiping = false, lpFired = false;
+  body.addEventListener("touchstart", function(e){
+    const msgEl = e.target.closest(".cv-msg");
+    lpFired = false; swiping = false; swipeEl = null;
+    if(!msgEl || e.touches.length !== 1) return;
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    swipeEl = msgEl; swipeMid = Number(msgEl.dataset.mid);
+    lpTimer = setTimeout(function(){
+      lpFired = true; swipeEl = null;
+      openMsgMenu(swipeMid);
+    }, 420);
+  }, { passive: true });
+  body.addEventListener("touchmove", function(e){
+    const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
+    if(lpTimer && (Math.abs(dx) > 8 || Math.abs(dy) > 8)){ clearTimeout(lpTimer); lpTimer = 0; }
+    if(!swipeEl) return;
+    const dir = swipeEl.classList.contains("mine") ? -1 : 1; // træk mod midten
+    const d = dx * dir;
+    if(!swiping){
+      if(d > 14 && Math.abs(dx) > Math.abs(dy) * 1.2) swiping = true;
+      else if(Math.abs(dy) > 12){ swipeEl = null; return; } // lodret scroll vinder
+      else return;
+    }
+    const off = Math.max(0, Math.min(64, d - 8));
+    swipeEl.style.transform = "translateX(" + (off * dir) + "px)";
+    swipeEl.classList.toggle("swiped", off > 44);
+  }, { passive: true });
+  body.addEventListener("touchend", function(){
+    clearTimeout(lpTimer); lpTimer = 0;
+    if(swipeEl && swiping){
+      const hit = swipeEl.classList.contains("swiped");
+      const sEl = swipeEl, mid = swipeMid;
+      sEl.style.transition = "transform .18s ease";
+      sEl.style.transform = "";
+      sEl.classList.remove("swiped");
+      setTimeout(function(){ sEl.style.transition = ""; }, 200);
+      if(hit){
+        const m = msgs.find(function(x){ return x.id === mid; });
+        if(m) startReply(m);
+      }
+    }
+    swipeEl = null; swiping = false;
+  });
+  body.addEventListener("contextmenu", function(e){
+    const msgEl = e.target.closest(".cv-msg");
+    if(!msgEl) return;
+    e.preventDefault();
+    openMsgMenu(Number(msgEl.dataset.mid));
+  });
+
+  /* Besked-menuens valg (inkl. bekræftelses-trin for Fjern/Anmeld/Blokér) */
+  el("cmenu").addEventListener("click", function(e){
+    const em = e.target.closest(".cm-emoji");
+    if(em){ const mid = menuMsg; closeMsgMenu(); setReaction(mid, em.dataset.e); return; }
+    const row = e.target.closest("[data-act]");
+    if(!row){ if(e.target === el("cmenu")) closeMsgMenu(); return; }
+    const act = row.dataset.act;
+    if(act === "cancel"){ closeMsgMenu(); return; }
+    if(act === "__do"){ const f = confirmDo; closeMsgMenu(); if(f) f(); return; }
+    const m = msgs.find(function(x){ return x.id === menuMsg; });
+    if(!m){ closeMsgMenu(); return; }
+    if(act === "reply"){ closeMsgMenu(); startReply(m); }
+    else if(act === "copy"){
+      closeMsgMenu();
+      try{ navigator.clipboard.writeText(m.text); toast(t("chat.copied")); }catch(_e){}
+    }
+    else if(act === "edit"){
+      closeMsgMenu();
+      editingMsg = m.id; pendingReply = null; pendingShare = null;
+      el("cv-input").value = m.text;
+      renderCtxBar();
+      el("cv-input").focus();
+    }
+    else if(act === "remove"){
+      confirmStep(t("chat.remove_confirm"), null, t("chat.remove"), function(){ doDeleteMsg(m); });
+    }
+    else if(act === "report"){
+      confirmStep(t("chat.report_confirm"), t("chat.report_note"), t("chat.report"), function(){ doReportMsg(m); });
+    }
+    else if(act === "block"){
+      confirmStep(t("rm.block") + " @" + esc(m.u) + "?", t("block.note"), t("block.do"), function(){
+        closeKredsChat(); // tråden med den blokerede skal ikke stå åben bagved
+        doBlockUser(m.u);
+      });
     }
   });
 }
