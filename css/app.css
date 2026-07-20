@@ -476,6 +476,18 @@
   .cmtp-lock svg{width:9px;height:9px}
   /* Minde-compose: ingen afstemning */
   .compose.memory #pollbtn{display:none}
+  /* Minde-format (browser-fallback): 1:1/4:5-piller + center-beskåret preview */
+  .mem-format{display:flex;gap:8px;margin:0 0 8px}
+  .mem-format[hidden]{display:none}
+  .mf-btn{
+    padding:7px 16px;border-radius:999px;
+    font-size:13.5px;font-weight:700;color:var(--gray);
+    background:var(--chip);
+  }
+  .mf-btn.on{background:var(--red);color:#fff}
+  #attach-img.memcrop{width:100%;object-fit:cover}
+  #attach-img.memcrop.a11{aspect-ratio:1/1}
+  #attach-img.memcrop.a45{aspect-ratio:4/5}
   /* Profil: toggle (Alt/Minder) + 3-kolonne minde-grid */
   /* Instagram-agtige profil-faner: ikoner i fuld bredde med streg under den aktive */
   .profbar{display:flex;border-top:1px solid var(--line)}

@@ -171,6 +171,11 @@
         <textarea id="compose-field" placeholder="Hvad sker der?" data-i18n-ph="compose.ph.default" maxlength="280"></textarea>
         <div class="pollbox" id="pollbox" style="display:none"></div>
         <div class="attach" id="attach">
+          <!-- Minde-format (browser-fallback): 1080x1080 eller 1080x1350, center-beskåret -->
+          <div class="mem-format" id="mem-format" hidden>
+            <button type="button" class="mf-btn" data-mf="11">1:1</button>
+            <button type="button" class="mf-btn on" data-mf="45">4:5</button>
+          </div>
           <img id="attach-img" alt="Valgt billede" data-i18n-alt="attach.alt">
           <video id="attach-vid" playsinline muted loop style="display:none"></video>
           <button id="attach-remove" aria-label="Fjern medie" data-i18n-aria="attach.remove">

@@ -7,6 +7,7 @@ import { mentionCards } from "./mentions.js";
 
 /* ================= Skriv ================= */
 let pendingImg = null; // { blob, url }
+let memAspect = "45";  // minde-format i browser-fallbacket: "11" = 1080x1080, "45" = 1080x1350
 let pendingVid = null; // { file, url }
 let pendingUploaded = null; // { path, isVideo } — allerede uploadet native medie (Tag med kamera)
 export const ta = el("compose-field");
@@ -87,6 +88,7 @@ export function getComposeKind(){ return composeKind; }
 function openComposeWith(kind){
   composeKind = (kind === "memory") ? "memory" : "thought";
   composeDest = destOverride || state.currentFeed;
+  memAspect = "45";           // minde-format starter altid som 4:5
   clearPendingImg();          // frisk medie hver gang (vælgeren sidder nu FØR compose)
   ta.value = ""; updateRing();
   el("compose").classList.toggle("memory", composeKind === "memory");
@@ -149,6 +151,7 @@ function openPhotoLib(purpose, start){
     labels: {
       title: purpose === "story" ? t("story.title") : t("compose.title.memory"), next: t("memory.next"), cancel: t("common.cancel"), share: purpose === "story" ? t("story.share") : t("compose.post"),
       captionPlaceholder: t("compose.ph.memory"), destLabel: t("compose.dest"), allLabel: t("feedbar.all"),
+      fit: t("memory.fit"),
       limited: t("photolib.limited"), manage: t("photolib.manage"), denied: t("photolib.denied"), settings: t("photolib.settings"),
       trimHint: t("memory.trim_hint")
     }
@@ -259,6 +262,41 @@ function clearImg(){
   pendingUploaded = null;
   el("attach-img").removeAttribute("src");
   el("attach-img").style.display = "none";
+  syncMemFormat();
+}
+/* Minde-format i browser-fallbacket: vis 1:1/4:5-vælgeren når et minde har et billede,
+   og lad previewet vise det center-beskårne udsnit (uploadet beskæres til præcis
+   1080x1080 eller 1080x1350 ved deling) */
+function syncMemFormat(){
+  const on = composeKind === "memory" && !!pendingImg;
+  el("mem-format").hidden = !on;
+  const img = el("attach-img");
+  img.classList.toggle("memcrop", on);
+  img.classList.toggle("a11", on && memAspect === "11");
+  img.classList.toggle("a45", on && memAspect === "45");
+  document.querySelectorAll("#mem-format .mf-btn").forEach(function(b){
+    b.classList.toggle("on", b.dataset.mf === memAspect);
+  });
+}
+/* Center-beskær det valgte billede til det præcise 1080-format */
+function memCropBlob(url){
+  return new Promise(function(resolve, reject){
+    const img = new Image();
+    img.onload = function(){
+      const W = 1080, H = memAspect === "11" ? 1080 : 1350;
+      const s = Math.max(W / img.width, H / img.height); // cover
+      const c = document.createElement("canvas");
+      c.width = W; c.height = H;
+      c.getContext("2d").drawImage(img,
+        (W - img.width * s) / 2, (H - img.height * s) / 2,
+        img.width * s, img.height * s);
+      c.toBlob(function(blob){
+        if(blob) resolve(blob); else reject(new Error("crop_failed"));
+      }, "image/jpeg", 0.88);
+    };
+    img.onerror = function(){ reject(new Error("crop_failed")); };
+    img.src = url;
+  });
 }
 function clearVid(){
   if(pendingVid && pendingVid.url) URL.revokeObjectURL(pendingVid.url);
@@ -308,6 +346,7 @@ function handleImageFile(file){
       pendingImg = { blob:blob, url:purl };
       el("attach-img").src = purl;
       el("attach-img").style.display = "block";
+      syncMemFormat();
       syncAttach();
       if(hadVid) toast(t("compose.vid_removed"));
       canPost();
@@ -470,6 +509,12 @@ function onFilePicked(input){
 }
 el("file-input").addEventListener("change", function(){ onFilePicked(this); });
 el("cam-photo").addEventListener("change", function(){ onFilePicked(this); });
+el("mem-format").addEventListener("click", function(e){
+  const b = e.target.closest(".mf-btn");
+  if(!b) return;
+  memAspect = b.dataset.mf === "11" ? "11" : "45";
+  syncMemFormat();
+});
 el("cam-video").addEventListener("change", function(){ onFilePicked(this); });
 el("attach-remove").addEventListener("click", function(){
   clearPendingImg();
@@ -527,8 +572,10 @@ el("compose-post").addEventListener("click", async function(){
       path = pendingUploaded.path;
       if(pendingUploaded.isVideo) vidPath = path; else imgPath = path;
     } else if(pendingImg){
+      // Et minde SKAL være 1080x1080 eller 1080x1350 — center-beskær til det valgte format
+      const blob = composeKind === "memory" ? await memCropBlob(pendingImg.url) : pendingImg.blob;
       path = me.id + "/" + uuid() + ".jpg";
-      const up = await sb.storage.from("post-images").upload(path, pendingImg.blob, { contentType:"image/jpeg" });
+      const up = await sb.storage.from("post-images").upload(path, blob, { contentType:"image/jpeg" });
       if(up.error) throw up.error;
       if(up.data && up.data.path) path = up.data.path;
       imgPath = path;
