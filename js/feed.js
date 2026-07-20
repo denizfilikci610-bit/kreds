@@ -2,7 +2,7 @@ import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, expandedCmts, pv, cstate, curTab, setCurTab, setCfilePid, ID2H, FRIEND_SINCE } from "./store.js";
 import { el, esc, richText, avaHTML, user, grad, toast, fmtTime, fmtDate, imgUrl, registerProfile, BADGE, HEART_SVG } from "./helpers.js";
 import { t, likesLabel } from "./i18n.js";
-import { renderChatList, openKredsChat, openDmWith } from "./chat.js";
+import { renderChatList, openDmWith, openThreadWithPost } from "./chat.js";
 import { cmtSectionHTML, toggleCmtSection, rerenderComposer, sendComment, toggleCmtLike, deleteComment, cInput, cKey, clearReply, clearCImg, pushNativeComments, pushNativePostPage } from "./comments.js";
 import { openFeedSheet, openMemberSheet } from "./kredse.js";
 import { openProfile, closeProfile, closeMemView, renderMyPosts, renderStories, refreshPv, doBlockUser, openPostView } from "./profile.js";
@@ -105,13 +105,23 @@ function postBody(p, media){
   return textHTML + media + pollHTML(p);
 }
 /* Handlingsrække (kommentar/like/del) — delt af tanke- og minde-skallen så alle interaktioner er ens. */
+const CMT_SVG = '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>';
 function actionsHTML(p){
+  // Kreds-minde (ikke ens eget): ekstra PRIVAT kommentar-ikon m. lås — svar direkte til
+  // forfatteren i jeres egen tråd i stedet for i kredsens fælles tråd
+  const privCmt = (p.kind === "memory" && p.feed && me && p.u !== me.handle)
+    ? '<button class="cmtp-btn" data-id="'+p.id+'" aria-label="'+t("aria.private_comment")+'">'+
+        CMT_SVG+
+        '<span class="cmtp-lock"><svg viewBox="0 0 24 24"><g class="stroke"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7"/></g></svg></span>'+
+      '</button>'
+    : '';
   return (
     '<div class="pactions">'+
       '<button class="cmt-btn" data-id="'+p.id+'" aria-label="'+t("aria.comments")+'">'+
-        '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>'+
+        CMT_SVG+
         cntHTML(p.kind === "memory" ? 0 : p.cmts.length)+ /* minder tæller i tråden, ikke her */
       '</button>'+
+      privCmt+
       '<button class="like-btn'+(p.liked ? " on" : "")+'" data-id="'+p.id+'" aria-pressed="'+p.liked+'" aria-label="'+t("aria.like")+'">'+
         HEART_SVG+
         cntHTML(p.likeCount)+
@@ -1243,6 +1253,17 @@ function timelineClick(e){
     cm.textContent = t(open ? "memory.less" : "memory.more");
     return;
   }
+  const cmp = e.target.closest(".cmtp-btn");
+  if(cmp){
+    // Privat kommentar (lås) på et kreds-minde: svar direkte til forfatteren i jeres
+    // egen tråd (2-personers kreds eller DM) med mindet som kontekst
+    const pp = findPost(cmp.dataset.id);
+    if(pp){
+      if(el("memview").classList.contains("on")) closeMemView();
+      openDmWith(user(pp.u).id, pp.id);
+    }
+    return;
+  }
   const cmt = e.target.closest(".cmt-btn");
   if(cmt){
     const cp = findPost(cmt.dataset.id);
@@ -1253,7 +1274,7 @@ function timelineClick(e){
     // Beskeder-listen.
     if(cp && cp.kind === "memory"){
       if(el("memview").classList.contains("on")) closeMemView();
-      if(cp.feed){ openKredsChat(cp.feed); return; }
+      if(cp.feed){ openThreadWithPost(cp.feed, cp.id); return; } // mindet som synlig kontekst
       if(me && cp.u === me.handle){ closeProfile(); switchTab("chat"); return; }
       openDmWith(user(cp.u).id, cp.id);
       return;

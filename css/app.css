@@ -463,7 +463,17 @@
   .save-btn.on svg path{fill:var(--ink);stroke:var(--ink)}
   .post.memory .like-btn{order:1}
   .post.memory .cmt-btn{order:2}
+  .post.memory .cmtp-btn{order:2} /* privat-kommentar (lås) lige efter kommentar-ikonet */
   .post.memory .share-btn{order:3}
+  /* Privat kommentar på et kreds-minde: kommentar-boble med lille lås-badge */
+  .cmtp-btn{position:relative}
+  .cmtp-lock{
+    position:absolute;right:-4px;bottom:-3px;
+    width:14px;height:14px;border-radius:50%;
+    background:var(--bg);color:var(--gray);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .cmtp-lock svg{width:9px;height:9px}
   /* Minde-compose: ingen afstemning */
   .compose.memory #pollbtn{display:none}
   /* Profil: toggle (Alt/Minder) + 3-kolonne minde-grid */
@@ -1275,14 +1285,32 @@
   .cv-share:active{opacity:.7}
   .cv-thumb{width:150px;height:150px;object-fit:cover;border-radius:12px;display:block}
   .cv-sharetxt{font-size:13px;font-weight:600;opacity:.85}
-  /* Composer i bunden af tråden */
+  /* Composer i bunden af tråden: blød skygge i stedet for en streg */
   .cv-composer{
     flex:0 0 auto;
     display:flex;align-items:center;gap:10px;
     padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-    border-top:1px solid var(--line);
     background:var(--bg);
+    box-shadow:0 -8px 20px rgba(0,0,0,.07);
   }
+  @media(prefers-color-scheme:dark){
+    .cv-composer{box-shadow:0 -8px 20px rgba(0,0,0,.45)}
+  }
+  /* Svar-kontekst over composeren: miniature + "Du svarer på et minde fra X" + kryds */
+  .cv-ctx{
+    flex:0 0 auto;
+    display:flex;align-items:center;gap:10px;
+    padding:8px 12px;
+    background:var(--chip);
+  }
+  .cv-ctx[hidden]{display:none}
+  .cv-ctxthumb{width:36px;height:36px;object-fit:cover;border-radius:8px;flex:0 0 auto;display:block}
+  .cv-ctxtxt{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cv-ctxx{flex:0 0 auto;display:flex;color:var(--gray);padding:6px}
+  .cv-ctxx svg{width:16px;height:16px}
+  .cv-ctxx:active{opacity:.5}
+  /* Læst/Ikke læst med småt under ens egen sidste besked */
+  .cv-status{align-self:flex-end;font-size:10.5px;font-weight:600;color:var(--gray);margin:2px 6px 0}
   .cv-composer input{
     flex:1;min-width:0;
     background:var(--chip);color:var(--ink);

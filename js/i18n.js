@@ -146,6 +146,11 @@ const DA = {
   "chat.you": "Dig",
   "chat.say_hi": "Sig hej 👋",
   "chat.unread": "Ulæste beskeder",
+  "chat.read": "Læst",
+  "chat.notread": "Ikke læst",
+  "chat.replying": "Du svarer på et minde fra {n}",
+  "chat.ctx_close": "Fjern",
+  "aria.private_comment": "Kommentér privat",
 
   /* Notifikationer */
   "notif.liked": "likede dit opslag",
@@ -583,6 +588,11 @@ const EN = {
   "chat.you": "You",
   "chat.say_hi": "Say hi 👋",
   "chat.unread": "Unread messages",
+  "chat.read": "Read",
+  "chat.notread": "Not read",
+  "chat.replying": "Replying to a memory from {n}",
+  "chat.ctx_close": "Remove",
+  "aria.private_comment": "Comment privately",
 
   /* Notifications */
   "notif.liked": "liked your post",

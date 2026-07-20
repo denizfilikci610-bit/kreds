@@ -132,6 +132,7 @@ export async function openKredsChat(feedId){
   el("cv-sub").textContent = f.isDm
     ? "@" + (f.members.filter(function(h){ return h !== me.handle; })[0] || "")
     : (f.members.length === 1 ? t("list.member_one") : t("list.member_count", { n: f.members.length }));
+  renderCtxBar();
   el("cv-body").innerHTML = '<div class="emptynote">'+t("common.loading")+'</div>';
   el("chatview").classList.add("on");
   const seq = ++chatSeq;
@@ -165,6 +166,33 @@ export async function openKredsChat(feedId){
   }
   renderThread(true);
   markThreadRead();
+}
+
+/* Svar-konteksten over composeren: hvilket minde svarer beskeden på? Vises så snart
+   tråden er åbnet via et kommentar-ikon, og kan fjernes med krydset (så sendes beskeden
+   uden vedhæftet minde). */
+function renderCtxBar(){
+  const box = el("cv-ctx");
+  const p = (pendingShare && chatFeed === pendingShare.feed) ? findPost(pendingShare.post) : null;
+  if(!p){ box.hidden = true; box.innerHTML = ""; return; }
+  const thumb = p.img
+    ? '<img class="cv-ctxthumb" src="'+esc(p.img.src)+'" alt="">'
+    : p.video
+    ? '<video class="cv-ctxthumb" src="'+esc(p.video.src)+'#t=0.1" muted playsinline preload="metadata"></video>'
+    : '';
+  box.innerHTML = thumb+
+    '<span class="cv-ctxtxt">'+t("chat.replying", { n: esc(user(p.u).name || p.u) })+'</span>'+
+    '<button class="cv-ctxx" aria-label="'+t("chat.ctx_close")+'">'+
+      '<svg viewBox="0 0 24 24"><path class="stroke" d="M6 6l12 12M18 6 6 18"/></svg>'+
+    '</button>';
+  box.hidden = false;
+}
+
+/* Kommentar på et KREDS-minde fra feedet: åbn kredsens tråd med mindet som synlig
+   kontekst på svaret */
+export function openThreadWithPost(feedId, postId){
+  pendingShare = { feed: feedId, post: postId };
+  openKredsChat(feedId);
 }
 
 /* Hele kredsen-minde → tråden med forfatteren: en eksisterende tråd med præcis jer to
@@ -210,6 +238,7 @@ function markThreadRead(){
 export function closeKredsChat(){
   chatFeed = null;
   pendingShare = null;
+  renderCtxBar();
   el("cv-input").blur();
   unpinChat();
   el("chatview").classList.remove("on");
@@ -268,6 +297,19 @@ function renderThread(scrollBottom){
   const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
   const prevTop = box.scrollTop;
   const seenBy = readReceipts();
+  // Læst/Ikke læst med småt under MIN sidste besked, når den er trådens nyeste
+  // (læst = mindst ét andet medlem har sit læse-mærke ved eller efter den)
+  let status = null;
+  if(readsOk && me && msgs.length){
+    const lastM = msgs[msgs.length - 1];
+    if(lastM.authorId === me.id && String(lastM.id).indexOf("tmp-") !== 0){
+      const ts = new Date(lastM.created).getTime();
+      const seen = Object.keys(reads).some(function(uid){
+        return uid !== me.id && new Date(reads[uid]).getTime() >= ts;
+      });
+      status = { id: lastM.id, seen: seen };
+    }
+  }
   // Messenger-agtig gruppering: beskeder i træk fra samme afsender klumpes — navn kun
   // øverst i gruppen, avatar og tid kun ved gruppens sidste boble. "Ulæste beskeder"-
   // linjen bryder en gruppe, så boblen efter linjen får navn/avatar igen.
@@ -278,7 +320,10 @@ function renderThread(scrollBottom){
                      msgs[i + 1].id === unreadAtId;
         return (m.id === unreadAtId ? '<div class="cv-unread">'+t("chat.unread")+'</div>' : '')+
                msgHTML(m, first, last)+
-               (seenBy[m.id] ? readsHTML(seenBy[m.id]) : '');
+               (seenBy[m.id] ? readsHTML(seenBy[m.id]) : '')+
+               (status && status.id === m.id
+                 ? '<span class="cv-status">'+t(status.seen ? "chat.read" : "chat.notread")+'</span>'
+                 : '');
       }).join("")
     : '<div class="emptynote">'+t("chat.no_messages")+'</div>';
   box.scrollTop = (scrollBottom || nearBottom) ? box.scrollHeight : prevTop;
@@ -365,7 +410,7 @@ async function sendChatMsg(){
     return;
   }
   const real = mapMsg(data);
-  if(share && pendingShare === share) pendingShare = null; // konteksten er afleveret
+  if(share && pendingShare === share){ pendingShare = null; renderCtxBar(); } // konteksten er afleveret
   if(!msgs.some(function(x){ return x.id === real.id; })) msgs.push(real);
   lastByFeed[feedId] = real;
   renderThread(true);
@@ -442,6 +487,10 @@ export function initChat(){
     if(!document.hidden) markThreadRead();
   });
   el("cv-back").addEventListener("click", closeKredsChat);
+  el("cv-ctx").addEventListener("click", function(e){
+    // Krydset fjerner svar-konteksten — beskeden sendes så uden vedhæftet minde
+    if(e.target.closest(".cv-ctxx")){ pendingShare = null; renderCtxBar(); }
+  });
   el("cv-send").addEventListener("click", sendChatMsg);
   el("cv-input").addEventListener("keydown", function(e){
     if(e.key === "Enter" && !e.isComposing) sendChatMsg();

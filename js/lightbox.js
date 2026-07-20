@@ -3,7 +3,7 @@ import { me, expandedCmts } from "./store.js";
 import { t } from "./i18n.js";
 import { findPost, setLike, sharePost, openPostMenu, openReportMenu, muteFeedSound, switchTab } from "./feed.js";
 import { openNativePostPage, rerenderPostCmts } from "./comments.js";
-import { openKredsChat, openDmWith } from "./chat.js";
+import { openThreadWithPost, openDmWith } from "./chat.js";
 import { openPostView } from "./profile.js";
 
 /* ================= Fuldskærms-lightbox (billede + video) =================
@@ -194,7 +194,7 @@ function openLbComments(){
   // vieweren først, tråden (z-85) ligger under den (z-300)
   if(p.kind === "memory"){
     closeLightbox();
-    if(p.feed){ openKredsChat(p.feed); return; }
+    if(p.feed){ openThreadWithPost(p.feed, p.id); return; }
     if(me && p.u === me.handle){ switchTab("chat"); return; }
     openDmWith(user(p.u).id, p.id);
     return;
