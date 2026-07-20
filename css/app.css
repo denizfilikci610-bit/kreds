@@ -772,6 +772,16 @@
   .lki{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:var(--chip);color:var(--gray);flex:0 0 auto}
   .lki svg{width:20px;height:20px}
   .lnote{padding:2px 16px 8px;font-size:12.5px;color:var(--gray)}
+  .lrow.go{cursor:pointer}
+  /* Anmod-knap på kredse man ikke er med i */
+  .lreq{
+    flex:0 0 auto;margin-left:auto;
+    padding:8px 14px;border-radius:999px;
+    background:var(--red);color:#fff;
+    font-size:13px;font-weight:700;
+  }
+  .lreq.sent{background:var(--chip);color:var(--gray)}
+  .lreq:active{opacity:.7}
   .pstats{display:flex;flex:1;min-width:0;gap:4px;justify-content:space-around;text-align:center}
   .pstats .stat{flex:1;min-width:0}
   .pstats .stat b{display:block;font-size:18px;font-weight:800;color:var(--ink);line-height:1.2}

@@ -12,6 +12,9 @@ struct ListKredsRow: Identifiable, Equatable {
     let id: String
     let name: String
     let members: String   // "3 medlemmer" (i18n from the web)
+    let friends: String   // "2 venner" — how many members are MY friends
+    let isMember: Bool    // I am in this kreds (row opens it)
+    let requested: Bool   // my join request is pending (button state)
 }
 
 final class ListPageModel: ObservableObject {
@@ -22,8 +25,7 @@ final class ListPageModel: ObservableObject {
     @Published var title = ""
     @Published var tab = "friends"              // "friends" | "kredse" (native-local after open)
     @Published var friends: [MentionCard]? = [] // nil = still loading (others' list via RPC)
-    @Published var kredse: [ListKredsRow] = []
-    @Published var sharedNote = ""
+    @Published var kredse: [ListKredsRow]? = [] // nil = still loading (others' list via RPC)
     @Published var labels: [String: String] = [:]
 
     // Native-local UI state
@@ -51,13 +53,19 @@ final class ListPageModel: ObservableObject {
         } else {
             friends = MentionSupport.parseCards(dict["friends"])
         }
-        kredse = ((dict["kredse"] as? [[String: Any]]) ?? []).compactMap { d in
-            guard let id = d["id"] as? String else { return nil }
-            return ListKredsRow(id: id,
-                                name: (d["name"] as? String) ?? "",
-                                members: (d["members"] as? String) ?? "")
+        if dict["kredse"] is NSNull || dict["kredse"] == nil {
+            kredse = nil
+        } else {
+            kredse = ((dict["kredse"] as? [[String: Any]]) ?? []).compactMap { d in
+                guard let id = d["id"] as? String else { return nil }
+                return ListKredsRow(id: id,
+                                    name: (d["name"] as? String) ?? "",
+                                    members: (d["members"] as? String) ?? "",
+                                    friends: (d["friends"] as? String) ?? "",
+                                    isMember: (d["isMember"] as? Bool) ?? false,
+                                    requested: (d["requested"] as? Bool) ?? false)
+            }
         }
-        sharedNote = dict["sharedNote"] as? String ?? ""
         if let l = dict["labels"] as? [String: Any] { labels = l.compactMapValues { $0 as? String } }
         open = true
     }
@@ -65,6 +73,7 @@ final class ListPageModel: ObservableObject {
     // MARK: actions
     func profile(_ handle: String) { send(["kind": "profile", "handle": handle]) }
     func kreds(_ id: String) { send(["kind": "kreds", "id": id]) }
+    func kredsReq(_ id: String, _ on: Bool) { send(["kind": "kredsreq", "id": id, "on": on]) }
     func dismiss() { send(["kind": "dismiss"]) }
 
     private func send(_ obj: [String: Any]) {
@@ -97,9 +106,10 @@ struct ListPageView: View {
         return all.filter { $0.name.localizedCaseInsensitiveContains(q) || $0.handle.localizedCaseInsensitiveContains(q) }
     }
     private var filteredKredse: [ListKredsRow] {
+        guard let all = model.kredse else { return [] }
         let q = model.query.trimmingCharacters(in: .whitespaces)
-        if q.isEmpty { return model.kredse }
-        return model.kredse.filter { $0.name.localizedCaseInsensitiveContains(q) }
+        if q.isEmpty { return all }
+        return all.filter { $0.name.localizedCaseInsensitiveContains(q) }
     }
 
     var body: some View {
@@ -255,50 +265,62 @@ struct ListPageView: View {
 
     @ViewBuilder
     private var kredsList: some View {
-        if !model.sharedNote.isEmpty {
-            Text(model.sharedNote)
-                .font(.system(size: 12.5)).foregroundStyle(.secondary)
-                .padding(.horizontal, 16).padding(.top, 2).padding(.bottom, 6)
-        }
-        if filteredKredse.isEmpty {
+        if model.kredse == nil {
+            ProgressView().frame(maxWidth: .infinity).padding(.vertical, 40)
+        } else if filteredKredse.isEmpty {
             Text(model.L("emptyKredse"))
                 .font(.system(size: 14)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity).padding(.vertical, 40)
                 .multilineTextAlignment(.center)
         } else {
-            ForEach(filteredKredse) { f in
-                Button { model.kreds(f.id) } label: {
-                    HStack(spacing: 12) {
-                        ZStack {
-                            Circle().fill(chipFill)
-                            // Kreds-ikonet: streg-ring med tre prikker (som webbens kchip)
-                            ZStack {
-                                Circle().strokeBorder(Color.secondary, lineWidth: 1.6)
-                                Circle().fill(Color.secondary).frame(width: 5, height: 5).offset(y: -10)
-                                Circle().fill(Color.secondary).frame(width: 5, height: 5).offset(x: -8.7, y: 5.2)
-                                Circle().fill(Color.secondary).frame(width: 5, height: 5).offset(x: 8.7, y: 5.2)
-                            }
-                            .frame(width: 20, height: 20)
-                        }
-                        .frame(width: 46, height: 46)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(f.name)
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(Color.primary)
-                                .lineLimit(1)
-                            Text(f.members)
-                                .font(.system(size: 13.5))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 16).padding(.vertical, 8)
-                    .contentShape(Rectangle())
+            ForEach(filteredKredse) { f in kredsRow(f) }
+        }
+    }
+
+    /// Medlem: rækken hopper til kredsen (chevron). Ikke medlem: Anmod-knap (tap igen = fortryd).
+    private func kredsRow(_ f: ListKredsRow) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(chipFill)
+                // Kreds-ikonet: streg-ring med tre prikker (som webbens kchip)
+                ZStack {
+                    Circle().strokeBorder(Color.secondary, lineWidth: 1.6)
+                    Circle().fill(Color.secondary).frame(width: 5, height: 5).offset(y: -10)
+                    Circle().fill(Color.secondary).frame(width: 5, height: 5).offset(x: -8.7, y: 5.2)
+                    Circle().fill(Color.secondary).frame(width: 5, height: 5).offset(x: 8.7, y: 5.2)
+                }
+                .frame(width: 20, height: 20)
+            }
+            .frame(width: 46, height: 46)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(f.name)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color.primary)
+                    .lineLimit(1)
+                Text(f.friends.isEmpty ? f.members : "\(f.members) · \(f.friends)")
+                    .font(.system(size: 13.5))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            if f.isMember {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            } else {
+                Button { model.kredsReq(f.id, !f.requested) } label: {
+                    Text(model.L(f.requested ? "requested" : "request"))
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(f.requested ? Color.secondary : .white)
+                        .padding(.vertical, 8).padding(.horizontal, 14)
+                        .background(Capsule().fill(f.requested ? chipFill : vfRed))
                 }
                 .buttonStyle(.plain)
             }
         }
+        .padding(.horizontal, 16).padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .onTapGesture { if f.isMember { model.kreds(f.id) } }
     }
 }
 

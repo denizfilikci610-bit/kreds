@@ -2,7 +2,7 @@ import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab, expandedCmts } from "./store.js";
 import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConsent, setConsent, imgUrl, ini } from "./helpers.js";
 import { t, setLang, getLang, policyURL } from "./i18n.js";
-import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps, applyFeedSound, switchTab, setFeed } from "./feed.js";
+import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, loadQuota, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps, applyFeedSound, switchTab, setFeed, feedById } from "./feed.js";
 import { openNativePostPage, rerenderPostCmts } from "./comments.js";
 import { openCompose, openStoryCamera } from "./compose.js";
 import { openStoryViewer } from "./stories.js";
@@ -377,11 +377,55 @@ function listRowFriend(h){
     '<span class="lcol"><span class="lnm">'+esc(u.name)+'</span><span class="lh">@'+esc(h)+'</span></span>'+
   '</button>';
 }
-function listRowKreds(f){
-  return '<button class="lrow" data-feed="'+esc(f.id)+'">'+
+/* Fælles række-model for kredse: { id, name, membersN, friendsN, isMember, requested } */
+function ownKredsRows(){
+  return state.feeds.map(function(f){
+    return { id: f.id, name: f.name, membersN: f.members.length,
+             friendsN: f.members.filter(function(h){ return state.friends.indexOf(h) >= 0; }).length,
+             isMember: true, requested: false };
+  });
+}
+function mapKredsOf(r){
+  return { id: r.feed_id, name: r.name, membersN: r.member_count, friendsN: r.friend_count,
+           isMember: !!r.is_member, requested: !!r.requested };
+}
+function nLabel(n, oneKey, manyKey){ return n === 1 ? t(oneKey) : t(manyKey, { n: n }); }
+function kredsRowMeta(r){
+  return nLabel(r.membersN, "list.member_one", "list.member_count") + " · " +
+         nLabel(r.friendsN, "list.friend_one", "list.friend_count");
+}
+function listRowKreds(r){
+  // Medlem: rækken er tap-bar og hopper til kredsen. Ikke medlem: Anmod-knap i stedet.
+  const btn = r.isMember ? "" :
+    '<button class="lreq'+(r.requested ? " sent" : "")+'" data-req="'+esc(r.id)+'">'+
+      t(r.requested ? "list.requested" : "list.request")+'</button>';
+  return '<div class="lrow'+(r.isMember ? " go" : "")+'"'+(r.isMember ? ' data-feed="'+esc(r.id)+'"' : '')+'>'+
     '<span class="lki">'+LIST_KREDS_SVG+'</span>'+
-    '<span class="lcol"><span class="lnm">'+esc(f.name)+'</span><span class="lh">'+t("list.member_count", { n: f.members.length })+'</span></span>'+
-  '</button>';
+    '<span class="lcol"><span class="lnm">'+esc(r.name)+'</span><span class="lh">'+kredsRowMeta(r)+'</span></span>'+
+    btn+
+  '</div>';
+}
+/* Anmod/fortryd om at komme med i en kreds (samme RPC'er som den gamle teaser-knap).
+   Optimistisk i både web-knappen og den native liste-cache; already_member = du kom
+   med imens -> genindlæs kredse og listen. */
+async function toggleKredsRequest(id, on, btn){
+  if(!me) return;
+  if(btn){
+    btn.classList.toggle("sent", on);
+    btn.textContent = t(on ? "list.requested" : "list.request");
+  }
+  setNativeKredsReq(id, on);
+  const { error } = await sb.rpc(on ? "request_join_kreds" : "cancel_join_request", { f: id });
+  if(!error) return;
+  console.error(error);
+  const m = String(error.message || "");
+  if(on && m.indexOf("already_member") >= 0){ await loadFeeds(); refreshNativeList(); return; }
+  if(btn && btn.isConnected){
+    btn.classList.toggle("sent", !on);
+    btn.textContent = t(!on ? "list.requested" : "list.request");
+  }
+  setNativeKredsReq(id, !on);
+  toast(t("err.generic"));
 }
 function showListSheet(title){
   el("ls-title").textContent = title;
@@ -411,81 +455,108 @@ async function openFriendsList(h){
     .sort();
   el("ls-list").innerHTML = hs.length ? hs.map(listRowFriend).join("") : '<div class="emptynote">'+t("list.empty_friends")+'</div>';
 }
-function openKredsList(h){
+async function openKredsList(h){
   const own = !!(me && h === me.handle);
-  showListSheet(own ? t("list.kredse") : t("list.shared_kredse"));
+  showListSheet(t("list.kredse"));
+  if(own){
+    const rows = ownKredsRows();
+    el("ls-list").innerHTML = rows.length ? rows.map(listRowKreds).join("") : '<div class="emptynote">'+t("list.empty_kredse")+'</div>';
+    return;
+  }
+  // Andres profil: ALLE deres kredse via kredse_of (medlemstal + hvor mange er DINE venner)
   const uid = user(h).id;
-  const feeds = own ? state.feeds : state.feeds.filter(function(f){ return uid && f.memberIds.indexOf(uid) >= 0; });
-  let html = own ? "" : '<div class="lnote">'+t("list.shared_note")+'</div>';
-  html += feeds.length
-    ? feeds.map(listRowKreds).join("")
-    : '<div class="emptynote">'+t(own ? "list.empty_kredse" : "list.empty_shared")+'</div>';
-  el("ls-list").innerHTML = html;
+  if(!uid){ el("ls-list").innerHTML = '<div class="emptynote">'+t("err.generic")+'</div>'; return; }
+  const { data, error } = await sb.rpc("kredse_of", { u: uid });
+  if(!el("lsheet").classList.contains("on")) return; // lukket imens
+  if(error){
+    console.error(error);
+    el("ls-list").innerHTML = '<div class="emptynote">'+t("act.load_failed")+'</div>';
+    return;
+  }
+  const rows = (data || []).map(mapKredsOf);
+  el("ls-list").innerHTML = rows.length ? rows.map(listRowKreds).join("") : '<div class="emptynote">'+t("list.empty_kredse")+'</div>';
 }
 
 /* ---- Native liste-SIDE (kun appen): Instagram-agtig fuldskærms-side med Venner/Kredse-
    faner, søgefelt og swipe-tilbage (ListPageView.swift). Web bygger snapshotten med BEGGE
    datasæt (fane-skift er rent nativt) og pusher; andres venneliste hentes async via
    friends_of og efter-pushes. Browser + ældre builds beholder web-sheetet (#lsheet). ---- */
-let nativeListH = null; // handle for den åbne liste-side (null = lukket)
+let nativeList = null; // { h, tab, friends:[handles]|null, kredse:[rows]|null } for den åbne side
 function friendCard(h){
   const u = user(h);
   return { handle: h, name: u.name || h, avatarUrl: u.avatar_path ? imgUrl(u.avatar_path) : "",
            initials: ini(h), gradient: u.g || [] };
 }
-function listPageSnapshot(h, tab, friendHandles){
-  const own = !!(me && h === me.handle);
-  const uid = user(h).id;
-  const feeds = own ? state.feeds : state.feeds.filter(function(f){ return uid && f.memberIds.indexOf(uid) >= 0; });
+function listPageSnapshot(){
+  const L = nativeList;
   return {
     open: true,
-    title: h,
-    tab: tab === "kredse" ? "kredse" : "friends",
-    friends: friendHandles ? friendHandles.map(friendCard) : null, // null = henter stadig
-    kredse: feeds.map(function(f){ return { id: f.id, name: f.name, members: t("list.member_count", { n: f.members.length }) }; }),
-    sharedNote: own ? "" : t("list.shared_note"),
+    title: L.h,
+    tab: L.tab === "kredse" ? "kredse" : "friends",
+    friends: L.friends ? L.friends.map(friendCard) : null, // null = henter stadig
+    kredse: L.kredse ? L.kredse.map(function(r){
+      return { id: r.id, name: r.name,
+               members: nLabel(r.membersN, "list.member_one", "list.member_count"),
+               friends: nLabel(r.friendsN, "list.friend_one", "list.friend_count"),
+               isMember: !!r.isMember, requested: !!r.requested };
+    }) : null,
     labels: {
       friendsTab: t("list.friends"),
-      kredseTab: own ? t("list.kredse") : t("list.shared_kredse"),
+      kredseTab: t("list.kredse"),
       searchPh: t("list.search_ph"),
       emptyFriends: t("list.empty_friends"),
-      emptyKredse: t(own ? "list.empty_kredse" : "list.empty_shared")
+      emptyKredse: t("list.empty_kredse"),
+      request: t("list.request"),
+      requested: t("list.requested")
     }
   };
 }
+function pushNativeList(){
+  if(!nativeList || !window.__vfListPagePush) return;
+  window.__vfListPagePush(listPageSnapshot());
+}
 async function openNativeListPage(h, tab){
-  nativeListH = h;
   const own = !!(me && h === me.handle);
-  if(own){
-    if(window.__vfListPagePush) window.__vfListPagePush(listPageSnapshot(h, tab, state.humanFriends));
-    return;
-  }
-  // Andres profil: vis siden straks (venner spinner), hent så listen og efter-push
-  if(window.__vfListPagePush) window.__vfListPagePush(listPageSnapshot(h, tab, null));
+  nativeList = { h: h, tab: tab,
+    friends: own ? state.humanFriends : null,
+    kredse: own ? ownKredsRows() : null };
+  pushNativeList(); // vis siden straks (andres lister spinner imens)
+  if(own) return;
   const uid = user(h).id;
   if(!uid) return;
-  const { data, error } = await sb.rpc("friends_of", { u: uid });
-  if(nativeListH !== h) return; // lukket eller skiftet imens
-  if(error){
-    console.error(error);
-    if(window.__vfListPagePush) window.__vfListPagePush(listPageSnapshot(h, tab, []));
-    return;
+  const res = await Promise.all([ sb.rpc("friends_of", { u: uid }), sb.rpc("kredse_of", { u: uid }) ]);
+  if(!nativeList || nativeList.h !== h) return; // lukket eller skiftet imens
+  const fr = res[0], kr = res[1];
+  if(fr.error){ console.error(fr.error); nativeList.friends = []; }
+  else {
+    (fr.data || []).forEach(registerProfile);
+    nativeList.friends = (fr.data || []).map(function(pr){ return pr.handle; })
+      .filter(function(x){ return x && x !== OFFICIAL_HANDLE; })
+      .sort();
   }
-  (data || []).forEach(registerProfile);
-  const hs = (data || []).map(function(pr){ return pr.handle; })
-    .filter(function(x){ return x && x !== OFFICIAL_HANDLE; })
-    .sort();
-  if(window.__vfListPagePush) window.__vfListPagePush(listPageSnapshot(h, tab, hs));
+  if(kr.error){ console.error(kr.error); nativeList.kredse = []; }
+  else nativeList.kredse = (kr.data || []).map(mapKredsOf);
+  pushNativeList();
+}
+/* Optimistisk anmodnings-tilstand i den native liste (kaldes fra toggleKredsRequest) */
+function setNativeKredsReq(id, on){
+  if(!nativeList || !nativeList.kredse) return;
+  nativeList.kredse.forEach(function(r){ if(String(r.id) === String(id)) r.requested = on; });
+  pushNativeList();
+}
+function refreshNativeList(){
+  if(!nativeList) return;
+  openNativeListPage(nativeList.h, nativeList.tab);
 }
 export function closeNativeListPage(){
-  if(nativeListH == null) return;
-  nativeListH = null;
+  if(!nativeList) return;
+  nativeList = null;
   if(window.__vfListPagePush) window.__vfListPagePush({ close: true });
 }
 export function nativeListPageAction(payload){
   if(!payload) return;
   if(payload.kind === "dismiss"){
-    nativeListH = null;
+    nativeList = null;
     if(window.__vfListPagePush) window.__vfListPagePush({ close: true });
     return;
   }
@@ -498,10 +569,15 @@ export function nativeListPageAction(payload){
     return;
   }
   if(payload.kind === "kreds"){
+    if(!feedById(payload.id)) return; // kun egne kredse kan åbnes
     closeNativeListPage();
     closeProfile();
     switchTab("feed");
     setFeed(payload.id);
+    return;
+  }
+  if(payload.kind === "kredsreq"){
+    toggleKredsRequest(payload.id, payload.on !== false, null);
   }
 }
 
@@ -789,6 +865,11 @@ function statTap(e, h){
 el("own-stats").addEventListener("click", function(e){ statTap(e, me ? me.handle : null); });
 el("pv-stats").addEventListener("click", function(e){ statTap(e, pv.u); });
 el("ls-list").addEventListener("click", function(e){
+  const rq = e.target.closest(".lreq[data-req]");
+  if(rq){
+    toggleKredsRequest(rq.dataset.req, !rq.classList.contains("sent"), rq);
+    return;
+  }
   const fr = e.target.closest(".lrow[data-u]");
   if(fr){
     closeListSheet();
