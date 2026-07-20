@@ -1274,6 +1274,9 @@
     padding:11px 16px;font-size:15px;
   }
   .cv-composer input::placeholder{color:var(--gray)}
+  /* Tastaturet er åbent (JS pinner siden til den synlige viewport): tastaturet dækker
+     hjemme-indikatoren, så safe-area-luften i bunden af composeren skal væk */
+  .chatview.kb .cv-composer{padding-bottom:10px}
   #cv-send{flex:0 0 auto;color:var(--red);padding:8px 4px;display:flex}
   #cv-send svg{width:23px;height:23px}
   #cv-send:active{opacity:.6}

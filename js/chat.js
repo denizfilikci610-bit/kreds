@@ -116,9 +116,49 @@ export async function openKredsChat(feedId){
 }
 export function closeKredsChat(){
   chatFeed = null;
+  el("cv-input").blur();
+  unpinChat();
   el("chatview").classList.remove("on");
   el("cv-body").innerHTML = "";
 }
+
+/* ---- iOS-tastaturet: pin tråden til den synlige viewport (Messenger-adfærd) ----
+   WKWebView/Safari ændrer ikke sidens layout når tastaturet åbner — den panorerer bare
+   den visuelle viewport, så en absolut fuldskærms-side ender med kun composeren synlig
+   over tastaturet. Mens tråden er åben følger #chatview derfor window.visualViewport
+   (top + højde): headeren bliver stående, composeren klæber lige over tastaturet, og
+   beskederne holder sig i bunden. Ved tastatur-ned/luk fjernes inline-målene igen. */
+let kbRaf = 0, kbOpen = false;
+function fitChatToViewport(){
+  kbRaf = 0;
+  const vv = window.visualViewport;
+  const cv = el("chatview");
+  const open = vv && cv.classList.contains("on") &&
+               document.documentElement.clientHeight - vv.height > 60;
+  if(!open){ if(kbOpen) unpinChat(); return; }
+  // iOS kan scrolle selv overflow:hidden-containere for at vise det fokuserede felt —
+  // nulstil .phone, ellers forskydes hele appen bag den pinnede tråd
+  if(cv.parentElement && cv.parentElement.scrollTop) cv.parentElement.scrollTop = 0;
+  // vv.pageTop = den synlige viewports topkant i dokumentet; .phone starter ved y=0,
+  // så tallet kan bruges direkte som top i #chatview's absolutte koordinater
+  cv.style.top = vv.pageTop + "px";
+  cv.style.height = vv.height + "px";
+  cv.style.bottom = "auto";
+  cv.classList.add("kb");
+  const body = el("cv-body");
+  const nearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 80;
+  if(!kbOpen || nearBottom) body.scrollTop = body.scrollHeight;
+  kbOpen = true;
+}
+function unpinChat(){
+  kbOpen = false;
+  const cv = el("chatview");
+  cv.style.top = cv.style.height = cv.style.bottom = "";
+  cv.classList.remove("kb");
+  if(cv.parentElement && cv.parentElement.scrollTop) cv.parentElement.scrollTop = 0;
+  window.scrollTo(0, 0); // ryd evt. rest-panorering fra tastaturet
+}
+function queueFit(){ if(!kbRaf) kbRaf = requestAnimationFrame(fitChatToViewport); }
 export function resetChat(){
   closeKredsChat();
   msgs = [];
@@ -227,6 +267,11 @@ export function chatRealtime(payload){
 }
 
 export function initChat(){
+  // Tastaturet ind/ud + iOS' panorering af den visuelle viewport → genplacér tråden
+  if(window.visualViewport){
+    window.visualViewport.addEventListener("resize", queueFit);
+    window.visualViewport.addEventListener("scroll", queueFit);
+  }
   el("cv-back").addEventListener("click", closeKredsChat);
   el("cv-send").addEventListener("click", sendChatMsg);
   el("cv-input").addEventListener("keydown", function(e){
