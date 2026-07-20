@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import UserNotifications
+import AVFAudio
 
 /// Receives the APNs device token and shows pushes while the app is open.
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
@@ -47,6 +48,11 @@ struct VibeFeedApp: App {
 
     init() {
         NotifManager.shared.register()
+        // Video sound in the media viewer must play even when the ringer switch is on
+        // silent (Instagram/X behavior). .playback overrides the switch; the session is
+        // only ACTIVATED by WebKit when media actually plays, so other apps' audio is
+        // untouched until then.
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
     }
 
     var body: some Scene {

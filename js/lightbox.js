@@ -132,6 +132,23 @@ function onPointerUp(e){
   }
 }
 
+/* ---- Lyd i video-vieweren (til som standard; valget huskes til næste video i sessionen) ---- */
+let lbSoundOn = true;
+const SOUND_ON_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><path d="M4.5 9.5v5h3.2l4.6 4v-13l-4.6 4Z"/><path d="M15.3 9.2a4.4 4.4 0 0 1 0 5.6"/><path d="M17.8 6.8a8 8 0 0 1 0 10.4"/></g></svg>';
+const SOUND_OFF_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><path d="M4.5 9.5v5h3.2l4.6 4v-13l-4.6 4Z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></g></svg>';
+function syncSoundIcon(){
+  el("lb-sound").innerHTML = lbSoundOn ? SOUND_ON_SVG : SOUND_OFF_SVG;
+}
+function toggleSound(){
+  lbSoundOn = !lbSoundOn;
+  const v = stage().querySelector("video");
+  if(v){
+    v.muted = !lbSoundOn;
+    if(lbSoundOn) v.play().catch(function(){}); // genstart hvis autoplay-fallback satte den på pause
+  }
+  syncSoundIcon();
+}
+
 /* ---- X-agtigt info-overlay (kun når mediet hører til et opslag) ---- */
 let lbPid = null;
 
@@ -198,10 +215,23 @@ export function openLightbox(kind, src, pid){
   scale = 1; tx = 0; ty = 0;
   if(kind === "video"){
     imgEl = null;
-    st.innerHTML = '<video src="' + esc(src) + '" controls playsinline autoplay loop></video>';
-    // Eksplicit play(): kører under det videresendte gesture-token, så lyd-autoplay virker i mobil-Safari/WKWebView
+    // Ingen native controls — videoen looper bare (som feedet, men MED lyd). Lyd-knappen
+    // øverst th. slår til/fra; i appen overdøver lyden telefonens lydløs-kontakt
+    // (AVAudioSession .playback sættes native — kræver app-build).
+    st.innerHTML = '<video src="' + esc(src) + '" playsinline autoplay loop></video>';
     const v = st.querySelector("video");
-    if(v) v.play().catch(function(){});
+    v.muted = !lbSoundOn;
+    el("lb-sound").style.display = "";
+    syncSoundIcon();
+    // Eksplicit play(): kører under det videresendte gesture-token, så lyd-autoplay virker
+    // i mobil-Safari/WKWebView. Blokeres lyd-autoplay alligevel (fx desktop-browser uden
+    // interaktion), falder vi tilbage til lydløs afspilning — knappen slår så lyden til.
+    v.play().catch(function(){
+      v.muted = true;
+      lbSoundOn = false;
+      syncSoundIcon();
+      v.play().catch(function(){});
+    });
   } else {
     st.innerHTML = '<img src="' + esc(src) + '" alt="" draggable="false">';
     imgEl = st.querySelector("img");
@@ -224,6 +254,7 @@ export function closeLightbox(){
   el("lb-info").innerHTML = "";
   el("lb-info").style.display = "none";
   el("lb-dots").style.display = "none";
+  el("lb-sound").style.display = "none";
   lbPid = null;
   imgEl = null;
   pointers.clear(); pinch = null; pan = null;
@@ -235,6 +266,7 @@ export function closeLightbox(){
 export function initLightbox(){
   el("lb-close").addEventListener("click", closeLightbox);
   el("lb-dots").addEventListener("click", lbMenu);
+  el("lb-sound").addEventListener("click", toggleSound);
   el("lb-info").addEventListener("click", function(e){
     const b = e.target.closest("[data-lb]");
     if(!b || lbPid == null) return;

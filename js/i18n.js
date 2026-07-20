@@ -403,6 +403,7 @@ const DA = {
   /* Lightbox */
   "lb.aria": "Medie i fuld skærm",
   "lb.close": "Luk",
+  "lb.sound": "Lyd til/fra",
 
   /* Sprogvalg */
   "lang.title": "Vælg sprog · Choose language",
@@ -822,6 +823,7 @@ const EN = {
   /* Lightbox */
   "lb.aria": "Fullscreen media",
   "lb.close": "Close",
+  "lb.sound": "Sound on/off",
 
   /* Language picker */
   "lang.title": "Vælg sprog · Choose language",
