@@ -124,6 +124,9 @@ function renderBanner(id, path){
   const node = el(id);
   node.innerHTML = path ? '<img src="' + esc(imgUrl(path)) + '" alt="">' : "";
   node.classList.toggle("on", !!path);
+  // Header-rækken lige under banneret får overlap-layoutet (avatar halvt ind over banneret)
+  const head = node.nextElementSibling;
+  if(head && head.classList.contains("phead-own")) head.classList.toggle("withban", !!path);
 }
 export function setOwnUI(){
   renderBanner("own-banner", me.banner_path);
