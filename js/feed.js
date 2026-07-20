@@ -10,7 +10,7 @@ import { renderSearch } from "./search.js";
 import { loadNotifs, setNotifDot } from "./notifications.js";
 import { scheduleRefetch } from "./realtime.js";
 import { mapPoll, pollHTML, votePoll } from "./polls.js";
-import { openLightbox } from "./lightbox.js";
+import { openLightbox, lbSync } from "./lightbox.js";
 import { AD_EVERY, adsEnabled, adSlotHTML, reportAdLayout, initAds } from "./ads.js";
 
 export const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id), poll_options(*, poll_votes(user_id)), membership_proposals(resolved)";
@@ -265,6 +265,7 @@ export function renderFeed(){
   clampMemCaps(el("feed")); // vis "Se mere" kun hvor minde-billedteksten løber over
   pushNativeComments();     // hold et evt. åbent native kommentar-sheet i sync (realtime)
   pushNativePostPage();     // …og den native opslags-side
+  lbSync();                 // …og viewerens info-overlay (lukker hvis opslaget forsvandt)
   if(fpid){
     const nf = el("feed").querySelector('.cbox[data-id="'+fpid+'"] .cfield');
     if(nf){ nf.focus(); try{ nf.setSelectionRange(selS, selE); }catch(_){} }
@@ -819,6 +820,7 @@ export async function setLike(id, force){
     objs.forEach(function(p){ p.liked = cur; p.likeCount = Math.max(0, p.likeCount + (on ? -1 : 1)); });
     applyLikeUI(id, cur);
     pushNativePostPage(); // rul like tilbage på den native opslags-side
+    lbSync();             // …og i viewerens overlay
     if(on && String(error.message || "").indexOf("like_quota") >= 0){
       const fname = (user(objs[0].u).name || objs[0].u).trim().split(/\s+/)[0];
       toast(t("like.quota", { name: fname }));
@@ -1234,8 +1236,8 @@ function timelineClick(e){
       clearTimeout(tapTimer);
       tapTimer = setTimeout(function(){
         tapTimer = null;
-        if(vid) openLightbox("video", vid.currentSrc || vid.src);
-        else if(img) openLightbox("img", img.currentSrc || img.src);
+        if(vid) openLightbox("video", vid.currentSrc || vid.src, id);
+        else if(img) openLightbox("img", img.currentSrc || img.src, id);
       }, 330);
     }
     return;

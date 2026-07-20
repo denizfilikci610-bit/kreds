@@ -1,10 +1,17 @@
-import { el, esc } from "./helpers.js";
+import { el, esc, user, avaHTML, HEART_SVG, BADGE } from "./helpers.js";
+import { me, expandedCmts } from "./store.js";
+import { t } from "./i18n.js";
+import { findPost, setLike, sharePost, openPostMenu, openReportMenu } from "./feed.js";
+import { openNativeComments, openNativePostPage, rerenderPostCmts } from "./comments.js";
+import { openPostView } from "./profile.js";
 
 /* ================= Fuldskærms-lightbox (billede + video) =================
    Side-zoom er slået fra (user-scalable=no i viewporten), så pinch-zoom,
    pan og dobbelttryk-zoom implementeres selv med Pointer Events — men KUN
    for billeder. Video vises med native controls og lyd, uden zoom-gestures.
-   Transform: translate(tx,ty) scale(scale) — origin i midten af billedet. */
+   Transform: translate(tx,ty) scale(scale) — origin i midten af billedet.
+   X-agtig viewer: hører mediet til et opslag (pid), vises et info-overlay i
+   bunden (forfatter, tekst, kommentar/like/del, kommentarfelt) + ⋯ øverst. */
 
 const MIN_SCALE = 1, MAX_SCALE = 4, DBL_SCALE = 2.5, DBL_MS = 320;
 
@@ -19,6 +26,8 @@ function stage(){ return el("lb-stage"); }
 
 function applyTransform(){
   if(imgEl) imgEl.style.transform = "translate(" + tx + "px," + ty + "px) scale(" + scale + ")";
+  // Zoomet ind = rent billede: overlay + ⋯ skjules (CSS på .zoomed) til man zoomer ud igen
+  el("lightbox").classList.toggle("zoomed", scale > 1.02);
 }
 function resetTransform(){
   scale = 1; tx = 0; ty = 0;
@@ -123,8 +132,68 @@ function onPointerUp(e){
   }
 }
 
-export function openLightbox(kind, src){
+/* ---- X-agtigt info-overlay (kun når mediet hører til et opslag) ---- */
+let lbPid = null;
+
+const LB_CMT_SVG = '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>';
+const LB_SHARE_SVG = '<svg viewBox="0 0 24 24"><path class="stroke" d="M21.5 2.5 10.8 13.2M21.5 2.5l-6.8 19-3.9-8.3-8.3-3.9Z"/></svg>';
+
+function lbCnt(n){ return n > 0 ? '<span class="lb-cnt">'+n+'</span>' : ''; }
+function renderLbInfo(){
+  const box = el("lb-info");
+  const p = lbPid != null ? findPost(lbPid) : null;
+  el("lb-dots").style.display = (p && me) ? "" : "none";
+  if(!p){ box.style.display = "none"; box.innerHTML = ""; return; }
+  const u = user(p.u);
+  box.style.display = "";
+  box.innerHTML =
+    '<div class="lb-author">'+avaHTML(p.u, 32)+
+      '<span class="lb-nm">'+esc(u.name)+'</span><span class="badge">'+BADGE()+'</span>'+
+      '<span class="lb-h">@'+esc(p.u)+'</span>'+
+    '</div>'+
+    (p.text ? '<div class="lb-cap">'+esc(p.text)+'</div>' : '')+
+    '<div class="lb-actions">'+
+      '<button class="lb-chip" data-lb="cmt" aria-label="'+t("aria.comments")+'">'+LB_CMT_SVG+lbCnt(p.cmts.length)+'</button>'+
+      '<button class="lb-chip'+(p.liked ? " on" : "")+'" data-lb="like" aria-pressed="'+p.liked+'" aria-label="'+t("aria.like")+'">'+HEART_SVG+lbCnt(p.likeCount)+'</button>'+
+      (p.feed ? '' : '<button class="lb-chip" data-lb="share" aria-label="'+t("aria.share")+'">'+LB_SHARE_SVG+'</button>')+
+    '</div>'+
+    (me ? '<button class="lb-reply" data-lb="reply">'+t("cmt.ph")+'</button>' : '');
+}
+/* Datasync mens vieweren er åben (likes/kommentarer/realtime). Forsvinder opslaget
+   (slettet/anmeldt/blokeret), lukkes hele vieweren — mediet må ikke blive hængende. */
+export function lbSync(){
+  if(!el("lightbox").classList.contains("on")) return;
+  if(lbPid != null && !findPost(lbPid)){ closeLightbox(); return; }
+  renderLbInfo();
+}
+/* Kommentar-tap i vieweren: i appen lægger sheetet (minde) eller den native side (tanke)
+   sig NATIVT OVEN PÅ vieweren — mediet bliver synligt bagved, som på X. I browseren
+   ligger web-siderne UNDER vieweren (z 90/120 < 300), så dér lukkes vieweren først. */
+function openLbComments(){
+  const p = findPost(lbPid);
+  if(!p) return;
+  if(window.__vfNative && window.__vfComments && p.kind === "memory"){ openNativeComments(p.id); return; }
+  if(window.__vfNative && window.__vfPostPage && p.kind !== "memory"){ openNativePostPage(p.id); return; }
+  closeLightbox();
+  expandedCmts.add(Number(p.id));
+  // Står vi allerede på web-detaljesiden med dette opslag, skal den ikke genåbnes (scroll bevares)
+  const node = el("mv-body").querySelector('.post[data-id="'+p.id+'"]');
+  if(node && el("memview").classList.contains("on")) rerenderPostCmts(p.id);
+  else openPostView(p);
+}
+function lbMenu(){
+  const p = findPost(lbPid);
+  if(!p || !me) return;
+  // Kun de native glas-kort kan åbne HENOVER vieweren — web-modalerne (z 120) ligger bagved
+  if(!(window.__vfGlassCard && window.__vfSheetPost)) closeLightbox();
+  if(p.u === me.handle) openPostMenu(p.id);
+  else openReportMenu(p.id);
+}
+
+export function openLightbox(kind, src, pid){
   const st = stage();
+  lbPid = pid != null ? Number(pid) : null;
+  renderLbInfo();
   pointers.clear(); pinch = null; pan = null; lastTapT = 0; moved = false;
   scale = 1; tx = 0; ty = 0;
   if(kind === "video"){
@@ -149,9 +218,13 @@ export function openLightbox(kind, src){
   el("app").classList.add("lb-lock");
 }
 export function closeLightbox(){
-  el("lightbox").classList.remove("on");
+  el("lightbox").classList.remove("on", "zoomed");
   el("lightbox").setAttribute("aria-hidden", "true");
   stage().innerHTML = ""; // stopper videoen og fjerner elementets lyttere
+  el("lb-info").innerHTML = "";
+  el("lb-info").style.display = "none";
+  el("lb-dots").style.display = "none";
+  lbPid = null;
   imgEl = null;
   pointers.clear(); pinch = null; pan = null;
   scale = 1; tx = 0; ty = 0;
@@ -161,6 +234,18 @@ export function closeLightbox(){
 
 export function initLightbox(){
   el("lb-close").addEventListener("click", closeLightbox);
+  el("lb-dots").addEventListener("click", lbMenu);
+  el("lb-info").addEventListener("click", function(e){
+    const b = e.target.closest("[data-lb]");
+    if(!b || lbPid == null) return;
+    if(b.dataset.lb === "like"){
+      setLike(lbPid);   // optimistisk tilstand er sat synkront før første await
+      renderLbInfo();
+      return;
+    }
+    if(b.dataset.lb === "share"){ sharePost(lbPid); return; }
+    openLbComments();   // cmt + reply-feltet
+  });
   el("lightbox").addEventListener("click", function(e){
     // tap på baggrunden (ikke billedet/videoen) lukker også
     if(e.target === el("lightbox") || e.target === el("lb-stage")) closeLightbox();

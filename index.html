@@ -515,12 +515,18 @@
 
   <input type="file" id="cfile" accept="image/*" style="display:none">
 
-  <!-- Fuldskærms-lightbox (billede med pinch-zoom / video med lyd og controls) -->
+  <!-- Fuldskærms-lightbox (billede med pinch-zoom / video med lyd og controls).
+       X-agtig viewer: tilbage-pil øverst tv., ⋯ øverst th. og et info-overlay i bunden
+       (forfatter, tekst, kommentar/like/del + kommentarfelt) når mediet hører til et opslag. -->
   <div class="lightbox" id="lightbox" role="dialog" aria-label="Medie i fuld skærm" data-i18n-aria="lb.aria" aria-hidden="true">
     <div class="lb-stage" id="lb-stage"></div>
-    <button class="lb-close" id="lb-close" aria-label="Luk" data-i18n-aria="lb.close">
-      <svg viewBox="0 0 24 24"><g class="stroke"><path d="M6 6l12 12M18 6 6 18"/></g></svg>
+    <button class="lb-close" id="lb-close" aria-label="Tilbage" data-i18n-aria="common.back">
+      <svg viewBox="0 0 24 24"><path class="stroke" d="M15 5l-7 7 7 7"/></svg>
     </button>
+    <button class="lb-dots" id="lb-dots" aria-label="Mere" data-i18n-aria="aria.more" style="display:none">
+      <svg viewBox="0 0 24 24"><g class="fillic"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></g></svg>
+    </button>
+    <div class="lb-info" id="lb-info" style="display:none"></div>
   </div>
 
   <!-- Stories: fuldskærms-viewer (bygges dynamisk af stories.js) -->
