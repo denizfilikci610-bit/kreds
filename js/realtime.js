@@ -8,6 +8,7 @@ import { loadPvPosts } from "./profile.js";
 import { renderSearch } from "./search.js";
 import { realtimeNotify, scheduleNotifDotRefresh } from "./notifications.js";
 import { chatRealtime, chatReadsRealtime, chatReactsRealtime } from "./chat.js";
+import { loadStories } from "./stories.js";
 
 /* ================= Realtime + fokus ================= */
 let channel = null, readsChannel = null, refetchTimer = null, pollTimer = null;
@@ -78,6 +79,9 @@ export function subscribeRealtime(){
       // Ingen scheduleRefetch: kommentar-like-tal ses kun i udfoldet tråd (gen-renderes ved åbning);
       // en fuld feed-refetch pr. kommentar-like ville være unødigt tungt.
       realtimeNotify("comment_likes", payload);
+    })
+    .on("postgres_changes", { event:"*", schema:"public", table:"stories" }, function(){
+      loadStories(); // story-ringene opdaterer live (kun rækken — feedet behøver ingen refetch)
     })
     .on("postgres_changes", { event:"*", schema:"public", table:"poll_votes" }, scheduleRefetch)
     .on("postgres_changes", { event:"*", schema:"public", table:"feed_members" }, scheduleRefetch)

@@ -3,6 +3,7 @@ import { me, state } from "./store.js";
 import { el, esc, toast, uuid } from "./helpers.js";
 import { t } from "./i18n.js";
 import { feedById, setFeed, switchTab } from "./feed.js";
+import { loadStories } from "./stories.js";
 import { mentionCards } from "./mentions.js";
 
 /* ================= Skriv ================= */
@@ -240,6 +241,7 @@ async function insertStory(m){
     });
     if(ins.error){ sb.storage.from("post-images").remove([m.path]).catch(function(){}); throw ins.error; }
     ackMemory("ok");
+    loadStories(); // egen ring dukker op med det samme (uden at vente på realtime/poll)
     const df = feedById(m.dest);
     toast(df ? t("compose.shared_in", { name: df.name }) : t("compose.shared_all"));
   }catch(err){
