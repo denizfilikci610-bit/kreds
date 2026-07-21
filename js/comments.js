@@ -208,7 +208,13 @@ export async function deleteComment(cid){
       const remove = descendantIds(p, cid);
       const before = p.cmts.length;
       p.cmts = p.cmts.filter(function(x){ return !remove.has(Number(x.id)); });
-      if(p.cmts.length !== before) affected.add(p.id);
+      if(p.cmts.length !== before){
+        affected.add(p.id);
+        // Svarer composeren på en af de netop slettede kommentarer, hænger svar-chippen
+        // ellers fast (reply_to peger på en væk-række) og beskeden kan ikke sendes.
+        const s = composers.get(Number(p.id));
+        if(s && s.replyTo && remove.has(Number(s.replyTo.id))) s.replyTo = null;
+      }
     });
   });
   affected.forEach(function(pid){ rerenderPostCmts(pid); });

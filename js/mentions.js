@@ -53,12 +53,17 @@ function candidateHandles(feedId, extra){
     seen.add(h);
     out.push(h);
   }
-  (state.humanFriends || []).forEach(add);
-  if(feedId && feedId !== "all"){
-    const f = feedById(feedId);
-    if(f && f.members) f.members.forEach(add);
+  const f = (feedId && feedId !== "all") ? feedById(feedId) : null;
+  if(f && f.members){
+    // Rigtig kreds: KUN medlemmer kan se opslaget, så kun de kan tagges. En ven uden for
+    // kredsen ville ellers blive foreslået, men DB-triggeren dropper omtalen i stilhed
+    // (can_see_post er falsk for ikke-medlemmer), så @navnet forsvandt uden besked.
+    f.members.forEach(add);
+  } else {
+    // Hele kredsen/venne-opslag (eller en kreds vi ikke selv er med i): venner kan se det.
+    (state.humanFriends || []).forEach(add);
   }
-  (extra || []).forEach(add);
+  (extra || []).forEach(add); // opslagets forfatter kan altid tagges (ser sit eget opslag)
   return out;
 }
 function candidatesFor(field){
