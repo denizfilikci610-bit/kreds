@@ -266,6 +266,14 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
             task.setTaskCompleted(success: true)
             return
         }
+        // Har enheden et aktivt push-token, leverer APNs allerede alle disse hændelser
+        // (der findes en push-trigger for hver type). At poll'e oveni ville give præcis
+        // SAMME notifikation to gange. Baggrunds-pollen er kun sikkerhedsnettet for
+        // enheder UDEN push, så den springes over når push virker.
+        if let tok = UserDefaults.standard.string(forKey: pushTokenKey), !tok.isEmpty {
+            task.setTaskCompleted(success: true)
+            return
+        }
         let since = UserDefaults.standard.string(forKey: lastCheckKey)
             ?? isoString(Date(timeIntervalSinceNow: -24 * 3600))
 

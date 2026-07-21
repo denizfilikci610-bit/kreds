@@ -243,7 +243,9 @@ export async function openKredsChat(feedId){
     sb.from("kreds_messages")
       .select(MSG_SELECT)
       .eq("feed_id", feedId)
-      .order("created_at", { ascending: true })
+      // Hent de NYESTE 300 (ikke de ældste): en tråd over 300 beskeder skal åbne på
+      // det seneste, ikke på begyndelsen. Vendes lokalt til ældst→nyest til visning.
+      .order("created_at", { ascending: false })
       .limit(300),
     sb.from("kreds_chat_reads").select("user_id, last_read_at").eq("feed_id", feedId),
     sb.from("kreds_chat_prefs").select("*").eq("feed_id", feedId).eq("user_id", me.id).maybeSingle()
@@ -256,7 +258,8 @@ export async function openKredsChat(feedId){
   }
   if(!pres.error && pres.data) prefs[feedId] = mapPref(pres.data);
   const pf = prefs[feedId] || {};
-  msgs = (mres.data || []).map(mapMsg);
+  // Hentet nyest-først; vend til ældst→nyest, som tråden vises.
+  msgs = (mres.data || []).slice().reverse().map(mapMsg);
   // Ryddet historik ("Ryd/Slet chatten") gælder kun mig: skjul alt før mit mærke
   if(pf.clearedAt){
     const cl = new Date(pf.clearedAt).getTime();
@@ -755,7 +758,10 @@ function renderSearchResults(q, msgRows){
   const box = el("chat-list");
   const ql = q.toLowerCase();
   const matched = allThreads().filter(function(f){
-    return threadName(f).toLowerCase().indexOf(ql) >= 0;
+    if(threadName(f).toLowerCase().indexOf(ql) < 0) return false;
+    // Samme regel som selve listen: en ryddet/slettet DM-tråd må ikke dukke op igen
+    // i søgningen, før der lander en ny besked.
+    return !f.isDm || !!lastVisible(f);
   });
   const threadRows = matched.map(chatRowHTML).join("");
   // Venner der allerede er dækket af en matchende 2-personers tråd vises ikke dobbelt
@@ -781,6 +787,10 @@ function renderSearchResults(q, msgRows){
   const msgsHtml = (msgRows || []).map(function(r){
     const f = threadById(r.feed_id);
     if(!f) return "";
+    // Beskeder fra før mit "Ryd/Slet chatten"-mærke er skjult for mig i tråden, så de
+    // må heller ikke dukke op som søgetræffere.
+    const cl = (prefs[r.feed_id] || {}).clearedAt;
+    if(cl && new Date(r.created_at).getTime() <= new Date(cl).getTime()) return "";
     const mm = mapMsg(r);
     return '<button class="chatrow" data-feed="'+esc(f.id)+'">'+
       chatAvaHTML(f, 52)+

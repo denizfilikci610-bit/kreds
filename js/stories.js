@@ -134,7 +134,10 @@ async function loadViews(it){
       .select("viewer, seen_at, profiles!story_views_viewer_fkey(handle, name, avatar_path)")
       .eq("story_id", it.id).neq("viewer", me.id)
       .order("seen_at", { ascending: false });
-    it.viewsData = data || [];
+    // En seer der har blokeret mig får sin profil skjult af RLS (embed'et bliver null).
+    // Uden profil kan seer-listen ikke tegne rækken (avaHTML → crash), og storyen ville
+    // fryse. Frasortér dem, så tal og liste altid er konsistente og listen kan åbnes.
+    it.viewsData = (data || []).filter(function(v){ return v.profiles; });
     it.viewsData.forEach(function(v){
       const p = v.profiles || {};
       if(p.handle) registerProfile({ id: v.viewer, handle: p.handle, name: p.name, avatar_path: p.avatar_path });
