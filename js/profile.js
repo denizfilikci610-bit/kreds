@@ -66,7 +66,8 @@ function timelineHTML(posts, tab, emptyHTML, withSaved){
   '</div>';
   let body;
   if(tab === "saved"){
-    body = gridHTML(posts, t(savedLoaded ? "save.empty" : "common.loading"));
+    // Efter et forsøg (success ELLER fejl) vises "ingen gemte" frem for en evig spinner.
+    body = gridHTML(posts, t(savedTried ? "save.empty" : "common.loading"));
   } else if(tab === "grid"){
     body = gridHTML(posts, t("memories.empty"));
   } else {
@@ -78,16 +79,21 @@ function timelineHTML(posts, tab, emptyHTML, withSaved){
 }
 /* Mine gemte opslag: hentes første gang Gemte-fanen åbnes (derefter holder toggleSave
    listen opdateret lokalt). RLS filtrerer gemte opslag jeg ikke længere må se. */
-let savedLoaded = false;
-export function resetSaved(){ savedLoaded = false; }
+let savedTried = false;
+export function resetSaved(){ savedTried = false; }
 async function loadSavedPosts(){
   if(!me) return;
-  const { data, error } = await sb.from("saved_posts")
-    .select("created_at, post:posts(" + POST_SELECT + ")")
-    .order("created_at", { ascending: false });
-  if(error){ console.error(error); return; }
-  state.savedPosts = (data || []).map(function(r){ return r.post; }).filter(Boolean).map(mapPost);
-  savedLoaded = true;
+  try{
+    const { data, error } = await sb.from("saved_posts")
+      .select("created_at, post:posts(" + POST_SELECT + ")")
+      .order("created_at", { ascending: false });
+    if(error){ console.error(error); return; }
+    state.savedPosts = (data || []).map(function(r){ return r.post; }).filter(Boolean).map(mapPost);
+  }finally{
+    // Sæt ALTID (også ved fejl) så renderMyPosts ikke kalder loadSavedPosts i en
+    // uendelig løkke når saved_posts-kaldet fejler (fx netværk/RLS).
+    savedTried = true;
+  }
 }
 
 /* Ét opslag i fuldskærms-siden #memview (glider ind fra højre). Genbruger den delte postHTML, så
@@ -139,7 +145,7 @@ export async function renderMyPosts(){
   el("stat-posts").textContent = mine.filter(function(p){ return !p.poll; }).length;
   el("stat-friends").textContent = state.humanFriends.length;
   el("stat-kredse").textContent = state.feeds.length;
-  if(myTab === "saved" && !savedLoaded){
+  if(myTab === "saved" && !savedTried){
     loadSavedPosts().then(function(){ if(me && myTab === "saved") renderMyPosts(); });
   }
   const list = myTab === "saved" ? state.savedPosts : mine;
