@@ -799,7 +799,15 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
     private var configured = false
 
     @Published var authorized = false
-    @Published var flashOn = false
+    @Published var flashOn = false {
+        didSet {   // blitz-tap MIDT i en optagelse slår lygten til/fra med det samme
+            let on = flashOn
+            queue.async { [weak self] in
+                guard let self, self.movieOutput.isRecording else { return }
+                self.applyTorch(on)
+            }
+        }
+    }
     @Published var recording = false
     @Published var secondsLeft = 0                    // nedtælling under optagelse (6 → 0)
     @Published var zoomFactor: CGFloat = 1.0          // aktuel zoom (1x → maks)
@@ -828,8 +836,10 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
 
     func stop() {
         queue.async { [weak self] in
-            if self?.movieOutput.isRecording == true { self?.movieOutput.stopRecording() }
-            if self?.session.isRunning == true { self?.session.stopRunning() }
+            guard let self else { return }
+            self.applyTorch(false)   // lygten må aldrig blive hængende tændt
+            if self.movieOutput.isRecording { self.movieOutput.stopRecording() }
+            if self.session.isRunning { self.session.stopRunning() }
         }
     }
 
@@ -899,6 +909,17 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
         }
     }
 
+    /// VIDEO-blitz er LYGTEN (torch) — foto-flashen virker ikke under en optagelse.
+    /// Skal kaldes på kamera-køen. Front-kameraet har ingen lygte (hasTorch-guard).
+    private func applyTorch(_ on: Bool) {
+        guard let device = videoInput?.device, device.hasTorch else { return }
+        do {
+            try device.lockForConfiguration()
+            device.torchMode = (on && device.isTorchModeSupported(.on)) ? .on : .off
+            device.unlockForConfiguration()
+        } catch {}
+    }
+
     func capture() {
         queue.async { [weak self] in
             guard let self, self.session.isRunning, !self.movieOutput.isRecording else { return }
@@ -916,6 +937,7 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
             let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
             try? FileManager.default.removeItem(at: url)
             self.movieOutput.startRecording(to: url, recordingDelegate: self)
+            if self.flashOn { self.applyTorch(true) }   // blitz under video = lygten
             DispatchQueue.main.async { self.beginCountdown() }
         }
     }
@@ -935,6 +957,7 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
         countdownTimer?.invalidate(); countdownTimer = nil
         queue.async { [weak self] in
             guard let self, self.movieOutput.isRecording else { return }
+            self.applyTorch(false)
             self.movieOutput.stopRecording()
         }
     }
