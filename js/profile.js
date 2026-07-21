@@ -134,7 +134,8 @@ export async function renderMyPosts(){
   if(!me) return;
   // ALT man selv har postet — også kreds-opslag (kreds-minder får en lille lås i grid'et)
   const mine = state.wholePosts.filter(function(p){ return p.u === me.handle; });
-  el("stat-posts").textContent = mine.length;
+  // Opslags-tallet tæller IKKE afstemninger (de vises heller ikke på profilen)
+  el("stat-posts").textContent = mine.filter(function(p){ return !p.poll; }).length;
   el("stat-friends").textContent = state.humanFriends.length;
   el("stat-kredse").textContent = state.feeds.length;
   if(myTab === "saved" && !savedLoaded){
@@ -146,8 +147,13 @@ export async function renderMyPosts(){
   restoreVideos(el("myposts"), vsnap);
   applyFeedSound();
   clampMemCaps(el("myposts"));
-  const r = await sb.from("posts").select("id", { count:"exact", head:true }).eq("author", me.id);
-  if(!r.error && r.count != null && me) el("stat-posts").textContent = r.count;
+  // Præcist tal fra databasen — afstemninger (opslag m. poll_options) tælles fra
+  const r = await sb.from("posts").select("id, poll_options(id)").eq("author", me.id).limit(1000);
+  if(!r.error && r.data && me){
+    el("stat-posts").textContent = r.data.filter(function(x){
+      return !(x.poll_options && x.poll_options.length);
+    }).length;
+  }
 }
 
 function renderBanner(id, path){
@@ -839,8 +845,9 @@ export async function loadPvPosts(){
     return;
   }
   pv.posts = (data || []).map(mapPost);
-  el("pv-count").textContent = t("pv.count", { n: pv.posts.length });
-  el("pv-stat-posts").textContent = pv.posts.length;
+  const pvN = pv.posts.filter(function(p){ return !p.poll; }).length; // afstemninger tælles ikke
+  el("pv-count").textContent = t("pv.count", { n: pvN });
+  el("pv-stat-posts").textContent = pvN;
   const vsnap = snapVideos(el("pv-posts"));
   el("pv-posts").innerHTML = timelineHTML(pv.posts, pvTab, pvEmptyNote(h)); // RLS giver tom liste for ikke-venner
   restoreVideos(el("pv-posts"), vsnap);
@@ -852,8 +859,9 @@ export function closeProfile(){
 }
 export function refreshPv(){
   if(pv.u && el("profileview").classList.contains("on")){
-    el("pv-count").textContent = t("pv.count", { n: pv.posts.length });
-    el("pv-stat-posts").textContent = pv.posts.length;
+    const pvN = pv.posts.filter(function(p){ return !p.poll; }).length; // afstemninger tælles ikke
+    el("pv-count").textContent = t("pv.count", { n: pvN });
+    el("pv-stat-posts").textContent = pvN;
     const vsnap = snapVideos(el("pv-posts"));
     el("pv-posts").innerHTML = timelineHTML(pv.posts, pvTab, pvEmptyNote(pv.u));
     restoreVideos(el("pv-posts"), vsnap);
