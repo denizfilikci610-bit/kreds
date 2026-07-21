@@ -424,10 +424,10 @@ export function closeKredsChat(){
 
 /* ---- iOS-tastaturet: pin tråden til den synlige viewport (Messenger-adfærd) ----
    WKWebView/Safari ændrer ikke sidens layout når tastaturet åbner — den panorerer bare
-   den visuelle viewport, så en absolut fuldskærms-side ender med kun composeren synlig
-   over tastaturet. Mens tråden er åben følger #chatview derfor window.visualViewport
-   (top + højde): headeren bliver stående, composeren klæber lige over tastaturet, og
-   beskederne holder sig i bunden. Ved tastatur-ned/luk fjernes inline-målene igen. */
+   den visuelle viewport. Tråden låses derfor til top 0 i visualViewport-HØJDEN, og
+   selve panoreringen annulleres (scrollTo 0,0): headeren står bomfast, composeren
+   klæber lige over tastaturet, beskederne holder sig i bunden. Ved tastatur-ned/luk
+   fjernes inline-målene igen. */
 let kbRaf = 0, kbOpen = false;
 function fitChatToViewport(){
   kbRaf = 0;
@@ -439,12 +439,16 @@ function fitChatToViewport(){
   // iOS kan scrolle selv overflow:hidden-containere for at vise det fokuserede felt —
   // nulstil .phone, ellers forskydes hele appen bag den pinnede tråd
   if(cv.parentElement && cv.parentElement.scrollTop) cv.parentElement.scrollTop = 0;
-  // vv.pageTop = den synlige viewports topkant i dokumentet; .phone starter ved y=0,
-  // så tallet kan bruges direkte som top i #chatview's absolutte koordinater
-  cv.style.top = vv.pageTop + "px";
+  // Headeren skal stå BOMFAST: i stedet for at følge iOS' panorering (top = vv.pageTop,
+  // som gav et synligt hop når tastaturet åbnede) låses siden til top 0 i den krympede
+  // højde, og panoreringen ANNULLERES med scrollTo(0,0). iOS accepterer det, fordi
+  // feltet allerede er synligt i den krympede side — vv.scroll-lytteren nulstiller igen,
+  // hvis iOS alligevel prøver at panorere (fx ved caret-flyt).
+  cv.style.top = "0px";
   cv.style.height = vv.height + "px";
   cv.style.bottom = "auto";
   cv.classList.add("kb");
+  if(vv.pageTop > 0.5 || window.scrollY) window.scrollTo(0, 0);
   const body = el("cv-body");
   const nearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 80;
   if(!kbOpen || nearBottom) body.scrollTop = body.scrollHeight;
@@ -470,6 +474,11 @@ export function resetChat(){
   el("cv-input").value = "";
   el("cv-search").value = "";
 }
+
+/* Sæt FØR renderThread ved en NYANKOMMEN besked (sendt eller modtaget): boblen glider
+   ind (.msg-new) og der rulles BLØDT til bunden. Alle andre renders (åbning, reads,
+   reaktioner, tmp→rigtig-byttet efter send) er som før — øjeblikkelige og uden animation. */
+let animateMid = null;
 
 function renderThread(scrollBottom){
   const box = el("cv-body");
@@ -505,7 +514,15 @@ function renderThread(scrollBottom){
                  : '');
       }).join("")
     : '<div class="emptynote">'+t("chat.no_messages")+'</div>';
-  box.scrollTop = (scrollBottom || nearBottom) ? box.scrollHeight : prevTop;
+  const fresh = animateMid != null ? box.querySelector('.cv-msg[data-mid="'+animateMid+'"]') : null;
+  animateMid = null;
+  if(fresh) fresh.classList.add("msg-new");
+  if(scrollBottom || nearBottom){
+    if(fresh) box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
+    else box.scrollTop = box.scrollHeight;
+  } else {
+    box.scrollTop = prevTop;
+  }
 }
 /* Set-kvitteringer: for hvert andet medlem findes den sidste besked (id) de har læst.
    Er ankeret medlemmets egen besked, vises ingen kvittering (som Messenger: at man
@@ -1008,6 +1025,7 @@ async function sendChatMsg(){
                  replyToId: reply ? reply.id : null,
                  t: fmtTime(new Date().toISOString()), created: new Date().toISOString() };
   msgs.push(temp);
+  animateMid = temp.id; // den nye boble glider ind
   renderThread(true);
   const { data, error } = await sb.from("kreds_messages")
     .insert({ feed_id: feedId, author: me.id, text: text,
@@ -1092,6 +1110,7 @@ export function chatRealtime(payload){
       if(chatFeed === m.feed && el("chatview").classList.contains("on")){
         if(!msgs.some(function(x){ return x.id === m.id; })){
           msgs.push(m);
+          animateMid = m.id; // den modtagne boble glider ind
           renderThread(true);
           markThreadRead(); // tråden er åben og synlig → den nye besked er læst
         }
