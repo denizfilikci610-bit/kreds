@@ -1060,10 +1060,12 @@ async function sendChatMsg(){
     if(chatFeed !== feedId) return;
     if(error || !data){
       console.error(error);
-      // 0 rammede rækker (PGRST116) = 15-min-vinduet er lukket (RLS blokerer opdateringen).
+      // 0 rammede rækker = 15-min-vinduet er lukket (RLS blokerer opdateringen); .single()
+      // melder det ALTID som PGRST116. En netværksfejl har også data=null men en ANDEN kode,
+      // så vi må IKKE lede med !data (ellers kaldes en midlertidig netværksfejl "for gammel").
       // Send-vejen giver teksten tilbage ved fejl; det skal redigeringen også, ellers taber
       // brugeren det, hun lige skrev. Gendan redigerings-tilstanden så intet mistes.
-      const tooOld = !data || (error && error.code === "PGRST116");
+      const tooOld = !!(error && error.code === "PGRST116");
       editingMsg = mid;
       inp.value = text;
       growInput();
