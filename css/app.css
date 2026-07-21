@@ -1575,14 +1575,17 @@
   .lb-chip.on,.lb-chip.on .lb-cnt{color:var(--red)}
   .lb-chip.on svg path{fill:var(--red);stroke:var(--red)}
   .lb-chip:active{opacity:.7}
-  .lb-reply{
-    display:block;width:100%;text-align:left;
-    padding:12px 16px;border-radius:999px;
-    background:rgba(255,255,255,.14);color:rgba(255,255,255,.66);
-    font-size:14.5px;
-    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  /* Rækken spejler feedet: bogmærket yderst til højre (som .save-btn's order:4) */
+  .lb-save{margin-left:auto}
+  /* Privat-kommentar (lås) — samme badge-idé som feedets .cmtp-lock, i viewerens mørke look */
+  .lb-cwrap{position:relative;display:flex}
+  .lb-plock{
+    position:absolute;right:-5px;bottom:-4px;
+    width:13px;height:13px;border-radius:50%;
+    background:#161616;color:#ddd;
+    display:flex;align-items:center;justify-content:center;
   }
-  .lb-reply:active{opacity:.7}
+  .lb-plock svg{width:8px;height:8px}
   .lb-close:active{opacity:.7}
   .lb-lock{overflow:hidden !important} /* låser app/body-scroll mens lightboxen er åben */
 

@@ -1,7 +1,7 @@
 import { el, esc, user, avaHTML, HEART_SVG, BADGE } from "./helpers.js";
 import { me, expandedCmts } from "./store.js";
 import { t } from "./i18n.js";
-import { findPost, setLike, sharePost, openPostMenu, openReportMenu, muteFeedSound, switchTab } from "./feed.js";
+import { findPost, setLike, sharePost, toggleSave, openPostMenu, openReportMenu, muteFeedSound, switchTab } from "./feed.js";
 import { openNativePostPage, rerenderPostCmts } from "./comments.js";
 import { openThreadWithPost, openDmWith } from "./chat.js";
 import { openPostView } from "./profile.js";
@@ -12,7 +12,7 @@ import { openPostView } from "./profile.js";
    for billeder. Video vises med native controls og lyd, uden zoom-gestures.
    Transform: translate(tx,ty) scale(scale) — origin i midten af billedet.
    X-agtig viewer: hører mediet til et opslag (pid), vises et info-overlay i
-   bunden (forfatter, tekst, kommentar/like/del, kommentarfelt) + ⋯ øverst. */
+   bunden (forfatter, tekst + feedets handlingsrække i samme rækkefølge) + ⋯ øverst. */
 
 const MIN_SCALE = 1, MAX_SCALE = 4, DBL_SCALE = 2.5, DBL_MS = 320;
 
@@ -155,6 +155,8 @@ let lbPid = null;
 
 const LB_CMT_SVG = '<svg viewBox="0 0 24 24"><path class="stroke" d="M12 3.3a8.7 8.7 0 0 0-7.4 13.2L3.4 20.6l4.2-1.1A8.7 8.7 0 1 0 12 3.3Z"/></svg>';
 const LB_SHARE_SVG = '<svg viewBox="0 0 24 24"><path class="stroke" d="M21.5 2.5 10.8 13.2M21.5 2.5l-6.8 19-3.9-8.3-8.3-3.9Z"/></svg>';
+const LB_SAVE_SVG = '<svg viewBox="0 0 24 24"><path class="stroke" d="M7 3.8h10a1 1 0 0 1 1 1v15.4l-6-4.1-6 4.1V4.8a1 1 0 0 1 1-1Z"/></svg>';
+const LB_LOCK_SVG = '<svg viewBox="0 0 24 24"><g class="stroke"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7"/></g></svg>';
 
 function lbCnt(n){ return n > 0 ? '<span class="lb-cnt">'+n+'</span>' : ''; }
 function renderLbInfo(){
@@ -163,6 +165,13 @@ function renderLbInfo(){
   el("lb-dots").style.display = (p && me) ? "" : "none";
   if(!p){ box.style.display = "none"; box.innerHTML = ""; return; }
   const u = user(p.u);
+  // Samme knapper og rækkefølge som feedets handlingsrække (actionsHTML + minde-CSS-order):
+  // hjerte, kommentar, privat-lås (andres kreds-minder), del — og bogmærke yderst th. på minder.
+  const privCmt = (p.kind === "memory" && p.feed && me && p.u !== me.handle)
+    ? '<button class="lb-chip" data-lb="privcmt" aria-label="'+t("aria.private_comment")+'">'+
+        '<span class="lb-cwrap">'+LB_CMT_SVG+'<span class="lb-plock">'+LB_LOCK_SVG+'</span></span>'+
+      '</button>'
+    : '';
   box.style.display = "";
   box.innerHTML =
     '<div class="lb-author">'+avaHTML(p.u, 32)+
@@ -171,11 +180,14 @@ function renderLbInfo(){
     '</div>'+
     (p.text ? '<div class="lb-cap">'+esc(p.text)+'</div>' : '')+
     '<div class="lb-actions">'+
-      '<button class="lb-chip" data-lb="cmt" aria-label="'+t("aria.comments")+'">'+LB_CMT_SVG+lbCnt(p.cmts.length)+'</button>'+
       '<button class="lb-chip'+(p.liked ? " on" : "")+'" data-lb="like" aria-pressed="'+p.liked+'" aria-label="'+t("aria.like")+'">'+HEART_SVG+lbCnt(p.likeCount)+'</button>'+
-      (p.feed ? '' : '<button class="lb-chip" data-lb="share" aria-label="'+t("aria.share")+'">'+LB_SHARE_SVG+'</button>')+
-    '</div>'+
-    (me ? '<button class="lb-reply" data-lb="reply">'+t("cmt.ph")+'</button>' : '');
+      '<button class="lb-chip" data-lb="cmt" aria-label="'+t("aria.comments")+'">'+LB_CMT_SVG+lbCnt(p.kind === "memory" ? 0 : p.cmts.length)+'</button>'+
+      privCmt+
+      '<button class="lb-chip" data-lb="share" aria-label="'+t("aria.share")+'">'+LB_SHARE_SVG+'</button>'+
+      (p.kind === "memory"
+        ? '<button class="lb-chip lb-save'+(p.saved ? " on" : "")+'" data-lb="save" aria-pressed="'+(!!p.saved)+'" aria-label="'+t("aria.save")+'">'+LB_SAVE_SVG+'</button>'
+        : '')+
+    '</div>';
 }
 /* Datasync mens vieweren er åben (likes/kommentarer/realtime). Forsvinder opslaget
    (slettet/anmeldt/blokeret), lukkes hele vieweren — mediet må ikke blive hængende. */
@@ -285,8 +297,21 @@ export function initLightbox(){
       renderLbInfo();
       return;
     }
-    if(b.dataset.lb === "share"){ sharePost(lbPid); return; }
-    openLbComments();   // cmt + reply-feltet
+    if(b.dataset.lb === "share"){ sharePost(lbPid); return; } // kreds-opslag toaster "privat" som i feedet
+    if(b.dataset.lb === "save"){
+      toggleSave(lbPid);   // optimistisk (p.saved flippes synkront)
+      renderLbInfo();
+      return;
+    }
+    if(b.dataset.lb === "privcmt"){
+      // Privat kommentar (lås) på et kreds-minde: DM-tråden (z-85) ligger under vieweren
+      const p = findPost(lbPid);
+      if(!p) return;
+      closeLightbox();
+      openDmWith(user(p.u).id, p.id);
+      return;
+    }
+    openLbComments();   // data-lb="cmt"
   });
   el("lightbox").addEventListener("click", function(e){
     // tap på baggrunden (ikke billedet/videoen) lukker også
