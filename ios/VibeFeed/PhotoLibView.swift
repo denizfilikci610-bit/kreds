@@ -518,7 +518,7 @@ struct MemoryGalleryScreen: View {
 
     var body: some View {
         ZStack {
-            Color(.systemBackground).ignoresSafeArea()
+            vfBackground.ignoresSafeArea()   // matcher appens tema (#161616/off-white) — kameraet har sit eget sorte chrome
             if model.step == .camera {
                 MemoryCameraScreen()   // fuldskærm, eget kamera-chrome
             } else {
@@ -664,7 +664,7 @@ struct MemoryGalleryScreen: View {
                 if !model.fitLabel.isEmpty {
                     Text(model.fitLabel)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(Color.primary.opacity(0.9))   // tema-bevidst (skærmen er ikke sort længere)
                 }
                 if !model.isStory {   // story er ALTID fuldskærms 9:16 — ingen format-valg
                     HStack(spacing: 8) {
@@ -678,12 +678,13 @@ struct MemoryGalleryScreen: View {
     }
 
     private func aspectPill(_ label: String, value: CGFloat) -> some View {
-        Button { model.cropAspect = value } label: {
+        let on = abs(model.cropAspect - value) < 0.01
+        return Button { model.cropAspect = value } label: {
             Text(label)
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(on ? .white : Color.primary)   // inaktiv følger temaet (før hvid-på-sort)
                 .padding(.horizontal, 18).padding(.vertical, 8)
-                .background(Capsule().fill(abs(model.cropAspect - value) < 0.01 ? vfRed : Color.white.opacity(0.18)))
+                .background(Capsule().fill(on ? vfRed : Color.primary.opacity(0.12)))
         }
         .buttonStyle(.plain)
     }
@@ -756,7 +757,7 @@ struct MemoryGalleryScreen: View {
         let on = model.dest == id
         return Button { model.dest = id } label: {
             Text(name).font(.system(size: 14, weight: .bold))
-                .foregroundStyle(on ? Color(.systemBackground) : Color.primary)
+                .foregroundStyle(on ? vfBackground : Color.primary)
                 .padding(.horizontal, 15).frame(height: 34)
                 .background(Group {
                     if on { Capsule().fill(Color.primary) } else { Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 1.5) }
@@ -770,9 +771,9 @@ private struct PreviewPane: View {
     @State private var image: UIImage?
     var body: some View {
         ZStack {
-            Color.black
+            vfBackground   // letterbox i tema-farven (før ren sort)
             if let image { Image(uiImage: image).resizable().scaledToFit() }
-            else { ProgressView().tint(.white) }
+            else { ProgressView() }
             if asset.mediaType == .video {
                 Image(systemName: "play.circle.fill").font(.system(size: 34)).foregroundStyle(.white.opacity(0.85))
             }

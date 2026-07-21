@@ -19,7 +19,7 @@ struct TrimPlayerView: UIViewRepresentable {
         let v = TrimPlayerUIView()
         v.playerLayer.player = player
         v.playerLayer.videoGravity = .resizeAspect
-        v.backgroundColor = .black
+        v.backgroundColor = .clear   // SwiftUI-baggrunden (tema-farven) skinner igennem
         return v
     }
     func updateUIView(_ v: TrimPlayerUIView, context: Context) { v.playerLayer.player = player }
@@ -113,7 +113,7 @@ struct VideoTrimView: View {
             TrimPlayerView(player: controller.player)
                 .frame(maxWidth: .infinity)
                 .frame(height: UIScreen.main.bounds.height * 0.44)
-                .background(Color.black)
+                .background(vfBackground)   // tema-farven i stedet for ren sort
 
             Spacer(minLength: 0)
 

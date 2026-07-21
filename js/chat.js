@@ -1185,6 +1185,17 @@ export function initChat(){
     openMemoryFor(chatFeed);
   });
   el("cv-send").addEventListener("click", sendChatMsg);
+  // Fokus-vagt: fra allerFØRSTE frame af tastatur-animationen annulleres iOS' panorering
+  // (før visualViewport overhovedet har meldt resize) — ellers kunne hele siden nå at
+  // blive skubbet ned et øjeblik med et hul over headeren (set i ejerens optagelse).
+  let panRaf = 0;
+  function holdPan(){
+    if(document.activeElement !== el("cv-input")){ panRaf = 0; return; }
+    const vv = window.visualViewport;
+    if(window.scrollY || (vv && vv.pageTop > 0.5)) window.scrollTo(0, 0);
+    panRaf = requestAnimationFrame(holdPan);
+  }
+  el("cv-input").addEventListener("focusin", function(){ if(!panRaf) panRaf = requestAnimationFrame(holdPan); });
   el("cv-input").addEventListener("input", function(){ growInput(); sendTyping(); });
   el("cv-input").addEventListener("keydown", function(e){
     // Enter sender (shift+enter = ny linje på desktop); preventDefault så textarea'en
