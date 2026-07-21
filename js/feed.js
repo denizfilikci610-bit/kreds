@@ -596,15 +596,17 @@ export function markFeedSeen(id, floor){
 export async function refreshUnseen(){
   if(!me) return;
   if(!state.feeds.length){ unseenFeeds.clear(); return; }
-  const { data, error } = await sb.from("posts")
-    .select("feed_id, created_at")
-    .not("feed_id", "is", null)
-    .order("created_at", { ascending:false })
-    .limit(100);
-  if(error){ console.error(error); return; }
+  // Nyeste opslag PR kreds (svarer til "distinct on feed_id"): én limit(1)-forespørgsel
+  // pr. kreds. Den gamle globale limit(100) tabte ulæst-prikken for en STILLE kreds, hvis
+  // dens nyeste opslag lå bag 100 nyere opslag fra travle kredse (top-100 nåede den aldrig).
+  const ids = state.feeds.map(function(f){ return f.id; });
+  const rows = await Promise.all(ids.map(function(id){
+    return sb.from("posts").select("created_at").eq("feed_id", id)
+      .order("created_at", { ascending:false }).limit(1).maybeSingle();
+  }));
   const newest = {};
-  (data || []).forEach(function(r){
-    if(newest[r.feed_id] === undefined) newest[r.feed_id] = r.created_at;
+  rows.forEach(function(r, i){
+    if(r && !r.error && r.data && r.data.created_at) newest[ids[i]] = r.data.created_at;
   });
   const m = readSeenMap();
   state.feeds.forEach(function(f){

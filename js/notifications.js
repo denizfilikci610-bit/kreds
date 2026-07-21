@@ -1,9 +1,9 @@
 import { sb, OFFICIAL_HANDLE } from "./config.js";
-import { me, expandedCmts, curTab } from "./store.js";
+import { me, state, expandedCmts, curTab } from "./store.js";
 import { el, esc, avaHTML, user, fmtTime, toast, registerProfile } from "./helpers.js";
 import { t } from "./i18n.js";
 import { scheduleRefetch } from "./realtime.js";
-import { switchTab, setFeed, resetBarHide, findPost, feedById } from "./feed.js";
+import { switchTab, setFeed, resetBarHide, findPost, feedById, POST_SELECT, mapPost } from "./feed.js";
 import { rerenderPostCmts, openNativeComments, openNativePostPage } from "./comments.js";
 import { openProfile, openPostView } from "./profile.js";
 import { openKredsChat } from "./chat.js";
@@ -573,7 +573,30 @@ export async function openNotifPost(pid, isCmt, cid){
     rerenderPostCmts(pid);
   }
   const node = document.querySelector('#feed .post[data-id="'+data.id+'"]');
-  if(!node){ toast(t("notif.post_not_visible")); return false; }
+  if(!node){
+    // Opslaget ligger uden for feedets seneste 100 (loadPosts .limit(100)) og har derfor
+    // ingen række i feedet. Åbn det ALENE på detalje-siden i stedet for den gamle blindgyde
+    // ("ikke synligt"-toasten), så en notifikation om et ældre opslag stadig rammer.
+    let fp = findPost(pid);
+    if(!fp){
+      const full = await sb.from("posts").select(POST_SELECT).eq("id", pid).maybeSingle();
+      if(full.error || !full.data){ toast(t(full.error ? "err.generic" : "notif.post_gone")); return false; }
+      fp = mapPost(full.data);
+      state.wholePosts.push(fp); // så findPost + den native detalje-side kan slå opslaget op
+    }
+    const nMem = !!(isCmt && cid && window.__vfNative && window.__vfComments && fp.kind === "memory");
+    if(fp.kind !== "memory" && window.__vfNative && window.__vfPostPage){
+      openNativePostPage(pid, isCmt ? cid : null); // native detalje-side, fokusér evt. kommentaren
+    } else {
+      openPostView(fp);
+      if(nMem){ openNativeComments(pid, cid); }
+      else if(isCmt && cid){
+        const mrow = el("mv-body").querySelector('.crow[data-cid="'+cid+'"]');
+        if(mrow){ mrow.scrollIntoView({ block:"center" }); mrow.classList.add("flash"); setTimeout(function(){ mrow.classList.remove("flash"); }, 1600); }
+      }
+    }
+    return true;
+  }
   const crow = (!nativeMemCmts && !thoughtCmts && cid) ? node.querySelector('.crow[data-cid="'+cid+'"]') : null;
   const hl = crow || node;
   // Fremhæv FØR hoppet, så man kan se målet mens billederne falder på plads
