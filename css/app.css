@@ -101,7 +101,7 @@
     height:calc(52px + env(safe-area-inset-top));
     padding:env(safe-area-inset-top) 16px 0;
     background:var(--bg);
-    border-bottom:1px solid var(--line);
+    /* ingen streg under topbaren (ejer-krav: streg-frit look) */
     transition:transform .25s ease;
   }
   /* Skjul topbaren ved scroll ned — feedbar/søgehoved glider op til toppen */
@@ -137,7 +137,7 @@
     padding:10px 12px;
     overflow-x:auto;
     scrollbar-width:none;
-    border-bottom:1px solid var(--line);
+    /* ingen streg under story-rækken (ejer-krav: streg-frit look) */
   }
   .stories::-webkit-scrollbar{display:none}
   .story{flex:0 0 auto;width:66px;text-align:center}
@@ -694,8 +694,7 @@
 
   /* ================= Notifikationer ================= */
   .pagetitle{font-size:19px;font-weight:800;color:var(--ink);padding:12px 16px 8px}
-  /* Beskeder-fanen er helt uden streger (Messenger-ren): heller ingen topbar-linje */
-  body[data-tab="chat"] .topbar{border-bottom-color:transparent}
+  /* (topbar-stregen er nu fjernet globalt — chat-særreglen er overflødig) */
   .notif{
     display:flex;align-items:center;gap:12px;
     padding:11px 16px;
