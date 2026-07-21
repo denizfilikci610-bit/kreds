@@ -7,63 +7,23 @@ import CoreImage.CIFilterBuiltins
 import MetalKit
 
 /// ================= VibeFeed-kameraets ANALOGE FILM-LOOK =================
-/// Ejer-krav: kameraet skal LIGNE et gammelt kamera — ikke et efter-filter. Looket
-/// ligger derfor i selve pipelinen: live i søgeren (Metal-preview), brændt ind i fotos
-/// ved optagelsen, i videoer ved eksporten og i afspilnings-previewet. Galleri-medier
-/// røres IKKE. Opskriften (efter ejerens referencebilleder): blegede farver, varm
-/// gylden støbning, løftede sorte/dæmpede højlys (matte), vignet og fint korn.
+/// Film-looket er FJERNET igen (ejer-ønske 2026-07-21) — kameraet optager nu neutralt.
+/// Enum'et består, fordi Metal-søgeren (FilmPreviewView) og video-eksporten stadig
+/// bruger dets delte CIContext/Metal-device, og applyStill stadig bager foto-
+/// orienteringen ind i selve pixels (som filteret gjorde før).
 enum VFFilmLook {
     static let device: MTLDevice? = MTLCreateSystemDefaultDevice()
     static let context: CIContext = {
         if let d = device { return CIContext(mtlDevice: d, options: [.cacheIntermediates: false]) }
         return CIContext()
     }()
-    private static let noise: CIImage = {
-        CIFilter.randomGenerator().outputImage ?? CIImage.empty()
-    }()
 
-    /// Hele kæden. `seed` flytter kornet pr. frame (levende korn på video/preview).
-    static func apply(_ input: CIImage, seed: Int) -> CIImage {
-        var img = input
-        // 1) Blegede farver + en anelse løftet lys
-        img = img.applyingFilter("CIColorControls", parameters: [
-            kCIInputSaturationKey: 0.78, kCIInputContrastKey: 0.97, kCIInputBrightnessKey: 0.015])
-        // 2) Varm, gylden støbning (gammelt dagslys-film)
-        img = img.applyingFilter("CITemperatureAndTint", parameters: [
-            "inputNeutral": CIVector(x: 6500, y: 0),
-            "inputTargetNeutral": CIVector(x: 5300, y: 10)])
-        // 3) Matte-kurven: løftede sorte, flade højlys
-        img = img.applyingFilter("CIToneCurve", parameters: [
-            "inputPoint0": CIVector(x: 0.00, y: 0.06),
-            "inputPoint1": CIVector(x: 0.25, y: 0.27),
-            "inputPoint2": CIVector(x: 0.50, y: 0.52),
-            "inputPoint3": CIVector(x: 0.75, y: 0.77),
-            "inputPoint4": CIVector(x: 1.00, y: 0.93)])
-        // 4) Vignet
-        img = img.applyingFilter("CIVignette", parameters: [
-            kCIInputIntensityKey: 0.55, kCIInputRadiusKey: 1.7])
-        // 5) Fint, levende korn (gråt støjlag lagt over med lav styrke)
-        let dx = CGFloat((seed &* 73) % 997), dy = CGFloat((seed &* 131) % 613)
-        let grain = noise
-            .transformed(by: CGAffineTransform(translationX: dx, y: dy))
-            .applyingFilter("CIColorMatrix", parameters: [
-                "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0.05),
-                "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0.05),
-                "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0.05),
-                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.05),
-                "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 0)])
-            .cropped(to: img.extent)
-        img = grain.applyingFilter("CISourceOverCompositing", parameters: [
-            kCIInputBackgroundImageKey: img])
-        return img.cropped(to: input.extent)
-    }
-
-    /// Stillbillede (foto taget med kameraet): look + korrekt orientering bagt ind.
+    /// Stillbillede (foto taget med kameraet): korrekt orientering bages ind i pixels.
     static func applyStill(_ ui: UIImage) -> UIImage {
+        guard ui.imageOrientation != .up else { return ui }
         guard var ci = CIImage(image: ui) else { return ui }
         ci = ci.oriented(forExifOrientation: exif(ui.imageOrientation))
-        let out = apply(ci, seed: 0)
-        guard let cg = context.createCGImage(out, from: out.extent) else { return ui }
+        guard let cg = context.createCGImage(ci, from: ci.extent) else { return ui }
         return UIImage(cgImage: cg)
     }
     private static func exif(_ o: UIImage.Orientation) -> Int32 {
@@ -72,14 +32,6 @@ enum VFFilmLook {
         case .upMirrored: return 2; case .downMirrored: return 4
         case .leftMirrored: return 5; case .rightMirrored: return 7
         @unknown default: return 1
-        }
-    }
-
-    /// Afspilnings-preview af en OPTAGET video (billedtekst-trinnet): look pr. frame.
-    static func playerComposition(for asset: AVAsset) -> AVVideoComposition {
-        AVMutableVideoComposition(asset: asset) { req in
-            let out = apply(req.sourceImage, seed: Int(req.compositionTime.seconds * 30))
-            req.finish(with: out, context: context)
         }
     }
 }
@@ -414,7 +366,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
         let asset = AVURLAsset(url: url)
         guard asset.tracks(withMediaType: .video).first != nil else { sharing = false; onUploadFailed?(); return }
         let render = outSize()   // minde 1080x1350, story 1080x1920
-        // CI-pipeline pr. frame: aspect-fill-beskær til render-størrelsen + FILM-LOOKET
+        // CI-pipeline pr. frame: aspect-fill-beskær til render-størrelsen
         // (sourceImage kommer allerede opret — preferredTransform er anvendt)
         let comp = AVMutableVideoComposition(asset: asset) { req in
             var img = req.sourceImage
@@ -427,7 +379,6 @@ final class PhotoLibModel: NSObject, ObservableObject {
                 img = img.transformed(by: CGAffineTransform(translationX: ox - e.origin.x, y: oy - e.origin.y))
                 img = img.cropped(to: CGRect(origin: .zero, size: render))
             }
-            img = VFFilmLook.apply(img, seed: Int(req.compositionTime.seconds * 30))
             req.finish(with: img, context: VFFilmLook.context)
         }
         comp.renderSize = render
@@ -741,7 +692,7 @@ struct MemoryGalleryScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 if let vurl = model.capturedVideoURL {
-                    LoopingVideoView(url: vurl, filmLook: true)       // loop m. film-looket (som eksporten)
+                    LoopingVideoView(url: vurl)       // loop af den optagne video (neutral, som eksporten)
                         .aspectRatio(4.0 / 5.0, contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.5)
                         .clipped()
@@ -887,7 +838,6 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
     // Film-look-søgeren: rå frames filtreres på preview-køen og skubbes til Metal-viewet
     private let videoDataOutput = AVCaptureVideoDataOutput()
     private let previewQueue = DispatchQueue(label: "vf.memory.camera.preview")
-    private var frameSeed = 0
     var previewSink: ((CIImage) -> Void)?
     private var onCapture: ((UIImage) -> Void)?
     private var onVideo: ((URL) -> Void)?
@@ -994,11 +944,10 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
         if c.isVideoMirroringSupported { c.isVideoMirrored = (position == .front) }
     }
 
-    /// Live-frames → film-look → søgeren (Metal-viewet)
+    /// Live-frames → søgeren (Metal-viewet) — neutralt, uden filter
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let sink = previewSink, let pb = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        frameSeed &+= 1
-        sink(VFFilmLook.apply(CIImage(cvPixelBuffer: pb), seed: frameSeed))
+        sink(CIImage(cvPixelBuffer: pb))
     }
 
     /// Fokus ud fra et normaliseret punkt i den viste (upright) søger-buffer.
@@ -1092,8 +1041,8 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
 
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         guard error == nil, let data = photo.fileDataRepresentation(), let image = UIImage(data: data) else { return }
-        let looked = VFFilmLook.applyStill(image)   // film-looket bages ind i selve fotoet
-        DispatchQueue.main.async { [weak self] in self?.onCapture?(looked) }
+        let upright = VFFilmLook.applyStill(image)   // kun EXIF-orienteringen bages ind (looket er fjernet)
+        DispatchQueue.main.async { [weak self] in self?.onCapture?(upright) }
     }
 
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
@@ -1197,9 +1146,8 @@ final class FilmPreviewView: UIView, MTKViewDelegate {
 /// lyden høres selv med lydløs-kontakten. resizeAspectFill i 4:5 → samme udsnit som den endelige beskæring.
 struct LoopingVideoView: UIViewRepresentable {
     let url: URL
-    var filmLook = false   // optaget m. kameraet → vis med film-looket (matcher eksporten)
     func makeUIView(context: Context) -> PlayerBox {
-        let v = PlayerBox(); v.configure(url: url, filmLook: filmLook); return v
+        let v = PlayerBox(); v.configure(url: url); return v
     }
     func updateUIView(_ uiView: PlayerBox, context: Context) {}
     static func dismantleUIView(_ uiView: PlayerBox, coordinator: ()) { uiView.teardown() }
@@ -1211,9 +1159,8 @@ struct LoopingVideoView: UIViewRepresentable {
         private var keepAlive: Timer?
         private var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
 
-        func configure(url: URL, filmLook: Bool = false) {
+        func configure(url: URL) {
             let it = AVPlayerItem(url: url)
-            if filmLook { it.videoComposition = VFFilmLook.playerComposition(for: AVURLAsset(url: url)) }
             let p = AVPlayer(playerItem: it)
             p.isMuted = false
             p.actionAtItemEnd = .none
