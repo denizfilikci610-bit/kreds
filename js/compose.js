@@ -152,6 +152,10 @@ function openPhotoLib(purpose, start){
       title: purpose === "story" ? t("story.title") : t("compose.title.memory"), next: t("memory.next"), cancel: t("common.cancel"), share: purpose === "story" ? t("story.share") : t("compose.post"),
       captionPlaceholder: t("compose.ph.memory"), destLabel: t("compose.dest"), allLabel: t("feedbar.all"),
       fit: t("memory.fit"),
+      // Minde/Story-vælgeren i kameraet: titel + del-tekst pr. tilstand
+      titleMemory: t("compose.title.memory"), titleStory: t("story.title"),
+      shareMemory: t("compose.post"), shareStory: t("story.share"),
+      modeMemory: t("mode.memory"), modeStory: t("mode.story"),
       limited: t("photolib.limited"), manage: t("photolib.manage"), denied: t("photolib.denied"), settings: t("photolib.settings"),
       trimHint: t("memory.trim_hint")
     }

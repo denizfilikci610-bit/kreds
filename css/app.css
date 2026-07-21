@@ -174,7 +174,18 @@
   .storyview{display:none;position:fixed;inset:0;z-index:200;background:#000}
   .storyview.on{display:block}
   .storyview .sv-media{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
-  .storyview .sv-media img,.storyview .sv-media video{width:100%;height:100%;object-fit:contain}
+  /* Storyen FYLDER hele skærmen (9:16-format; cover beskærer evt. gamle 4:5-stories) */
+  .storyview .sv-media img,.storyview .sv-media video{width:100%;height:100%;object-fit:cover}
+  /* Slet egen story: skraldespand i headeren; første tryk armerer ("Slet?"), andet sletter */
+  .sv-del{
+    flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+    color:#fff;padding:6px;margin-right:2px;
+  }
+  .sv-del svg{width:19px;height:19px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5))}
+  .sv-del.arm{
+    background:var(--red);border-radius:999px;
+    padding:6px 14px;font-size:13.5px;font-weight:800;
+  }
   .storyview .sv-bars{
     position:absolute;top:calc(8px + env(safe-area-inset-top));left:8px;right:8px;
     display:flex;gap:4px;z-index:3;

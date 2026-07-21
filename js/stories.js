@@ -1,6 +1,7 @@
 import { sb } from "./config.js";
 import { me, state } from "./store.js";
-import { el, esc, imgUrl, avaHTML, registerProfile } from "./helpers.js";
+import { el, esc, imgUrl, avaHTML, registerProfile, toast } from "./helpers.js";
+import { t } from "./i18n.js";
 import { renderStories } from "./profile.js";
 
 /* ================= Stories: data ================= */
@@ -29,7 +30,9 @@ export async function loadStories(){
     }
     const isVideo = !!r.video_path;
     byAuthor.get(r.author).items.push({
-      id: r.id, url: imgUrl(isVideo ? r.video_path : r.image_path), isVideo: isVideo, seen: seenSet.has(r.id)
+      id: r.id, url: imgUrl(isVideo ? r.video_path : r.image_path), isVideo: isVideo,
+      path: isVideo ? r.video_path : r.image_path, // rå sti (storage-oprydning ved sletning)
+      seen: seenSet.has(r.id)
     });
   });
   const groups = Array.from(byAuthor.values());
@@ -76,6 +79,11 @@ function showItem(){
     '<div class="sv-head">' +
       '<span class="sv-ava">' + avaHTML(g.author.handle, 30) + '</span>' +
       '<span class="sv-name">' + esc(g.author.name || g.author.handle) + '</span>' +
+      (g.isMe
+        ? '<button class="sv-del" data-sv="del" aria-label="' + esc(t("story.delete")) + '">' +
+            '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4.5 6.5h15M9.5 6V4.5h5V6M6.5 6.5l1 13h9l1-13M10 10.5v6M14 10.5v6"/></g></svg>' +
+          '</button>'
+        : '') +
       '<button class="sv-close" data-sv="close" aria-label="Luk">✕</button>' +
     '</div>' +
     '<button class="sv-tap sv-left" data-sv="prev" aria-label="Forrige"></button>' +
@@ -119,6 +127,30 @@ async function markSeen(it){
   }catch(_e){}
 }
 
+/* Slet den viste story (kun egne — RLS håndhæver det også). To-trins: første tryk
+   armerer knappen ("Slet?") og sætter fremdriften på pause, andet tryk sletter. */
+async function deleteCurrentStory(){
+  const g = vw.groups[vw.gi];
+  const it = g && g.items[vw.ii];
+  if(!g || !it || !g.isMe) return;
+  clearTimer();
+  const { error } = await sb.from("stories").delete().eq("id", it.id);
+  if(error){ console.error(error); toast(t("err.generic")); showItem(); return; }
+  if(it.path) sb.storage.from("post-images").remove([it.path]).catch(function(){});
+  g.items.splice(vw.ii, 1);
+  toast(t("story.deleted"));
+  if(!g.items.length){
+    vw.groups.splice(vw.gi, 1);
+    if(!vw.groups.length){ closeStoryViewer(); loadStories().then(renderStories); return; }
+    if(vw.gi >= vw.groups.length) vw.gi = vw.groups.length - 1;
+    vw.ii = 0;
+  } else if(vw.ii >= g.items.length){
+    vw.ii = g.items.length - 1;
+  }
+  showItem();
+  loadStories().then(renderStories); // rækken/ringene opdateres i baggrunden
+}
+
 export function initStories(){
   el("storyview").addEventListener("click", function(e){
     const b = e.target.closest("[data-sv]");
@@ -127,5 +159,16 @@ export function initStories(){
     if(a === "close") closeStoryViewer();
     else if(a === "next") next();
     else if(a === "prev") prev();
+    else if(a === "del"){
+      if(!b.classList.contains("arm")){
+        b.classList.add("arm");
+        b.textContent = t("story.del_confirm");
+        clearTimer(); // stå stille mens man beslutter sig
+        const v = el("storyview").querySelector("video");
+        if(v) v.pause();
+        return;
+      }
+      deleteCurrentStory();
+    }
   });
 }
