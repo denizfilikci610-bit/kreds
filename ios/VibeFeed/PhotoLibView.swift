@@ -843,6 +843,13 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
         }
     }
 
+    /// Kobl preview-laget af sessionen PÅ KAMERA-KØEN (serialiseret med stop/flip/
+    /// configure). Blokken holder laget i live til afkoblingen er sket, så lagets
+    /// senere dealloc på main-tråden ikke rører den kørende session.
+    func detachPreview(_ layer: AVCaptureVideoPreviewLayer) {
+        queue.async { layer.session = nil }
+    }
+
     private func configureAndRun() {
         queue.async { [weak self] in
             guard let self else { return }
@@ -982,21 +989,34 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
 /// Tryk konverteres til enheds-koordinater og meldes tilbage (device-punkt 0-1, view-punkt).
 struct CameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
+    /// Kaldes ved nedrivning med preview-laget, så ejeren kan koble sessionen af på
+    /// KAMERA-KØEN. Dealloc af et lag med session åbner en session-transaktion på
+    /// main-tråden, som kolliderer med stopRunning på kamera-køen → NSException-crash
+    /// (set som SIGABRT i stop() når man filmede og lukkede kameraet).
+    var onDetach: ((AVCaptureVideoPreviewLayer) -> Void)? = nil
     var onFocus: ((CGPoint, CGPoint) -> Void)? = nil
     func makeUIView(context: Context) -> PreviewView {
         let v = PreviewView()
         v.previewLayer.session = session
         v.previewLayer.videoGravity = .resizeAspectFill
         v.onFocus = onFocus
+        v.onDetach = onDetach
         let tap = UITapGestureRecognizer(target: v, action: #selector(PreviewView.handleTap(_:)))
         v.addGestureRecognizer(tap)
         return v
     }
-    func updateUIView(_ uiView: PreviewView, context: Context) { uiView.onFocus = onFocus }
+    func updateUIView(_ uiView: PreviewView, context: Context) {
+        uiView.onFocus = onFocus
+        uiView.onDetach = onDetach
+    }
+    static func dismantleUIView(_ uiView: PreviewView, coordinator: ()) {
+        uiView.onDetach?(uiView.previewLayer)
+    }
     final class PreviewView: UIView {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
         var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
         var onFocus: ((CGPoint, CGPoint) -> Void)?
+        var onDetach: ((AVCaptureVideoPreviewLayer) -> Void)?
         @objc func handleTap(_ g: UITapGestureRecognizer) {
             let vp = g.location(in: self)
             let dp = previewLayer.captureDevicePointConverted(fromLayerPoint: vp)
@@ -1095,7 +1115,7 @@ struct MemoryCameraScreen: View {
                 // Live-preview begrænset til 4:5, centreret. Alt uden for rammen er mørkt (fade).
                 Group {
                     if cam.authorized {
-                        CameraPreview(session: cam.session, onFocus: { dp, vp in
+                        CameraPreview(session: cam.session, onDetach: { cam.detachPreview($0) }, onFocus: { dp, vp in
                             cam.focus(at: dp)
                             focusPt = vp
                             focusSeq += 1
@@ -1116,7 +1136,10 @@ struct MemoryCameraScreen: View {
                     }
                 }
                 .overlay(Rectangle().strokeBorder(Color.white.opacity(model.isStory ? 0 : 0.22), lineWidth: 1).frame(width: w, height: fh))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Minde: 4:5-rammen ligger ØVERST (under top-kontrollerne), så den ikke
+                // rammer udløser-knappen og Minde/Story-vælgeren. Story: fuld skærm.
+                .padding(.top, model.isStory ? 0 : 106)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: model.isStory ? .center : .top)
                 .gesture(
                     MagnificationGesture()
                         .onChanged { scale in cam.setZoom(baseZoom * scale) }
