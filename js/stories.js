@@ -1,8 +1,8 @@
-import { sb } from "./config.js";
+import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state } from "./store.js";
-import { el, esc, imgUrl, avaHTML, registerProfile, toast, fmtTime } from "./helpers.js";
+import { el, esc, imgUrl, avaHTML, registerProfile, toast, fmtTime, user } from "./helpers.js";
 import { t } from "./i18n.js";
-import { renderStories } from "./profile.js";
+import { renderStories, doBlockUser } from "./profile.js";
 import { KREDS_SVG, feedById, setFeed, switchTab } from "./feed.js";
 
 /* ================= Stories: data ================= */
@@ -19,6 +19,12 @@ export async function loadStories(){
     const { data: seen } = await sb.from("story_views").select("story_id");
     (seen || []).forEach(function(v){ seenSet.add(v.story_id); });
   }catch(_e){}
+  // Kan der anmeldes? (samme mønster som blockReady: fejler kaldet, findes tabellen
+  // ikke endnu, og anmeld-valget holdes skjult — web kan deployes FØR databasen.)
+  try{
+    const { error: rerr } = await sb.from("story_reports").select("story_id").limit(1);
+    state.storyReportReady = !rerr;
+  }catch(_e){ state.storyReportReady = false; }
   const byAuthor = new Map();
   rows.forEach(function(r){
     const p = r.profiles || {};
@@ -92,7 +98,11 @@ function showItem(){
         ? '<button class="sv-del" data-sv="del" aria-label="' + esc(t("story.delete")) + '">' +
             '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4.5 6.5h15M9.5 6V4.5h5V6M6.5 6.5l1 13h9l1-13M10 10.5v6M14 10.5v6"/></g></svg>' +
           '</button>'
-        : '') +
+        : (canModerate(g)
+          ? '<button class="sv-more" data-sv="menu" aria-label="' + esc(t("aria.more")) + '">' +
+              '<svg viewBox="0 0 24 24"><g fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></g></svg>' +
+            '</button>'
+          : '')) +
       '<button class="sv-close" data-sv="close" aria-label="Luk">✕</button>' +
     '</div>' +
     (g.isMe
@@ -162,6 +172,147 @@ function closeViewers(){
   showItem();
 }
 
+/* ================= Anmeld / blokér (kun ANDRES stories) =================
+   Apple 1.2: alt brugerskabt indhold skal kunne anmeldes. Samme to-trins-flow og
+   samme glas-kort som ⋯-menuen på opslag (feed.js openReportMenu). Fremdriften står
+   på pause mens menuen er fremme — som seer-listen — og starter forfra ved annuller. */
+function canReportStories(){ return !!state.storyReportReady; }
+function canBlockAuthor(g){
+  return !!state.blockReady && !!g && g.author.handle !== OFFICIAL_HANDLE;
+}
+function canModerate(g){
+  return !!me && !g.isMe && (canReportStories() || canBlockAuthor(g));
+}
+/* Stil storyen i bero (menu/ark fremme). showItem() sætter den i gang igen. */
+function pauseStory(){
+  clearTimer();
+  const v = el("storyview").querySelector("video");
+  if(v) v.pause();
+}
+function storyPreview(g, it){
+  const nm = g.author.name || g.author.handle;
+  return {
+    name: nm,
+    snippet: it && it.isVideo ? t("story.one_video") : t("story.one"),
+    initials: nm.trim().split(/\s+/).map(function(w){ return w.charAt(0); }).slice(0, 2).join("").toUpperCase(),
+    avatarUrl: g.author.avatar_path ? imgUrl(g.author.avatar_path) : ""
+  };
+}
+function openStoryMenu(){
+  const g = vw.groups[vw.gi];
+  const it = g && g.items[vw.ii];
+  if(!g || !it || !canModerate(g)) return;
+  const h = g.author.handle;
+  pauseStory();
+  // App'en: ægte native Liquid Glass-kort.
+  if(window.__vfGlassCard && window.__vfSheetPost){
+    const btns = [];
+    if(canReportStories()) btns.push({ label: t("story.report"), action: "report", role: "destructive" });
+    if(canBlockAuthor(g)) btns.push({ label: t("rm.block"), action: "block", role: "destructive" });
+    btns.push({ label: t("common.cancel"), action: "__cancel", role: "cancel" });
+    window.__vfSheetPost({ preview: storyPreview(g, it), buttons: btns }, function(a){
+      if(a === "report"){
+        window.__vfSheetPost({
+          title: t("story.report_confirm"), message: t("rm.note"),
+          buttons: [
+            { label: t("rm.do"), action: "do", role: "destructive" },
+            { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+          ]
+        }, function(b){ if(b === "do") reportCurrentStory(); else showItem(); });
+        return;
+      }
+      if(a === "block"){
+        window.__vfSheetPost({
+          title: t("block.confirm", { name: user(h).name }), message: t("block.note"),
+          buttons: [
+            { label: t("block.do"), action: "do", role: "destructive" },
+            { label: t("common.cancel"), action: "__cancel", role: "cancel" }
+          ]
+        }, function(b){
+          if(b === "do"){ closeStoryViewer(); doBlockUser(h); } else showItem();
+        });
+        return;
+      }
+      showItem(); // annulleret → storyen kører videre
+    });
+    return;
+  }
+  renderStoryMenu("main");
+}
+/* Browser-fallback: web-modalens glas-piller, tegnet INDE i vieweren (som seer-listen),
+   ellers ville den ligge under fuldskærms-vieweren. */
+function renderStoryMenu(step){
+  const g = vw.groups[vw.gi];
+  const it = g && g.items[vw.ii];
+  if(!g || !it) return;
+  closeStoryMenu(false);
+  const nm = esc(user(g.author.handle).name || g.author.handle);
+  let inner;
+  if(step === "report"){
+    inner = '<div class="mgroup">' +
+        '<div class="mtitle">' + esc(t("story.report_confirm")) + '</div>' +
+        '<p class="mtext">' + esc(t("rm.note")) + '</p>' +
+        '<button class="mrow danger" data-sv="mreport2">' + esc(t("rm.do")) + '</button>' +
+      '</div>' +
+      '<button class="mrow mcancel" data-sv="mcancel">' + esc(t("common.cancel")) + '</button>';
+  } else if(step === "block"){
+    inner = '<div class="mgroup">' +
+        '<div class="mtitle">' + esc(t("block.confirm", { name: nm })) + '</div>' +
+        '<p class="mtext">' + esc(t("block.note")) + '</p>' +
+        '<button class="mrow danger" data-sv="mblock2">' + esc(t("block.do")) + '</button>' +
+      '</div>' +
+      '<button class="mrow mcancel" data-sv="mcancel">' + esc(t("common.cancel")) + '</button>';
+  } else {
+    inner = '<div class="mgroup">' +
+        '<div class="mprev">' + avaHTML(g.author.handle, 34) +
+          '<div class="mprev-txt"><span class="mprev-nm">' + nm + '</span>' +
+          '<span class="mprev-snip">' + esc(it.isVideo ? t("story.one_video") : t("story.one")) + '</span></div>' +
+        '</div>' +
+        (canReportStories() ? '<button class="mrow danger" data-sv="mreport">' + esc(t("story.report")) + '</button>' : '') +
+        (canBlockAuthor(g) ? '<button class="mrow danger" data-sv="mblock">' + esc(t("rm.block")) + '</button>' : '') +
+      '</div>' +
+      '<button class="mrow mcancel" data-sv="mcancel">' + esc(t("common.cancel")) + '</button>';
+  }
+  const wrap = document.createElement("div");
+  wrap.className = "modal sheet sv-menu on";
+  wrap.setAttribute("role", "dialog");
+  wrap.setAttribute("aria-label", t("story.report"));
+  wrap.innerHTML = '<div class="modal-card"><div class="mstep">' + inner + '</div></div>';
+  el("storyview").appendChild(wrap);
+}
+/* resume=true: storyen kører videre (showItem starter de 6 sek forfra). */
+function closeStoryMenu(resume){
+  const w = el("storyview").querySelector(".sv-menu");
+  if(w) w.remove();
+  if(resume && w) showItem();
+}
+async function reportCurrentStory(){
+  const g = vw.groups[vw.gi];
+  const it = g && g.items[vw.ii];
+  if(!g || !it || !me) return;
+  closeStoryMenu(false);
+  const { error } = await sb.from("story_reports").insert({ story_id: it.id, user_id: me.id });
+  if(error && error.code !== "23505"){ // 23505 = allerede anmeldt — tæller som succes
+    console.error(error);
+    toast(t("err.generic"));
+    showItem();
+    return;
+  }
+  // Skjult for anmelderen (RLS-gaten gør det samme server-side ved næste hentning)
+  g.items.splice(vw.ii, 1);
+  toast(t("story.reported"));
+  if(!g.items.length){
+    vw.groups.splice(vw.gi, 1);
+    if(!vw.groups.length){ closeStoryViewer(); loadStories(); return; }
+    if(vw.gi >= vw.groups.length) vw.gi = vw.groups.length - 1;
+    vw.ii = 0;
+  } else if(vw.ii >= g.items.length){
+    vw.ii = g.items.length - 1;
+  }
+  showItem();
+  loadStories(); // rækken/ringene opdateres i baggrunden (loadStories tegner selv)
+}
+
 function next(){
   const g = vw.groups[vw.gi];
   if(g && vw.ii < g.items.length - 1){ vw.ii++; showItem(); }
@@ -223,9 +374,24 @@ async function deleteCurrentStory(){
 
 export function initStories(){
   el("storyview").addEventListener("click", function(e){
+    // Klik på menuens baggrund (uden for kortet) = annuller, som web-modalerne
+    if(e.target.classList.contains("sv-menu")){ closeStoryMenu(true); return; }
     const b = e.target.closest("[data-sv]");
     if(!b) return;
     const a = b.dataset.sv;
+    if(a === "menu"){ openStoryMenu(); return; }
+    if(a === "mcancel"){ closeStoryMenu(true); return; }
+    if(a === "mreport"){ renderStoryMenu("report"); return; }
+    if(a === "mblock"){ renderStoryMenu("block"); return; }
+    if(a === "mreport2"){ reportCurrentStory(); return; }
+    if(a === "mblock2"){
+      const g = vw.groups[vw.gi];
+      const h = g && g.author.handle;
+      closeStoryMenu(false);
+      closeStoryViewer();
+      if(h) doBlockUser(h);
+      return;
+    }
     if(a === "close") closeStoryViewer();
     else if(a === "next") next();
     else if(a === "prev") prev();

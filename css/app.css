@@ -185,6 +185,15 @@
     background:var(--red);border-radius:999px;
     padding:6px 14px;font-size:13.5px;font-weight:800;
   }
+  /* Anmeld/blokér på ANDRES stories: samme ⋯ som på opslag, i story-headeren */
+  .sv-more{
+    flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+    color:#fff;padding:6px;margin-right:2px;
+  }
+  .sv-more svg{width:20px;height:20px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5))}
+  /* Menuen ligger INDE i vieweren (som seer-listen), så den kommer over storyen.
+     Den arver hele .modal.sheet-glasset fra web-modalerne. */
+  .storyview .modal{z-index:6}
   .storyview .sv-bars{
     position:absolute;top:calc(8px + env(safe-area-inset-top));left:8px;right:8px;
     display:flex;gap:4px;z-index:3;

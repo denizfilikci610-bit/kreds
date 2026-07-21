@@ -21,7 +21,8 @@ export const state = {
   dms: [],                // DM-tråde (feeds m. is_dm) — KUN Beskeder kender dem, aldrig kreds-UI
   currentFeed: "all",
   savedPosts: [],         // mine gemte opslag (kun minder i UI'et; privat, saved_posts-tabellen)
-  storyGroups: []         // [{ author:{id,handle,name,avatar_path}, items:[{id,url,isVideo,seen}], allSeen, isMe }]
+  storyGroups: [],        // [{ author:{id,handle,name,avatar_path}, items:[{id,url,isVideo,seen}], allSeen, isMe }]
+  storyReportReady: false // story_reports-tabellen findes i DB — anmeld-valget i vieweren vises kun da
 };
 
 export const expandedCmts = new Set();   // post ids med fuldt udfoldet kommentartråd
