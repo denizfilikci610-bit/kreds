@@ -18,7 +18,18 @@ final class PhotoLibModel: NSObject, ObservableObject {
     enum Step { case camera, gallery, trim, crop, caption }
     @Published var open = false
     @Published var forCompose = false   // åbnet fra en TANKE (Tag med kamera) → hæft medie, opret ikke minde
-    @Published var isStory = false      // åbnet som STORY → indsæt i stories (24t), ingen billedtekst
+    @Published var isStory = false      // STORY-tilstand → indsæt i stories (24t), ingen billedtekst, 9:16
+    // Minde/Story-vælgeren i kameraet: titel + del-tekst pr. tilstand (fra web-i18n)
+    @Published var titleMemory = ""
+    @Published var titleStory = ""
+    @Published var shareMemory = ""
+    @Published var shareStory = ""
+    @Published var modeMemoryLabel = ""
+    @Published var modeStoryLabel = ""
+    var curTitle: String { isStory ? (titleStory.isEmpty ? title : titleStory) : (titleMemory.isEmpty ? title : titleMemory) }
+    var curShare: String { isStory ? (shareStory.isEmpty ? shareLabel : shareStory) : (shareMemory.isEmpty ? shareLabel : shareMemory) }
+    /// Output-pixelmål: story fylder hele skærmen (9:16), minde er 4:5
+    func outSize() -> CGSize { isStory ? CGSize(width: 1080, height: 1920) : CGSize(width: 1080, height: 1350) }
     @Published var step: Step = .camera
     @Published var status: PHAuthorizationStatus = .notDetermined
     @Published var assets: [PHAsset] = []
@@ -96,6 +107,9 @@ final class PhotoLibModel: NSObject, ObservableObject {
         if let l = dict["labels"] as? [String: Any] {
             title = s(l, "title"); nextLabel = s(l, "next"); cancelLabel = s(l, "cancel"); shareLabel = s(l, "share")
             fitLabel = s(l, "fit")
+            titleMemory = s(l, "titleMemory"); titleStory = s(l, "titleStory")
+            shareMemory = s(l, "shareMemory"); shareStory = s(l, "shareStory")
+            modeMemoryLabel = s(l, "modeMemory"); modeStoryLabel = s(l, "modeStory")
             captionPlaceholder = s(l, "captionPlaceholder"); destLabel = s(l, "destLabel"); allLabel = s(l, "allLabel")
             limitedNote = s(l, "limited"); manageLabel = s(l, "manage"); deniedNote = s(l, "denied"); settingsLabel = s(l, "settings")
             trimHint = s(l, "trimHint")
@@ -181,8 +195,9 @@ final class PhotoLibModel: NSObject, ObservableObject {
         if asset.mediaType != .video {
             showTrimStep = false
             if forCompose { share(); return }
-            // Minde: galleri-billeder SKAL beskæres til 1080x1080 eller 1080x1350 —
-            // hent fuld preview-opløsning og vis beskærings-trinnet
+            // Galleri-billeder beskæres altid: minde → 1:1/4:5, story → fast 9:16.
+            // Hent fuld preview-opløsning og vis beskærings-trinnet.
+            cropAspect = isStory ? 9.0 / 16.0 : 4.0 / 5.0
             trimReqSeq += 1
             let seqI = trimReqSeq
             preparingTrim = true
@@ -290,9 +305,10 @@ final class PhotoLibModel: NSObject, ObservableObject {
         if forCompose { share() } else { step = .caption }
     }
 
-    /// Center-beskær + skalér til præcis 1080x1350 (4:5). draw(in:) respekterer orienteringen.
+    /// Center-beskær + skalér til det aktuelle format (minde 4:5, story 9:16).
+    /// draw(in:) respekterer orienteringen.
     private func cropTo45(_ image: UIImage) -> UIImage {
-        let out = CGSize(width: 1080, height: 1350)
+        let out = outSize()
         let fmt = UIGraphicsImageRendererFormat.default(); fmt.scale = 1; fmt.opaque = true
         return UIGraphicsImageRenderer(size: out, format: fmt).image { _ in
             let iw = image.size.width, ih = image.size.height
@@ -316,7 +332,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
     private func export45Video(_ url: URL) {
         let asset = AVURLAsset(url: url)
         guard let track = asset.tracks(withMediaType: .video).first else { sharing = false; onUploadFailed?(); return }
-        let render = CGSize(width: 1080, height: 1350)
+        let render = outSize()   // minde 1080x1350, story 1080x1920
         let comp = AVMutableVideoComposition()
         comp.renderSize = render
         comp.frameDuration = CMTime(value: 1, timescale: 30)
@@ -497,7 +513,7 @@ struct MemoryGalleryScreen: View {
             }
             .foregroundStyle(Color.primary)
             Spacer()
-            Text(model.title).font(.system(size: 16, weight: .bold))
+            Text(model.curTitle).font(.system(size: 16, weight: .bold))
             Spacer()
             switch model.step {
             case .camera:
@@ -519,7 +535,7 @@ struct MemoryGalleryScreen: View {
             case .caption:
                 Button { model.share() } label: {
                     if model.sharing { ProgressView() } else {
-                        Text(model.shareLabel).font(.system(size: 16, weight: .bold)).foregroundStyle(vfRed)
+                        Text(model.curShare).font(.system(size: 16, weight: .bold)).foregroundStyle(vfRed)
                     }
                 }.disabled(model.sharing)
             }
@@ -590,9 +606,11 @@ struct MemoryGalleryScreen: View {
                     image: src,
                     aspect: model.cropAspect,
                     circular: false,
-                    targetSize: model.cropAspect == 1
-                        ? CGSize(width: 1080, height: 1080)
-                        : CGSize(width: 1080, height: 1350),
+                    targetSize: model.isStory
+                        ? CGSize(width: 1080, height: 1920)
+                        : (model.cropAspect == 1
+                            ? CGSize(width: 1080, height: 1080)
+                            : CGSize(width: 1080, height: 1350)),
                     title: "",
                     cancelLabel: model.cancelLabel,
                     useLabel: model.nextLabel,
@@ -607,9 +625,11 @@ struct MemoryGalleryScreen: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.9))
                 }
-                HStack(spacing: 8) {
-                    aspectPill("1:1", value: 1)
-                    aspectPill("4:5", value: 4.0 / 5.0)
+                if !model.isStory {   // story er ALTID fuldskærms 9:16 — ingen format-valg
+                    HStack(spacing: 8) {
+                        aspectPill("1:1", value: 1)
+                        aspectPill("4:5", value: 4.0 / 5.0)
+                    }
                 }
             }
             .padding(.top, 10)
@@ -1020,6 +1040,19 @@ struct LoopingVideoView: UIViewRepresentable {
 /// (luk, blitz, optage-knap, vend-kamera, galleri-miniature). Ingen OPSLAG/STORY/REELS.
 struct MemoryCameraScreen: View {
     @ObservedObject private var model = PhotoLibModel.shared
+
+    /// Minde/Story-knappen: den valgte tilstand står hvid og fed, den anden dæmpet
+    private func modeButton(_ label: String, story: Bool) -> some View {
+        Button { model.isStory = story } label: {
+            Text(label.uppercased())
+                .font(.system(size: 13, weight: .bold))
+                .kerning(0.7)
+                .foregroundStyle(model.isStory == story ? .white : .white.opacity(0.5))
+                .padding(.horizontal, 6).padding(.vertical, 5)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
     @StateObject private var cam = MemoryCamera()
     @State private var thumb: UIImage?
     @State private var holdWork: DispatchWorkItem?   // udløser video-start hvis knappen holdes
@@ -1031,7 +1064,8 @@ struct MemoryCameraScreen: View {
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width
-            let fh = w * 5.0 / 4.0   // 4:5-optageområdet (1080x1350)
+            // Minde: 4:5-optageområde (1080x1350). Story: HELE skærmen (1080x1920).
+            let fh = model.isStory ? geo.size.height : w * 5.0 / 4.0
             ZStack {
                 Color.black.ignoresSafeArea()
 
@@ -1058,7 +1092,7 @@ struct MemoryCameraScreen: View {
                         deniedPanel.frame(width: w, height: fh)
                     }
                 }
-                .overlay(Rectangle().strokeBorder(Color.white.opacity(0.22), lineWidth: 1).frame(width: w, height: fh))
+                .overlay(Rectangle().strokeBorder(Color.white.opacity(model.isStory ? 0 : 0.22), lineWidth: 1).frame(width: w, height: fh))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .gesture(
                     MagnificationGesture()
@@ -1122,7 +1156,16 @@ struct MemoryCameraScreen: View {
                         iconButton("arrow.triangle.2.circlepath.camera") { cam.flip() }
                             .frame(width: 48, height: 48)
                     }
-                    .padding(.horizontal, 26).padding(.bottom, 28)
+                    .padding(.horizontal, 26).padding(.bottom, 10)
+
+                    // Minde/Story-vælgeren (Instagram-agtig, under udløseren)
+                    if !model.forCompose {
+                        HStack(spacing: 26) {
+                            modeButton(model.modeMemoryLabel.isEmpty ? "Minde" : model.modeMemoryLabel, story: false)
+                            modeButton(model.modeStoryLabel.isEmpty ? "Story" : model.modeStoryLabel, story: true)
+                        }
+                        .padding(.bottom, 16)
+                    }
                 }
 
                 // Tanke-tilstand: kort upload-spinner mens det tagne medie uploades og hæftes på.
