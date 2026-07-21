@@ -690,20 +690,20 @@
   .caughtup p{font-size:13.5px;color:var(--gray);margin-top:4px}
 
   /* ================= Søg ================= */
+  /* Ingen streg under søge-headeren (ejer-krav: streg-frit look) */
   .searchhead{
-    padding:10px 16px 10px;position:sticky;top:calc(52px + env(safe-area-inset-top));z-index:40;
+    padding:12px 16px 10px;position:sticky;top:calc(52px + env(safe-area-inset-top));z-index:40;
     background:var(--bg);
-    border-bottom:1px solid var(--line);
     transition:top .25s ease;
   }
+  /* Fælles søgefelt-look (Søg-fanen OG Beskeder): stort, blødt gråt felt uden kant */
   .searchbox{
-    display:flex;align-items:center;gap:9px;
-    background:var(--inputbg);
-    border:1px solid var(--line);
-    border-radius:10px;
-    padding:9px 12px;
+    display:flex;align-items:center;gap:10px;
+    background:var(--chip);
+    border-radius:15px;
+    padding:13px 14px;
   }
-  .searchbox svg{width:17px;height:17px;color:var(--gray);flex:0 0 auto}
+  .searchbox svg{width:19px;height:19px;color:var(--gray);flex:0 0 auto}
   .searchbox input{flex:1;min-width:0;border:none;background:transparent;font-size:16px}
   .searchbox input:focus{outline:none}
   .listrow{display:flex;align-items:center;gap:12px;padding:11px 16px}
@@ -1326,14 +1326,8 @@
   /* Pin/mute-mærker på en liste-række */
   .cv-flag{flex:0 0 auto;display:flex;color:var(--gray)}
   .cv-flag svg{width:15px;height:15px}
-  /* Søgefeltet øverst i Beskeder: samme look som søgningen på liste-siden
-     (Venner/Kredse): stort, blødt gråt felt uden kant */
+  /* Søgefeltet øverst i Beskeder: selve feltet er det fælles .searchbox-look */
   .chat-search{padding:12px 16px 10px}
-  .chat-search .searchbox{
-    background:var(--chip);border:none;border-radius:15px;
-    padding:13px 14px;gap:10px;
-  }
-  .chat-search .searchbox svg{width:19px;height:19px}
   /* Tråd-siden: under minde-siden (z-90), så et delt minde kan åbnes ovenpå */
   .chatview{z-index:85}
   /* En åben tråd er sin EGEN side: alt bagved skjules helt, så hverken feedet eller
