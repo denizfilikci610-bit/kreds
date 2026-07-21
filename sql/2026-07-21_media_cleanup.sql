@@ -207,10 +207,21 @@ security definer
 set search_path to 'app_hidden'
 as $$ update deleted_media set last_error = left(err, 300) where id = any(ids) $$;
 
-revoke all on function public.check_media_hook(text)      from public;
-revoke all on function public.claim_media(int)            from public;
-revoke all on function public.ack_media(bigint[])         from public;
-revoke all on function public.fail_media(bigint[], text)  from public;
+-- VIGTIGT: 'revoke ... from public' er IKKE nok i Supabase. Skemaet public har
+-- default privileges der giver EXECUTE på NYE funktioner til anon og
+-- authenticated, og de grants er eksplicitte, så PUBLIC-revoket rører dem ikke.
+-- Uden linjerne til anon/authenticated nedenfor kunne hvem som helst kalde
+-- fejerens RPC'er over REST: ack_media ville tømme køen så filer aldrig blev
+-- slettet, og claim_media ville vise stier på andres slettede medier.
+-- (Fanget ved at spørge has_function_privilege i stedet for at tro på SQL'en.)
+revoke all    on function public.check_media_hook(text)      from public;
+revoke all    on function public.claim_media(int)            from public;
+revoke all    on function public.ack_media(bigint[])         from public;
+revoke all    on function public.fail_media(bigint[], text)  from public;
+revoke execute on function public.check_media_hook(text)     from anon, authenticated;
+revoke execute on function public.claim_media(int)           from anon, authenticated;
+revoke execute on function public.ack_media(bigint[])        from anon, authenticated;
+revoke execute on function public.fail_media(bigint[], text) from anon, authenticated;
 grant execute on function public.check_media_hook(text)     to service_role;
 grant execute on function public.claim_media(int)           to service_role;
 grant execute on function public.ack_media(bigint[])        to service_role;

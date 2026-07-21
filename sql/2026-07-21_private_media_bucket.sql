@@ -13,6 +13,12 @@
 -- Rækkens EGEN RLS gælder inde i det opslag, så synligheden på filen bliver
 -- automatisk den samme som på storyen/beskeden. Ingen dobbeltbogføring.
 --
+-- OPRYDNING ER ALLEREDE PÅ PLADS: køen i 2026-07-21_media_cleanup.sql har en
+-- bucket-kolonne, og edge-funktionen media-sweeper grupperer efter bøtte, så
+-- filer i vf-private ryddes uden ændringer i fejeren. Husk blot at
+-- app_hidden.enqueue_media i dag hardcoder 'post-images': den skal have bøtten
+-- med, når web-delen begynder at lægge stier i den private bøtte.
+--
 -- WEB-DELEN MANGLER STADIG (bevidst, se noten nederst).
 -- =============================================================================
 
