@@ -128,9 +128,6 @@
   @media (prefers-color-scheme: dark){ .wordmark{ background-image:url(../img/logo-dark.png); } }
   .wordmark .prik{display:none}
   .authview .wordmark,.langview .wordmark,.consentview .wordmark{width:214px;height:44px;margin:0 auto}
-  .nosparkle{padding:6px 2px;color:var(--ink)}
-  .nosparkle svg{width:23px;height:23px;display:block}
-  .tright{display:flex;align-items:center;gap:10px}
 
   /* ================= Stories ================= */
   .stories{

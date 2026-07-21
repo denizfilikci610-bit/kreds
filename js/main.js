@@ -60,9 +60,6 @@ el("scrim").addEventListener("click", function(){ closeFeedSheet(); closeMemberS
 document.querySelectorAll(".tabbar [data-view]").forEach(function(tab){
   tab.addEventListener("click", function(){ switchTab(tab.dataset.view); });
 });
-el("nosparkle").addEventListener("click", function(){
-  toast(t("nosparkle.toast"));
-});
 
 /* ================= Native tabbar-bro (KUN i app'en; window.__vfNative injiceres af Swift) =================
    Den native Liquid Glass-bar erstatter web-tabbaren i app'en. Native → web: window.vfTab(name).
