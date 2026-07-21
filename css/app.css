@@ -140,35 +140,33 @@
     /* ingen streg under story-rækken (ejer-krav: streg-frit look) */
   }
   .stories::-webkit-scrollbar{display:none}
-  .story{flex:0 0 auto;width:66px;text-align:center}
+  /* Instagram-størrelse: 92px ring, avataren fylder hele boblen (avaHTML(…, 80) i profile.js følger med) */
+  .story{flex:0 0 auto;width:96px;text-align:center}
   .story .bub{
-    width:62px;height:62px;margin:0 auto;border-radius:50%;
-    border:1px solid var(--line);
+    margin:0 auto;border-radius:50%;overflow:hidden;
     display:flex;align-items:center;justify-content:center;
   }
   .story .lbl{
     display:block;
-    margin-top:5px;font-size:11px;color:var(--ink);
+    margin-top:6px;font-size:12px;color:var(--ink);
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
-  .story .ringwrap{position:relative;width:62px;margin:0 auto}
   .story .plusb{
-    position:absolute;right:-1px;bottom:-1px;
-    width:21px;height:21px;border-radius:50%;
+    position:absolute;right:1px;bottom:1px;
+    width:26px;height:26px;border-radius:50%;
     background:var(--red);color:#fff;
-    border:2.5px solid var(--bg);
+    border:3px solid var(--bg);
     display:flex;align-items:center;justify-content:center;
-    font-size:14px;font-weight:700;line-height:1;
+    font-size:16px;font-weight:700;line-height:1;
   }
-  /* Story-ringe: farvet = uset, grå = set */
-  .story{width:70px}
+  /* Story-ringe: farvet = uset, grå = set; egen uden story = ingen ring (transparent) */
   .story .ringwrap{
-    width:66px;height:66px;border-radius:50%;padding:3px;box-sizing:border-box;
+    width:92px;height:92px;border-radius:50%;padding:3.5px;box-sizing:border-box;
     display:flex;align-items:center;justify-content:center;margin:0 auto;position:relative;
   }
   .story.unseen .ringwrap{background:linear-gradient(45deg,#F58529,#DD2A7B,#8134AF)}
   .story.seen .ringwrap{background:#c7c7cc}
-  .story .ringwrap .bub{width:100%;height:100%;border:2.5px solid var(--bg);box-sizing:border-box}
+  .story .ringwrap .bub{width:100%;height:100%;border:3px solid var(--bg);box-sizing:border-box}
 
   /* ================= Story-viewer (fuldskærm) ================= */
   .storyview{display:none;position:fixed;inset:0;z-index:200;background:#000}

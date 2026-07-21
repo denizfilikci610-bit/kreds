@@ -17,7 +17,7 @@ export function renderStories(){
   const meRing = mine ? (mine.allSeen ? " seen" : " unseen") : "";
   let html =
     '<button class="story'+meRing+'" data-u="'+esc(me.handle)+'" data-me="1">'+
-      '<div class="ringwrap"><div class="bub">'+avaHTML(me.handle, 56)+'</div>'+
+      '<div class="ringwrap"><div class="bub">'+avaHTML(me.handle, 80)+'</div>'+
       '<span class="plusb">+</span></div>'+
       '<span class="lbl">'+t("profile.you")+'</span>'+
     '</button>';
@@ -25,7 +25,7 @@ export function renderStories(){
     if(g.isMe) return;
     html +=
       '<button class="story '+(g.allSeen ? "seen" : "unseen")+'" data-u="'+esc(g.author.handle)+'">'+
-        '<div class="ringwrap"><div class="bub">'+avaHTML(g.author.handle, 56)+'</div></div>'+
+        '<div class="ringwrap"><div class="bub">'+avaHTML(g.author.handle, 80)+'</div></div>'+
         '<span class="lbl">'+esc((g.author.name || g.author.handle).split(" ")[0])+'</span>'+
       '</button>';
   });
