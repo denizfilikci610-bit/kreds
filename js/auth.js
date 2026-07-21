@@ -9,6 +9,7 @@ import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
 import { closeNativePostPage } from "./comments.js";
 import { resetChat, refreshChatUnread } from "./chat.js";
 import { closeLightbox } from "./lightbox.js";
+import { ADS_LIVE } from "./ads.js";
 import { subscribeRealtime, unsubscribeRealtime } from "./realtime.js";
 import { refreshNotifDot } from "./notifications.js";
 import { resetSearch } from "./search.js";
@@ -160,10 +161,11 @@ export async function boot(session){
   hideAuth();
   hideSplash(); // appen står nu færdig på rette fane + kreds → fad splashen væk
   pushNativeCreds(); // fire-and-forget — kun i WKWebView'en
-  // Reklame-valget (flyttet fra førstegangs-gaten): ark over feedet ved FØRSTE besøg
-  // efter login/oprettelse. Ingen await — arket er modalt (inert) og styrer sig selv;
-  // reklamerne starter først når valget er truffet.
-  if(!getConsent()) showConsentGate();
+  // Reklame-valget: ark over feedet ved FØRSTE besøg efter login/oprettelse.
+  // Vises KUN når reklamer faktisk er tændt (ADS_LIVE, den fælles kill-switch i
+  // ads.js) — ellers ville vi bede om samtykke til noget der ikke findes.
+  // Ingen await — arket er modalt (inert) og styrer sig selv.
+  if(ADS_LIVE && !getConsent()) showConsentGate();
 }
 export function resetApp(){
   nativeLogout(); // no-op hvis allerede kaldt før signOut (nøglen er fjernet)

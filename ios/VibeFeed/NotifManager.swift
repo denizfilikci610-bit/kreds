@@ -46,6 +46,12 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
                 scheduleRefresh()
                 sendPushRegistration() // if a push token already arrived, register it now
             }
+        case "adsLive":
+            // Reklamernes hovedkontakt bor i web'en (js/ads.js → ADS_LIVE) og meldes
+            // ved hver boot. false (eller aldrig meldt) = Appodeal starter ikke, og
+            // ATT-dialogen kommer aldrig. Gemmes bevidst ikke: hver start begynder slukket.
+            let live = (dict["value"] as? Bool) ?? false
+            Task { @MainActor in AdsManager.shared.setAdsLive(live) }
         case "consent":
             // "personal" (personalized ads allowed) or "limited" (non-personalized
             // only). Persisted for the ad SDK; AdsManager is notified so it can

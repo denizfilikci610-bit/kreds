@@ -13,15 +13,20 @@ import { el, getConsent } from "./helpers.js";
    Ét sted at ændre kadencen. */
 export const AD_EVERY = 3;
 
-/* KILL-SWITCH: Appodeal serverer først rigtige annoncer når appen ER live på
-   App Store og godkendt i deres dashboard. Indtil da ville Release-builds vise
-   TOMME "Promovering"-kort (gråt hul uden annonce) — grimt for både TestFlight-
-   brugere og Apple-review. false = ingen annonce-kort og ingen video-tilbud.
-   Kort TÆNDT 2026-07-14 for at teste: bekræftede at appen requester annoncer,
-   MEN der er ZERO fill endnu (feed-annoncer flimrede/foldede sammen, rewarded
-   video sagde "Ingen video lige nu") fordi Appodeal/AdMob ikke er godkendt endnu.
-   SLUKKET IGEN for ren oplevelse til de første brugere. TÆND (true + deploy) igen
-   når Appodeal/AdMob ER godkendt og der kommer rigtig fill. */
+/* ======================= DEN FÆLLES KILL-SWITCH =======================
+   Dette ene flag styrer HELE reklame-maskineriet, web som native:
+     • ingen annonce-kort og ingen video-tilbud i feedet
+     • ingen samtykke-skærm ved oprettelse (auth.js)
+     • ingen reklame-valg i Rediger profil (profile.js)
+     • Appodeal initialiseres ALDRIG, og sporings-dialogen (ATT) vises ALDRIG
+       — native venter på at web'en melder adsLive:true (se pushAdsLive nedenfor
+       og AdsManager.setAdsLive i appen), så en app-opdatering er ikke nødvendig.
+   TÆND igen ved at sætte true her og deploye. Det er det eneste sted.
+
+   Historik: Appodeal serverer først rigtige annoncer når appen ER live på App
+   Store og godkendt i deres dashboard. Kort TÆNDT 2026-07-14 for at teste, men
+   der var zero fill. SLUKKET IGEN for en ren, reklamefri oplevelse til de første
+   brugere (og så Sporing ærligt kan erklæres NEJ i App Privacy). */
 export const ADS_LIVE = false;
 
 function bridge(){
@@ -163,7 +168,19 @@ function setFill(id, filled){
 }
 
 /* Sæt op én gang. No-op uden for appen. */
+/* Melder kill-switchens stilling til appen ved hver boot. Native starter INTET
+   (hverken Appodeal eller ATT-dialogen) før den har hørt adsLive:true herfra, så
+   web'en er den eneste kontakt — også for allerede installerede builds. */
+export function pushAdsLive(){
+  try{
+    const b = bridge();
+    if(b) b.postMessage({ type:"adsLive", value: ADS_LIVE });
+  }catch(_e){ /* broen må aldrig vælte web-appen */ }
+}
+
 export function initAds(){
+  pushAdsLive();        // altid — også (og især) når svaret er "slukket"
+  if(!ADS_LIVE) return; // kill-switch: ingen lyttere, ingen heartbeat, ingen bro-trafik
   if(!bridge()) return; // almindelig browser
   window.VibeFeedAds = window.VibeFeedAds || {};
   window.VibeFeedAds.fill = function(id, filled){ try{ setFill(id, !!filled); }catch(_e){} };

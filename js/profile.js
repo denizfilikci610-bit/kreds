@@ -8,6 +8,7 @@ import { openCompose, openStoryCamera } from "./compose.js";
 import { openStoryViewer } from "./stories.js";
 import { renderSearch, refreshSearchAfterFriendAdd } from "./search.js";
 import { resetApp, showAuth, nativeLogout } from "./auth.js";
+import { ADS_LIVE } from "./ads.js";
 
 /* ================= Bobler-række ================= */
 export function renderStories(){
@@ -183,8 +184,13 @@ export function closeEditSheet(){
 }
 function epCan(){ el("ep-save").disabled = !el("ep-name").value.trim(); }
 
-/* ---- Reklame-samtykke (Privatliv-chips i Rediger profil) ---- */
+/* ---- Reklame-samtykke (Privatliv-chips i Rediger profil) ----
+   Hele rækken forsvinder når reklamer er slukket (ADS_LIVE i ads.js) — der er
+   intet at vælge imellem. Privatlivspolitik-linket bliver stående. */
 function syncAdsChips(){
+  const row = el("ep-adsrow"), lab = el("ep-adslabel");
+  if(row) row.style.display = ADS_LIVE ? "" : "none";
+  if(lab) lab.style.display = ADS_LIVE ? "" : "none";
   const c = getConsent();
   el("ads-personal").classList.toggle("on", c === "personal");
   el("ads-limited").classList.toggle("on", c === "limited");
@@ -224,7 +230,8 @@ function epheetSnapshot(){
     bio: me ? (me.bio || "") : "",
     share: me ? (me.show_activity !== false) : true,
     lang: getLang(),
-    consent: getConsent()
+    consent: getConsent(),
+    adsOn: ADS_LIVE // false = skjul hele reklame-valget i den native sheet
   };
 }
 function meAvatarCard(){
@@ -324,8 +331,10 @@ async function nativeEsheetSave(obj){
     if(newPath) me.avatar_path = newPath;
     if(newBanner) me.banner_path = newBanner;
     registerProfile(me);
-    const newConsent = obj.consent === "limited" ? "limited" : "personal";
-    if(newConsent !== getConsent()) setConsent(newConsent); // per-enhed; poster til ad-broen
+    if(ADS_LIVE){ // slukkede reklamer må ikke sætte et samtykke brugeren aldrig blev spurgt om
+      const newConsent = obj.consent === "limited" ? "limited" : "personal";
+      if(newConsent !== getConsent()) setConsent(newConsent); // per-enhed; poster til ad-broen
+    }
     epStagedAvatar = null;
     epStagedBanner = null;
     window.__vfEsheetPush({ close: true });

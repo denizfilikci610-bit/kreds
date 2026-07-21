@@ -64,6 +64,9 @@ final class EsheetModel: ObservableObject {
     @Published var share = true
     @Published var lang = "da"
     @Published var consent = "personal"
+    /// Reklame-valget vises kun når reklamer faktisk kører (web'ens ADS_LIVE).
+    /// Ældre web uden feltet → false, altså skjult; det er den sikre vej.
+    @Published var adsOn = false
     @Published var pickedAvatar: UIImage?      // preview of a newly-picked photo (uploaded on Save)
     @Published var saving = false
     @Published var deleting = false
@@ -106,6 +109,7 @@ final class EsheetModel: ObservableObject {
         share = (dict["share"] as? Bool) ?? true
         lang = str(dict, "lang").isEmpty ? "da" : str(dict, "lang")
         consent = str(dict, "consent").isEmpty ? "personal" : str(dict, "consent")
+        adsOn = (dict["adsOn"] as? Bool) ?? false
         pickedAvatar = nil; saving = false; deleting = false; deleteStep = false
         open = true
     }
@@ -374,8 +378,10 @@ struct EditProfilePage: View {
                 } else {
                     segments([("da", model.langDaLabel), ("en", model.langEnLabel)], selected: model.lang) { model.chooseLang($0) }
                 }
-                sectionLabel(model.privacyLabel)
-                segments([("personal", model.adsPersonalLabel), ("limited", model.adsLimitedLabel)], selected: model.consent) { model.chooseConsent($0) }
+                if model.adsOn { // reklame-valget findes kun når reklamer kører
+                    sectionLabel(model.privacyLabel)
+                    segments([("personal", model.adsPersonalLabel), ("limited", model.adsLimitedLabel)], selected: model.consent) { model.chooseConsent($0) }
+                }
                 Button { model.openPolicy() } label: {
                     Text(model.policyLabel).font(.system(size: 13, weight: .semibold)).underline()
                         .foregroundStyle(.secondary).padding(.horizontal, 16).padding(.top, 14)

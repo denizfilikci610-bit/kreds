@@ -65,6 +65,14 @@ final class AdsManager: NSObject, ObservableObject {
     private var started = false
     private var attRequested = false
 
+    /// DEN FÆLLES KILL-SWITCH, native side. Står på false ved hver app-start og
+    /// bliver kun true hvis web'en melder adsLive:true (js/ads.js → ADS_LIVE →
+    /// pushAdsLive). Så længe den er false initialiseres Appodeal ALDRIG, og
+    /// sporings-dialogen (ATT) vises ALDRIG — heller ikke for brugere der har et
+    /// gammelt vf_consent liggende fra dengang samtykke-skærmen fandtes.
+    /// Bevidst IKKE gemt i UserDefaults: hver start begynder slukket.
+    private var adsLive = false
+
     // Inline feed ads
     private weak var overlay: UIView?
     private weak var webView: WKWebView?
@@ -95,9 +103,18 @@ final class AdsManager: NSObject, ObservableObject {
         start()
     }
 
-    /// Begins SDK setup. No-op until the user's consent choice is known, and only
-    /// ever runs once. Safe to call repeatedly.
+    /// Web → native: reklamernes hovedkontakt (js/ads.js ADS_LIVE). Meldes ved hver
+    /// boot af web-appen. true her er en FORUDSÆTNING for at noget som helst starter.
+    func setAdsLive(_ live: Bool) {
+        guard live != adsLive else { return }
+        adsLive = live
+        if live { start() } // web'en kan tænde uden app-opdatering
+    }
+
+    /// Begins SDK setup. No-op until ads are switched on AND the user's consent
+    /// choice is known, and only ever runs once. Safe to call repeatedly.
     func start() {
+        guard adsLive else { return } // kill-switch: intet SDK, ingen ATT-dialog
         guard !started else { return }
         guard let consent = UserDefaults.standard.string(forKey: "vf_consent") else { return }
         started = true
@@ -112,6 +129,7 @@ final class AdsManager: NSObject, ObservableObject {
 
     /// Called by NotifManager when the web app reports a consent choice/change.
     func applyConsent(_ value: String) {
+        guard adsLive else { return } // slukket = valget er ligegyldigt, og ATT må aldrig komme
         if !started {
             start()
         } else if value == "personal" {
@@ -165,6 +183,7 @@ final class AdsManager: NSObject, ObservableObject {
     /// Shows a rewarded video; on full watch we tell the web the reward was earned so
     /// it can grant +20 like-capacity. If none is available, we report that too.
     func showRewarded() {
+        guard adsLive else { rewardWeb(false); return } // kill-switch
         guard let root = Self.topViewController() else { rewardWeb(false); return }
         #if DEBUG
         if let ad = googleRewarded {

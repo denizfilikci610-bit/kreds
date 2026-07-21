@@ -62,7 +62,8 @@ struct VibeFeedApp: App {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
-                // Ads only start once the app is active and consent is known.
+                // No-op indtil web'en har meldt adsLive:true (kill-switch i js/ads.js);
+                // først derefter tæller samtykke, SDK-init og ATT overhovedet.
                 AdsManager.shared.appDidBecomeActive()
                 // Åbning = notifikationer "set": nulstil app-ikonets badge (lokalt + server)
                 NotifManager.shared.appDidBecomeActive()
