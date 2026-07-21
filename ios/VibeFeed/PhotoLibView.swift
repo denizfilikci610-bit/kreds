@@ -1182,8 +1182,8 @@ final class FilmPreviewView: UIView, MTKViewDelegate {
         let e = out.extent
         out = out.transformed(by: CGAffineTransform(translationX: (dw - e.width) / 2 - e.origin.x,
                                                     y: (dh - e.height) / 2 - e.origin.y))
-        // CI tegner med origo nederst — flip så billedet vender rigtigt i Metal-teksturen
-        out = out.transformed(by: CGAffineTransform(translationX: 0, y: dh).scaledBy(x: 1, y: -1))
+        // INGEN Y-flip: render(to:texture:) rammer teksturen i samme retning som
+        // kamera-bufferen — flippet vendte søgeren på hovedet (medierne var korrekte)
         VFFilmLook.context.render(out, to: drawable.texture, commandBuffer: buffer,
                                   bounds: CGRect(x: 0, y: 0, width: dw, height: dh),
                                   colorSpace: CGColorSpaceCreateDeviceRGB())
