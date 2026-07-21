@@ -31,6 +31,7 @@ final class EsheetModel: ObservableObject {
     @Published var shareNote = ""
     @Published var langLabel = ""
     @Published var langDaLabel = ""
+    @Published var langs: [[String]] = []     // [[kode, eget navn]] — alle appens sprog (fra web)
     @Published var langEnLabel = ""
     @Published var privacyLabel = ""
     @Published var adsPersonalLabel = ""
@@ -91,6 +92,7 @@ final class EsheetModel: ObservableObject {
         bioLabel = str(dict, "bioLabel"); bioPlaceholder = str(dict, "bioPlaceholder")
         activityLabel = str(dict, "activityLabel"); shareLabel = str(dict, "shareLabel"); shareNote = str(dict, "shareNote")
         langLabel = str(dict, "langLabel"); langDaLabel = str(dict, "langDaLabel"); langEnLabel = str(dict, "langEnLabel")
+        if let ls = dict["langs"] as? [[String]] { langs = ls } // fuld sprogliste (32) fra web → Menu-picker
         privacyLabel = str(dict, "privacyLabel"); adsPersonalLabel = str(dict, "adsPersonalLabel")
         adsLimitedLabel = str(dict, "adsLimitedLabel"); policyLabel = str(dict, "policyLabel")
         policyUrl = str(dict, "policyUrl") // absolut URL fra web (sprogafhængig); tom på ældre web → fallback
@@ -350,7 +352,28 @@ struct EditProfilePage: View {
                 Rectangle().fill(hairline).frame(height: 0.5)
 
                 sectionLabel(model.langLabel)
-                segments([("da", model.langDaLabel), ("en", model.langEnLabel)], selected: model.lang) { model.chooseLang($0) }
+                if model.langs.count > 2 {
+                    // Alle 32 sprog: native Menu-picker (viser det aktive sprogs eget navn)
+                    Menu {
+                        ForEach(model.langs, id: \.first) { pair in
+                            Button(pair.count > 1 ? pair[1] : pair[0]) { model.chooseLang(pair[0]) }
+                        }
+                    } label: {
+                        HStack {
+                            Text(model.langs.first(where: { $0.first == model.lang }).map { $0.count > 1 ? $0[1] : $0[0] } ?? model.lang)
+                                .font(.system(size: 14, weight: .bold))
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down").font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 14).padding(.vertical, 12)
+                        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.06)))
+                        .padding(.horizontal, 16)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    segments([("da", model.langDaLabel), ("en", model.langEnLabel)], selected: model.lang) { model.chooseLang($0) }
+                }
                 sectionLabel(model.privacyLabel)
                 segments([("personal", model.adsPersonalLabel), ("limited", model.adsLimitedLabel)], selected: model.consent) { model.chooseConsent($0) }
                 Button { model.openPolicy() } label: {

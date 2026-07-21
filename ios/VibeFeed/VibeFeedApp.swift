@@ -94,7 +94,7 @@ struct ContentView: View {
                 WebView(model: model)
 
                 if model.failed {
-                    let danish = (UserDefaults.standard.string(forKey: "vf_lang") ?? "da") != "en"
+                    let danish = (UserDefaults.standard.string(forKey: "vf_lang") ?? "da") == "da" // øvrige 31 sprog → engelsk fejltekst
                     VStack(spacing: 14) {
                         Text("VibeFeed.")
                             .font(.custom("Georgia-Bold", size: 40))

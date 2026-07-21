@@ -1627,14 +1627,29 @@
   }
   @media (prefers-color-scheme: dark){ .sp-name{ background-image:url(../img/logo-dark.png); } }
   .sp-dot{display:none}
-  /* Sprog-skift direkte på login-skærmen (gættes automatisk fra enheden ved første start) */
+  /* Sprog-skift direkte på login-skærmen (detekteres automatisk fra enheden ved første
+     start — alle 32 sprog). Pillen viser koden; en usynlig <select> ligger ovenpå og
+     åbner iOS' native sprogliste ved tap. */
+  .auth-langwrap{position:absolute;top:calc(14px + env(safe-area-inset-top));right:16px;z-index:1;display:inline-block}
   .auth-lang{
-    position:absolute;top:calc(14px + env(safe-area-inset-top));right:16px;z-index:1;
     padding:7px 14px;border-radius:999px;
     border:1px solid var(--line);color:var(--gray);
     font-size:13px;font-weight:800;letter-spacing:.04em;
   }
-  .auth-lang:active{opacity:.6}
+  .auth-langwrap:active .auth-lang{opacity:.6}
+  .langsel-overlay{
+    position:absolute;inset:0;opacity:0;width:100%;height:100%;
+    -webkit-appearance:none;appearance:none;border:none;background:transparent;
+    font-size:16px;
+  }
+  /* Sprogvælgeren i Rediger profil (web-arket): stil som inputfelterne */
+  .langsel{
+    width:100%;
+    -webkit-appearance:none;appearance:none;
+    background:var(--inputbg);color:var(--ink);
+    border:1px solid var(--line);border-radius:12px;
+    padding:11px 12px;font-size:15px;font-weight:600;
+  }
 
   /* ---- Auth ---- */
   .authview{

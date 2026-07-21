@@ -1,7 +1,7 @@
 import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab, expandedCmts } from "./store.js";
 import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConsent, setConsent, imgUrl, ini } from "./helpers.js";
-import { t, setLang, getLang, policyURL } from "./i18n.js";
+import { t, setLang, getLang, policyURL, LANGS } from "./i18n.js";
 import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps, applyFeedSound, switchTab, setFeed, feedById, POST_SELECT } from "./feed.js";
 import { openNativePostPage, rerenderPostCmts } from "./comments.js";
 import { openCompose, openStoryCamera } from "./compose.js";
@@ -210,7 +210,8 @@ function epheetSnapshot(){
     useLabel: t("ep.use"), // "Brug"-knappen i den native beskærings-flade
     bioLabel: t("ep.bio"), bioPlaceholder: t("ep.bio_ph"), bioMaxLength: 160,
     activityLabel: t("ep.activity"), shareLabel: t("ep.share"), shareNote: t("ep.share_note"),
-    langLabel: t("ep.lang"), langDaLabel: "Dansk", langEnLabel: "English",
+    langLabel: t("ep.lang"), langDaLabel: "Dansk", langEnLabel: "English", // (ældre builds: da/en-segmenter)
+    langs: Object.keys(LANGS).map(function(c){ return [c, LANGS[c]]; }), // nye builds: fuld sprogliste (Menu-picker)
     privacyLabel: t("ep.privacy"), adsPersonalLabel: t("ep.ads_personal"), adsLimitedLabel: t("ep.ads_limited"),
     policyLabel: t("consent.policy"),
     // Absolut, sprogafhængig URL — native åbner den selv i Safari (window.open over broen
@@ -330,7 +331,7 @@ async function nativeEsheetSave(obj){
     window.__vfEsheetPush({ close: true });
     setOwnUI(); renderFeed(); renderStories(); renderMyPosts(); setTabIcons(curTab); refreshPv();
     if(el("view-search").classList.contains("active")) renderSearch();
-    const newLang = obj.lang === "en" ? "en" : "da";
+    const newLang = LANGS[obj.lang] ? obj.lang : getLang();
     if(newLang !== getLang()) setLang(newLang); // kun ved faktisk skift: gen-renderer hele app'en
     toast(t("profile.updated"));
   }catch(err){
@@ -974,8 +975,7 @@ el("ep-save").addEventListener("click", async function(){
   toast(t("profile.updated"));
 });
 /* ---- Sprog (per enhed — gemmes i localStorage, ikke i profilen) ---- */
-el("lang-da").addEventListener("click", function(){ setLang("da"); });
-el("lang-en").addEventListener("click", function(){ setLang("en"); });
+/* Sprogvalget i web-arket sker via select[data-langsel] (i18n.js lytter selv) */
 /* ---- Reklame-samtykke (per enhed — setConsent poster også til den native bro) ---- */
 el("ads-personal").addEventListener("click", function(){ setConsent("personal"); syncAdsChips(); });
 el("ads-limited").addEventListener("click", function(){ setConsent("limited"); syncAdsChips(); });

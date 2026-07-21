@@ -347,8 +347,7 @@
       </div>
       <div class="fs-label" data-i18n="ep.lang">Sprog / Language</div>
       <div class="ep-langrow">
-        <button class="langchip" id="lang-da" type="button">Dansk</button>
-        <button class="langchip" id="lang-en" type="button">English</button>
+        <select class="langsel" data-langsel aria-label="Sprog / Language"></select>
       </div>
       <div class="fs-label" data-i18n="ep.privacy">Privatliv</div>
       <div class="ep-langrow">
@@ -521,7 +520,10 @@
 
   <!-- Auth -->
   <div class="authview" id="authview">
-    <button type="button" class="auth-lang" id="auth-lang" aria-label="Sprog / Language">EN</button>
+    <span class="auth-langwrap">
+      <button type="button" class="auth-lang" id="auth-lang" tabindex="-1" aria-hidden="true">DA</button>
+      <select class="langsel-overlay" data-langsel aria-label="Sprog / Language"></select>
+    </span>
     <div class="auth-inner">
     <div class="wordmark">VibeFeed<span class="prik">.</span></div>
     <div class="auth-tag" data-i18n="auth.tag">Ingen algoritme. Bare din kreds.</div>

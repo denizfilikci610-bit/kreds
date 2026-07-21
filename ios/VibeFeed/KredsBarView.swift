@@ -57,7 +57,7 @@ struct NativeKredsBar: View {
     @FocusState private var focused: Bool
 
     private var searchPlaceholder: String {
-        (UserDefaults.standard.string(forKey: "vf_lang") ?? "da") == "en" ? "Search your circles …" : "Søg i dine kredse …"
+        (UserDefaults.standard.string(forKey: "vf_lang") ?? "da") == "da" ? "Søg i dine kredse …" : "Search your circles …" // øvrige sprog → engelsk placeholder
     }
 
     // During search: "Hele kredsen" + matching kredse only (no search circle / no "+ Ny").

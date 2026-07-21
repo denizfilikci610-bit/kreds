@@ -35,7 +35,7 @@ export function setAuthMode(mode){
   el("auth-confirm").style.display = mode === "confirm" ? "flex" : "none";
   el("auth-alt").style.display = (mode === "login" || mode === "signup") ? "" : "none";
   el("auth-alt-txt").textContent = mode === "login" ? t("auth.alt_login") : t("auth.alt_signup");
-  el("auth-lang").textContent = getLang() === "da" ? "EN" : "DA"; // chippen viser MÅL-sproget
+  el("auth-lang").textContent = getLang().split("-")[0].toUpperCase(); // pillen viser det AKTIVE sprog (vælgeren ligger usynligt ovenpå)
   el("auth-toggle").textContent = mode === "login" ? t("auth.toggle_login") : t("auth.toggle_signup");
   /* Politik-linjen under opret-knappen (kun statiske i18n-tekster — ingen brugerdata) */
   el("su-policy").innerHTML = t("signup.accept", {
@@ -245,11 +245,8 @@ el("li-forgot").addEventListener("click", function(){
   setAuthMode("reset");
   el("fp-email").value = el("li-email").value.trim();
 });
-el("auth-lang").addEventListener("click", function(){
-  // initI18n-callback'en (main.js) gen-render'er auth-teksterne, og setAuthMode
-  // (via refreshAuthMode) opdaterer chippen til det nye mål-sprog
-  setLang(getLang() === "da" ? "en" : "da");
-});
+/* Sprogskift på login-skærmen sker via select[data-langsel]-overlayet (i18n.js
+   lytter selv); initI18n-callback'en (main.js) gen-render'er auth-teksterne. */
 el("fp-back").addEventListener("click", function(){
   setAuthMode("login");
 });

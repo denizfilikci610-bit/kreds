@@ -1,14 +1,34 @@
 /* ================= i18n =================
    Sprog-lag: t(key, vars) slår op i det aktive sprogs ordbog, falder tilbage
-   til dansk og til sidst til selve nøglen. Sproget er per enhed (localStorage
-   vf_lang) — serverskabt indhold (governance-afstemninger, velkomstopslaget)
-   forbliver dansk by design og oversættes IKKE her.
+   til engelsk, så dansk og til sidst til selve nøglen. Sproget vælges
+   automatisk fra ENHEDENS sprog (navigator.languages) medmindre brugeren
+   selv har valgt et (localStorage vf_lang — kun brugerens EGET valg gemmes,
+   auto-detektionen gemmes ikke, så et telefon-sprogskifte følger med).
+   da+en bor i denne fil; de øvrige 30 sprog bor i js/lang/<kode>.js og
+   hentes med dynamisk import ved behov (CSP script-src 'self' tillader det).
+   Serverskabt indhold (governance-afstemninger, velkomstopslaget) forbliver
+   dansk by design og oversættes IKKE her.
    REGEL: Dette modul må ikke importere andre app-moduler (skal kunne
    importeres af alle uden cyklus-problemer). */
 
 const LS_KEY = "vf_lang";
 let lang = "da";
 let changeCb = null;
+
+/* Alle understøttede sprog: kode → eget navn (bruges i sprogvælgerne).
+   Koderne er også filnavne i js/lang/ (undtagen da/en der bor her). */
+export const LANGS = {
+  "da": "Dansk", "en": "English", "de": "Deutsch", "fr": "Français",
+  "it": "Italiano", "es": "Español", "pt": "Português", "nl": "Nederlands",
+  "sv": "Svenska", "no": "Norsk", "fi": "Suomi", "pl": "Polski",
+  "cs": "Čeština", "el": "Ελληνικά", "ro": "Română", "ru": "Русский",
+  "tr": "Türkçe", "uk": "Українська", "zh-hans": "简体中文", "zh-hant": "繁體中文",
+  "ja": "日本語", "ko": "한국어", "hi": "हिन्दी", "id": "Bahasa Indonesia",
+  "ms": "Bahasa Melayu", "th": "ไทย", "vi": "Tiếng Việt", "ar": "العربية",
+  "he": "עברית", "fa": "فارسی", "af": "Afrikaans", "tl": "Filipino"
+};
+/* Højre-mod-venstre-sprog: html[dir=rtl] (flex/tekst flipper automatisk) */
+const RTL = { "ar": 1, "he": 1, "fa": 1 };
 
 const DA = {
   /* Fælles */
@@ -992,10 +1012,11 @@ const EN = {
   "signup.terms": "terms of use"
 };
 
-const DICT = { da: DA, en: EN };
+const DICT = { da: DA, en: EN }; // øvrige sprog lægges heri efter dynamisk import
 
 export function t(key, vars){
-  let s = DICT[lang][key];
+  let s = (DICT[lang] || EN)[key];
+  if(s === undefined) s = EN[key];
   if(s === undefined) s = DA[key];
   if(s === undefined) return key;
   if(vars){
@@ -1009,33 +1030,90 @@ export function t(key, vars){
 export function getLang(){ return lang; }
 
 export function hasStoredLang(){
-  try{ const v = localStorage.getItem(LS_KEY); return v === "da" || v === "en"; }
+  try{ return !!LANGS[localStorage.getItem(LS_KEY)]; }
   catch(_e){ return false; }
 }
 
-export function setLang(l){
-  if(l !== "da" && l !== "en") return;
+/* Hent et sprogs ordbog (no-op for da/en og allerede hentede) */
+function ensureLang(l){
+  if(DICT[l]) return Promise.resolve(true);
+  return import("./lang/" + l + ".js").then(function(mod){
+    DICT[l] = mod.default || {};
+    return true;
+  }, function(err){
+    console.error("i18n: kunne ikke hente sproget", l, err);
+    return false;
+  });
+}
+
+/* Gør sproget aktivt (ordbogen SKAL være hentet) + opdater dokumentet */
+function commitLang(l){
   lang = l;
-  try{ localStorage.setItem(LS_KEY, l); }catch(_e){}
   document.documentElement.lang = l;
+  document.documentElement.dir = RTL[l] ? "rtl" : "ltr";
   applyStaticI18n();
   if(changeCb) changeCb(l);
 }
 
-export function initI18n(cb){
-  changeCb = cb || null;
-  try{
-    const stored = localStorage.getItem(LS_KEY);
-    if(stored === "da" || stored === "en") lang = stored;
-  }catch(_e){}
-  document.documentElement.lang = lang;
-  applyStaticI18n();
+/* Brugerens EGET valg (sprogvælgerne): gemmes og aktiveres når ordbogen er klar */
+export function setLang(l){
+  if(!LANGS[l]) return;
+  try{ localStorage.setItem(LS_KEY, l); }catch(_e){}
+  ensureLang(l).then(function(ok){ commitLang(ok ? l : "en"); });
 }
 
-/* Sprogafhængig URL til privatlivspolitikken (statisk side pr. sprog) */
+/* Enhedens sprog → nærmeste understøttede kode (fallback: engelsk).
+   Kinesisk deles på skrift (Hans/Hant via region), norsk bokmål/nynorsk → no,
+   gamle iOS-koder (iw/in/fil) mappes til de moderne. */
+export function deviceLang(){
+  const cands = (navigator.languages && navigator.languages.length
+    ? navigator.languages : [navigator.language || "en"]);
+  for(let i = 0; i < cands.length; i++){
+    const v = String(cands[i] || "").toLowerCase();
+    if(!v) continue;
+    if(v.indexOf("zh") === 0){
+      return (v.indexOf("hant") >= 0 || /-(tw|hk|mo)\b/.test(v)) ? "zh-hant" : "zh-hans";
+    }
+    let base = v.split("-")[0];
+    if(base === "nb" || base === "nn") base = "no";
+    if(base === "iw") base = "he";
+    if(base === "in") base = "id";
+    if(base === "fil") base = "tl";
+    if(LANGS[base]) return base;
+  }
+  return "en";
+}
+
+export function initI18n(cb){
+  changeCb = cb || null;
+  let stored = null;
+  try{ stored = localStorage.getItem(LS_KEY); }catch(_e){}
+  const target = LANGS[stored] ? stored : deviceLang();
+  if(DICT[target]){
+    lang = target;
+    document.documentElement.lang = target;
+    document.documentElement.dir = RTL[target] ? "rtl" : "ltr";
+    applyStaticI18n();
+  } else {
+    // Ordbogen hentes (samme origin, typisk <100 ms bag boot-splashen).
+    // Indtil da vises engelsk; commitLang gen-render'er når den lander.
+    lang = "en";
+    document.documentElement.lang = "en";
+    applyStaticI18n();
+    ensureLang(target).then(function(ok){ if(ok) commitLang(target); });
+  }
+  // Sprogvælgerne (select[data-langsel]) er selvkørende herfra
+  document.addEventListener("change", function(e){
+    if(e.target && e.target.matches && e.target.matches("select[data-langsel]")){
+      setLang(e.target.value);
+    }
+  });
+}
+
+/* Sprogafhængig URL til privatlivspolitikken (kun da har egen side) */
 export function policyURL(){ return lang === "da" ? "/privatliv.html" : "/privacy.html"; }
 
-/* Sprogafhængig URL til vilkårene (statisk side pr. sprog) */
+/* Sprogafhængig URL til vilkårene (kun da har egen side) */
 export function termsURL(){ return lang === "da" ? "/vilkaar.html" : "/terms.html"; }
 
 /* Statisk markup: data-i18n (textContent), data-i18n-ph (placeholder),
@@ -1046,9 +1124,17 @@ export function applyStaticI18n(){
   document.querySelectorAll("[data-i18n-aria]").forEach(function(n){ n.setAttribute("aria-label", t(n.dataset.i18nAria)); });
   document.querySelectorAll("[data-i18n-title]").forEach(function(n){ n.title = t(n.dataset.i18nTitle); });
   document.querySelectorAll("[data-i18n-alt]").forEach(function(n){ n.setAttribute("alt", t(n.dataset.i18nAlt)); });
-  const cd = document.getElementById("lang-da"), ce = document.getElementById("lang-en");
-  if(cd) cd.classList.toggle("on", lang === "da");
-  if(ce) ce.classList.toggle("on", lang === "en");
+  /* Sprogvælgere: udfyld med alle sprog (én gang) + vis det aktive */
+  document.querySelectorAll("select[data-langsel]").forEach(function(sel){
+    if(!sel.options.length){
+      Object.keys(LANGS).forEach(function(code){
+        const o = document.createElement("option");
+        o.value = code; o.textContent = LANGS[code];
+        sel.appendChild(o);
+      });
+    }
+    sel.value = lang;
+  });
   /* Links til privatlivspolitikken følger sproget */
   document.querySelectorAll("a[data-policy-link]").forEach(function(a){ a.setAttribute("href", policyURL()); });
 }
@@ -1058,4 +1144,13 @@ export function likesLabel(n){ return n === 1 ? t("likes.one") : t("likes.many",
 export function stemmerLabel(n){ return n === 1 ? t("votes.one") : t("votes.many", { n: n }); }
 
 /* Datolokale til toLocaleDateString-fallback i fmtTime */
-export function dateLocale(){ return lang === "da" ? "da-DK" : "en-GB"; }
+const LOCALES = {
+  "da": "da-DK", "en": "en-GB", "de": "de-DE", "fr": "fr-FR", "it": "it-IT",
+  "es": "es-ES", "pt": "pt-PT", "nl": "nl-NL", "sv": "sv-SE", "no": "nb-NO",
+  "fi": "fi-FI", "pl": "pl-PL", "cs": "cs-CZ", "el": "el-GR", "ro": "ro-RO",
+  "ru": "ru-RU", "tr": "tr-TR", "uk": "uk-UA", "zh-hans": "zh-CN", "zh-hant": "zh-TW",
+  "ja": "ja-JP", "ko": "ko-KR", "hi": "hi-IN", "id": "id-ID", "ms": "ms-MY",
+  "th": "th-TH", "vi": "vi-VN", "ar": "ar", "he": "he-IL", "fa": "fa-IR",
+  "af": "af-ZA", "tl": "fil-PH"
+};
+export function dateLocale(){ return LOCALES[lang] || "en-GB"; }

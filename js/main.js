@@ -215,10 +215,9 @@ window.addEventListener("hashchange", function(){
 })();
 setTabIcons("feed");
 (async function init(){
-  // Sproget gættes fra enheden (dansk enhed → dansk, ellers engelsk) — ingen gate-side.
-  // Kan skiftes med DA/EN-knappen på login-skærmen og i Rediger profil.
+  // Sproget følger ENHEDEN automatisk (alle 32 sprog, detekteres i initI18n) — ingen
+  // gate-side. Kan overstyres med sprogvælgeren på login-skærmen og i Rediger profil.
   // (Reklame-samtykket vises som ark ved FØRSTE feed-besøg efter login — se boot() i auth.js.)
-  if(!hasStoredLang()) setLang(/^da/i.test(navigator.language || "") ? "da" : "en");
   // Universal-link-landing: mail-links peger direkte på vibefeed.dk/?token_hash=…&type=…
   // (så iOS kan åbne APPEN i stedet for Safari). Tokenet veksles med verifyOtp — virker i
   // enhver browser/app-kontekst, uafhængigt af hvor mailen blev bestilt.
