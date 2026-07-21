@@ -263,7 +263,10 @@ export async function sendComment(pid){
     });
     if(s.img && s.img.url) URL.revokeObjectURL(s.img.url);
     composers.set(pid, { text:"", replyTo:null, img:null });
-    expandedCmts.add(pid);
+    // BEVIDST ingen expandedCmts.add her: alle inline-kontekster har allerede foldet tråden
+    // ud FØR send (web-detaljesiden ved åbning, browser-minder via toggle, deep-links
+    // eksplicit). Kun den native side/sheetet rammer ellers denne gren — og dér må feedet
+    // bagved IKKE folde tråden ud (den stod fremme i feedet efter tilbage-swipe).
     rerenderPostCmts(pid);
   }catch(err){
     console.error(err);
