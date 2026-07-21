@@ -2,6 +2,87 @@ import SwiftUI
 import Photos
 import AVFoundation
 import UIKit
+import CoreImage
+import CoreImage.CIFilterBuiltins
+import MetalKit
+
+/// ================= VibeFeed-kameraets ANALOGE FILM-LOOK =================
+/// Ejer-krav: kameraet skal LIGNE et gammelt kamera — ikke et efter-filter. Looket
+/// ligger derfor i selve pipelinen: live i søgeren (Metal-preview), brændt ind i fotos
+/// ved optagelsen, i videoer ved eksporten og i afspilnings-previewet. Galleri-medier
+/// røres IKKE. Opskriften (efter ejerens referencebilleder): blegede farver, varm
+/// gylden støbning, løftede sorte/dæmpede højlys (matte), vignet og fint korn.
+enum VFFilmLook {
+    static let device: MTLDevice? = MTLCreateSystemDefaultDevice()
+    static let context: CIContext = {
+        if let d = device { return CIContext(mtlDevice: d, options: [.cacheIntermediates: false]) }
+        return CIContext()
+    }()
+    private static let noise: CIImage = {
+        CIFilter.randomGenerator().outputImage ?? CIImage.empty()
+    }()
+
+    /// Hele kæden. `seed` flytter kornet pr. frame (levende korn på video/preview).
+    static func apply(_ input: CIImage, seed: Int) -> CIImage {
+        var img = input
+        // 1) Blegede farver + en anelse løftet lys
+        img = img.applyingFilter("CIColorControls", parameters: [
+            kCIInputSaturationKey: 0.78, kCIInputContrastKey: 0.97, kCIInputBrightnessKey: 0.015])
+        // 2) Varm, gylden støbning (gammelt dagslys-film)
+        img = img.applyingFilter("CITemperatureAndTint", parameters: [
+            "inputNeutral": CIVector(x: 6500, y: 0),
+            "inputTargetNeutral": CIVector(x: 5300, y: 10)])
+        // 3) Matte-kurven: løftede sorte, flade højlys
+        img = img.applyingFilter("CIToneCurve", parameters: [
+            "inputPoint0": CIVector(x: 0.00, y: 0.06),
+            "inputPoint1": CIVector(x: 0.25, y: 0.27),
+            "inputPoint2": CIVector(x: 0.50, y: 0.52),
+            "inputPoint3": CIVector(x: 0.75, y: 0.77),
+            "inputPoint4": CIVector(x: 1.00, y: 0.93)])
+        // 4) Vignet
+        img = img.applyingFilter("CIVignette", parameters: [
+            kCIInputIntensityKey: 0.55, kCIInputRadiusKey: 1.7])
+        // 5) Fint, levende korn (gråt støjlag lagt over med lav styrke)
+        let dx = CGFloat((seed &* 73) % 997), dy = CGFloat((seed &* 131) % 613)
+        let grain = noise
+            .transformed(by: CGAffineTransform(translationX: dx, y: dy))
+            .applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0.05),
+                "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0.05),
+                "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0.05),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.05),
+                "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 0)])
+            .cropped(to: img.extent)
+        img = grain.applyingFilter("CISourceOverCompositing", parameters: [
+            kCIInputBackgroundImageKey: img])
+        return img.cropped(to: input.extent)
+    }
+
+    /// Stillbillede (foto taget med kameraet): look + korrekt orientering bagt ind.
+    static func applyStill(_ ui: UIImage) -> UIImage {
+        guard var ci = CIImage(image: ui) else { return ui }
+        ci = ci.oriented(forExifOrientation: exif(ui.imageOrientation))
+        let out = apply(ci, seed: 0)
+        guard let cg = context.createCGImage(out, from: out.extent) else { return ui }
+        return UIImage(cgImage: cg)
+    }
+    private static func exif(_ o: UIImage.Orientation) -> Int32 {
+        switch o {
+        case .up: return 1; case .down: return 3; case .left: return 8; case .right: return 6
+        case .upMirrored: return 2; case .downMirrored: return 4
+        case .leftMirrored: return 5; case .rightMirrored: return 7
+        @unknown default: return 1
+        }
+    }
+
+    /// Afspilnings-preview af en OPTAGET video (billedtekst-trinnet): look pr. frame.
+    static func playerComposition(for asset: AVAsset) -> AVVideoComposition {
+        AVMutableVideoComposition(asset: asset) { req in
+            let out = apply(req.sourceImage, seed: Int(req.compositionTime.seconds * 30))
+            req.finish(with: out, context: context)
+        }
+    }
+}
 
 /// Instagram-style IN-APP photo/video gallery composer for MEMORIES (the owner sent the IG screenshot).
 /// A WKWebView can't read the photo library, so this is native PhotoKit: a grid of the user's own
@@ -323,25 +404,34 @@ final class PhotoLibModel: NSObject, ObservableObject {
     private func posterFrame(_ url: URL) -> UIImage? {
         let gen = AVAssetImageGenerator(asset: AVURLAsset(url: url))
         gen.appliesPreferredTrackTransform = true
-        gen.maximumSize = CGSize(width: 1080, height: 1350)
+        gen.maximumSize = CGSize(width: 1080, height: 1920)
         guard let cg = try? gen.copyCGImage(at: CMTime(seconds: 0.1, preferredTimescale: 600), actualTime: nil) else { return nil }
-        return cropTo45(UIImage(cgImage: cg))
+        return cropTo45(VFFilmLook.applyStill(UIImage(cgImage: cg)))   // poster matcher den færdige video
     }
 
     /// Beskær den optagne video til 4:5 (1080x1350) via en video-composition og upload som mp4.
     private func export45Video(_ url: URL) {
         let asset = AVURLAsset(url: url)
-        guard let track = asset.tracks(withMediaType: .video).first else { sharing = false; onUploadFailed?(); return }
+        guard asset.tracks(withMediaType: .video).first != nil else { sharing = false; onUploadFailed?(); return }
         let render = outSize()   // minde 1080x1350, story 1080x1920
-        let comp = AVMutableVideoComposition()
+        // CI-pipeline pr. frame: aspect-fill-beskær til render-størrelsen + FILM-LOOKET
+        // (sourceImage kommer allerede opret — preferredTransform er anvendt)
+        let comp = AVMutableVideoComposition(asset: asset) { req in
+            var img = req.sourceImage
+            let iw = img.extent.width, ih = img.extent.height
+            if iw > 0, ih > 0 {
+                let scale = max(render.width / iw, render.height / ih)
+                img = img.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+                let e = img.extent
+                let ox = (render.width - e.width) / 2, oy = (render.height - e.height) / 2
+                img = img.transformed(by: CGAffineTransform(translationX: ox - e.origin.x, y: oy - e.origin.y))
+                img = img.cropped(to: CGRect(origin: .zero, size: render))
+            }
+            img = VFFilmLook.apply(img, seed: Int(req.compositionTime.seconds * 30))
+            req.finish(with: img, context: VFFilmLook.context)
+        }
         comp.renderSize = render
         comp.frameDuration = CMTime(value: 1, timescale: 30)
-        let instruction = AVMutableVideoCompositionInstruction()
-        instruction.timeRange = CMTimeRange(start: .zero, duration: asset.duration)
-        let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: track)
-        layer.setTransform(aspectFill45(track: track, render: render), at: .zero)
-        instruction.layerInstructions = [layer]
-        comp.instructions = [instruction]
 
         let out = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mp4")
         try? FileManager.default.removeItem(at: out)
@@ -651,7 +741,7 @@ struct MemoryGalleryScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 if let vurl = model.capturedVideoURL {
-                    LoopingVideoView(url: vurl)                       // videoen spiller i loop, 4:5
+                    LoopingVideoView(url: vurl, filmLook: true)       // loop m. film-looket (som eksporten)
                         .aspectRatio(4.0 / 5.0, contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.5)
                         .clipped()
@@ -787,13 +877,18 @@ struct PhotoLibHost: ViewModifier {
 // MARK: - Native kamera (skræddersyet, som Instagram-kameraet men uden mode-faner)
 
 /// Ejer AVCaptureSession'en for minde-kameraet: live-preview, foto-optagelse, blitz og vend-kamera.
-final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutputRecordingDelegate {
+final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutputRecordingDelegate, AVCaptureVideoDataOutputSampleBufferDelegate {
     let session = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
     private let movieOutput = AVCaptureMovieFileOutput()
     private var videoInput: AVCaptureDeviceInput?
     private var audioInput: AVCaptureDeviceInput?
     private let queue = DispatchQueue(label: "vf.memory.camera")
+    // Film-look-søgeren: rå frames filtreres på preview-køen og skubbes til Metal-viewet
+    private let videoDataOutput = AVCaptureVideoDataOutput()
+    private let previewQueue = DispatchQueue(label: "vf.memory.camera.preview")
+    private var frameSeed = 0
+    var previewSink: ((CIImage) -> Void)?
     private var onCapture: ((UIImage) -> Void)?
     private var onVideo: ((URL) -> Void)?
     private var configured = false
@@ -843,13 +938,6 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
         }
     }
 
-    /// Kobl preview-laget af sessionen PÅ KAMERA-KØEN (serialiseret med stop/flip/
-    /// configure). Blokken holder laget i live til afkoblingen er sket, så lagets
-    /// senere dealloc på main-tråden ikke rører den kørende session.
-    func detachPreview(_ layer: AVCaptureVideoPreviewLayer) {
-        queue.async { layer.session = nil }
-    }
-
     private func configureAndRun() {
         queue.async { [weak self] in
             guard let self else { return }
@@ -861,6 +949,13 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
                 self.setAudioInput()
                 if self.session.canAddOutput(self.photoOutput) { self.session.addOutput(self.photoOutput) }
                 if self.session.canAddOutput(self.movieOutput) { self.session.addOutput(self.movieOutput) }
+                if self.session.canAddOutput(self.videoDataOutput) {
+                    self.videoDataOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+                    self.videoDataOutput.alwaysDiscardsLateVideoFrames = true
+                    self.videoDataOutput.setSampleBufferDelegate(self, queue: self.previewQueue)
+                    self.session.addOutput(self.videoDataOutput)
+                }
+                self.updatePreviewConnection()
                 self.session.commitConfiguration()
             }
             if !self.session.isRunning { self.session.startRunning() }
@@ -887,6 +982,32 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
         queue.async { [weak self] in
             guard let self else { return }
             self.session.beginConfiguration(); self.setVideoInput(self.position); self.session.commitConfiguration()
+            self.updatePreviewConnection()   // spejling følger front/bag
+        }
+    }
+
+    /// Søger-forbindelsen leverer OPRETTE (portræt) og front-spejlede frames.
+    private func updatePreviewConnection() {
+        guard let c = videoDataOutput.connection(with: .video) else { return }
+        if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
+        c.automaticallyAdjustsVideoMirroring = false
+        if c.isVideoMirroringSupported { c.isVideoMirrored = (position == .front) }
+    }
+
+    /// Live-frames → film-look → søgeren (Metal-viewet)
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        guard let sink = previewSink, let pb = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        frameSeed &+= 1
+        sink(VFFilmLook.apply(CIImage(cvPixelBuffer: pb), seed: frameSeed))
+    }
+
+    /// Fokus ud fra et normaliseret punkt i den viste (upright) søger-buffer.
+    func focusNormalized(_ p: CGPoint) {
+        queue.async { [weak self] in
+            guard let self else { return }
+            let r = self.videoDataOutput.metadataOutputRectConverted(
+                fromOutputRect: CGRect(x: p.x, y: p.y, width: 0.001, height: 0.001))
+            self.focus(at: r.origin)
         }
     }
 
@@ -971,7 +1092,8 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
 
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         guard error == nil, let data = photo.fileDataRepresentation(), let image = UIImage(data: data) else { return }
-        DispatchQueue.main.async { [weak self] in self?.onCapture?(image) }
+        let looked = VFFilmLook.applyStill(image)   // film-looket bages ind i selve fotoet
+        DispatchQueue.main.async { [weak self] in self?.onCapture?(looked) }
     }
 
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
@@ -987,41 +1109,86 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
 
 /// SwiftUI-wrapper om AVCaptureVideoPreviewLayer (den live kamera-forhåndsvisning).
 /// Tryk konverteres til enheds-koordinater og meldes tilbage (device-punkt 0-1, view-punkt).
-struct CameraPreview: UIViewRepresentable {
-    let session: AVCaptureSession
-    /// Kaldes ved nedrivning med preview-laget, så ejeren kan koble sessionen af på
-    /// KAMERA-KØEN. Dealloc af et lag med session åbner en session-transaktion på
-    /// main-tråden, som kolliderer med stopRunning på kamera-køen → NSException-crash
-    /// (set som SIGABRT i stop() når man filmede og lukkede kameraet).
-    var onDetach: ((AVCaptureVideoPreviewLayer) -> Void)? = nil
-    var onFocus: ((CGPoint, CGPoint) -> Void)? = nil
-    func makeUIView(context: Context) -> PreviewView {
-        let v = PreviewView()
-        v.previewLayer.session = session
-        v.previewLayer.videoGravity = .resizeAspectFill
-        v.onFocus = onFocus
-        v.onDetach = onDetach
-        let tap = UITapGestureRecognizer(target: v, action: #selector(PreviewView.handleTap(_:)))
-        v.addGestureRecognizer(tap)
+/// Metal-søgeren: viser de FÆRDIG-filtrerede film-look-frames fra MemoryCamera
+/// (aspect-fill). Ingen AVCaptureVideoPreviewLayer → ingen session-berøring ved
+/// nedrivning (den gamle dealloc/stopRunning-crash-klasse er dermed helt væk).
+struct FilmCameraPreview: UIViewRepresentable {
+    let camera: MemoryCamera
+    var onFocus: ((CGPoint) -> Void)? = nil   // view-punktet (til fokus-firkanten)
+    func makeUIView(context: Context) -> FilmPreviewView {
+        let v = FilmPreviewView()
+        v.onTap = { [weak v] viewPoint in
+            guard let v else { return }
+            if let norm = v.normalizedImagePoint(for: viewPoint) { camera.focusNormalized(norm) }
+            onFocus?(viewPoint)
+        }
+        camera.previewSink = { [weak v] img in
+            DispatchQueue.main.async { v?.push(img) }
+        }
         return v
     }
-    func updateUIView(_ uiView: PreviewView, context: Context) {
-        uiView.onFocus = onFocus
-        uiView.onDetach = onDetach
+    func updateUIView(_ uiView: FilmPreviewView, context: Context) {}
+}
+
+final class FilmPreviewView: UIView, MTKViewDelegate {
+    private let mtk: MTKView
+    private let commandQueue: MTLCommandQueue?
+    private var image: CIImage?
+    var onTap: ((CGPoint) -> Void)?
+
+    override init(frame: CGRect) {
+        let dev = VFFilmLook.device
+        mtk = MTKView(frame: .zero, device: dev)
+        commandQueue = dev?.makeCommandQueue()
+        super.init(frame: frame)
+        backgroundColor = .black
+        clipsToBounds = true
+        mtk.framebufferOnly = false
+        mtk.isPaused = true
+        mtk.enableSetNeedsDisplay = false
+        mtk.isUserInteractionEnabled = false
+        mtk.delegate = self
+        addSubview(mtk)
+        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped(_:))))
     }
-    static func dismantleUIView(_ uiView: PreviewView, coordinator: ()) {
-        uiView.onDetach?(uiView.previewLayer)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+    override func layoutSubviews() { super.layoutSubviews(); mtk.frame = bounds }
+
+    func push(_ img: CIImage) { image = img; mtk.draw() }
+
+    /// View-punkt → normaliseret punkt i den viste (upright) buffer (aspect-fill-regnestykke)
+    func normalizedImagePoint(for p: CGPoint) -> CGPoint? {
+        guard let img = image, bounds.width > 0, bounds.height > 0,
+              img.extent.width > 0, img.extent.height > 0 else { return nil }
+        let scale = max(bounds.width / img.extent.width, bounds.height / img.extent.height)
+        let ox = (bounds.width - img.extent.width * scale) / 2
+        let oy = (bounds.height - img.extent.height * scale) / 2
+        let x = (p.x - ox) / scale / img.extent.width
+        let y = (p.y - oy) / scale / img.extent.height
+        guard x >= 0, x <= 1, y >= 0, y <= 1 else { return nil }
+        return CGPoint(x: x, y: y)
     }
-    final class PreviewView: UIView {
-        override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
-        var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
-        var onFocus: ((CGPoint, CGPoint) -> Void)?
-        var onDetach: ((AVCaptureVideoPreviewLayer) -> Void)?
-        @objc func handleTap(_ g: UITapGestureRecognizer) {
-            let vp = g.location(in: self)
-            let dp = previewLayer.captureDevicePointConverted(fromLayerPoint: vp)
-            onFocus?(dp, vp)
-        }
+    @objc private func tapped(_ g: UITapGestureRecognizer) { onTap?(g.location(in: self)) }
+
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+    func draw(in view: MTKView) {
+        guard let img = image, let drawable = view.currentDrawable, let cq = commandQueue,
+              let buffer = cq.makeCommandBuffer(),
+              img.extent.width > 0, img.extent.height > 0 else { return }
+        let dw = CGFloat(view.drawableSize.width), dh = CGFloat(view.drawableSize.height)
+        guard dw > 0, dh > 0 else { return }
+        let scale = max(dw / img.extent.width, dh / img.extent.height)
+        var out = img.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        let e = out.extent
+        out = out.transformed(by: CGAffineTransform(translationX: (dw - e.width) / 2 - e.origin.x,
+                                                    y: (dh - e.height) / 2 - e.origin.y))
+        // CI tegner med origo nederst — flip så billedet vender rigtigt i Metal-teksturen
+        out = out.transformed(by: CGAffineTransform(translationX: 0, y: dh).scaledBy(x: 1, y: -1))
+        VFFilmLook.context.render(out, to: drawable.texture, commandBuffer: buffer,
+                                  bounds: CGRect(x: 0, y: 0, width: dw, height: dh),
+                                  colorSpace: CGColorSpaceCreateDeviceRGB())
+        buffer.present(drawable)
+        buffer.commit()
     }
 }
 
@@ -1030,8 +1197,9 @@ struct CameraPreview: UIViewRepresentable {
 /// lyden høres selv med lydløs-kontakten. resizeAspectFill i 4:5 → samme udsnit som den endelige beskæring.
 struct LoopingVideoView: UIViewRepresentable {
     let url: URL
+    var filmLook = false   // optaget m. kameraet → vis med film-looket (matcher eksporten)
     func makeUIView(context: Context) -> PlayerBox {
-        let v = PlayerBox(); v.configure(url: url); return v
+        let v = PlayerBox(); v.configure(url: url, filmLook: filmLook); return v
     }
     func updateUIView(_ uiView: PlayerBox, context: Context) {}
     static func dismantleUIView(_ uiView: PlayerBox, coordinator: ()) { uiView.teardown() }
@@ -1043,8 +1211,9 @@ struct LoopingVideoView: UIViewRepresentable {
         private var keepAlive: Timer?
         private var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
 
-        func configure(url: URL) {
+        func configure(url: URL, filmLook: Bool = false) {
             let it = AVPlayerItem(url: url)
+            if filmLook { it.videoComposition = VFFilmLook.playerComposition(for: AVURLAsset(url: url)) }
             let p = AVPlayer(playerItem: it)
             p.isMuted = false
             p.actionAtItemEnd = .none
@@ -1115,8 +1284,8 @@ struct MemoryCameraScreen: View {
                 // Live-preview begrænset til 4:5, centreret. Alt uden for rammen er mørkt (fade).
                 Group {
                     if cam.authorized {
-                        CameraPreview(session: cam.session, onDetach: { cam.detachPreview($0) }, onFocus: { dp, vp in
-                            cam.focus(at: dp)
+                        FilmCameraPreview(camera: cam, onFocus: { vp in
+                            // fokus sættes internt (normaliseret punkt) — her kun firkanten
                             focusPt = vp
                             focusSeq += 1
                             let s = focusSeq
