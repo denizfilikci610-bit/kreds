@@ -429,6 +429,27 @@ function openMediaMenu(){
   // Vis "Tag et billede eller video" (native kamera) KUN på builds der kan compose-kameraet
   // (__vfComposeCamera). Så påvirkes ældre installerede apps ikke; de beholder systemkameraet.
   const native = !!window.__vfComposeCamera;
+  // I app'en: ÆGTE iOS 26 Liquid Glass-kort (samme motor som +-vælgeren og chat-menuerne,
+  // SheetView.swift GlassSheetCard), ikke CSS-modalen der lignede en gammel systemsheet.
+  // Web ejer stadig flowet; Swift kalder vfSheet(action) tilbage med det valgte.
+  if(window.__vfGlassCard && window.__vfSheetPost){
+    const buttons = native
+      ? [{ label: t("mm.camera"), action: "camera" }]
+      : [{ label: t("mm.photo"), action: "photo" }, { label: t("mm.video"), action: "video" }];
+    buttons.push({ label: t("mm.lib"), action: "lib" });
+    buttons.push({ label: t("common.cancel"), action: "__cancel", role: "cancel" });
+    window.__vfSheetPost({ buttons: buttons }, function(a){
+      if(a === "camera") openNativeCameraForCompose();
+      else if(a === "photo") el("cam-photo").click();
+      else if(a === "video") el("cam-video").click();
+      else if(a === "lib"){
+        if(window.__vfComposeCamera) openNativeLibraryForCompose(); // native galleri direkte
+        else el("file-input").click();                             // browser/ældre app
+      }
+    });
+    return;
+  }
+  // Browser/ældre app uden glas-kort: CSS-modalen (uændret fallback)
   el("mm-native").style.display = native ? "block" : "none";
   el("mm-photo").style.display = native ? "none" : "block";
   el("mm-video").style.display = native ? "none" : "block";
