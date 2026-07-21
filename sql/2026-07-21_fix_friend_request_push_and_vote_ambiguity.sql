@@ -1,0 +1,45 @@
+-- =============================================================================
+-- To fejl fundet i produktionsloggen 2026-07-21 (begge reproduceret som rigtig
+-- bruger i en rollback-blok, og efterprøvet igen efter rettelsen).
+-- Migration: fix_friend_request_push_and_vote_ambiguity
+--
+-- FEJL 1: "man kan ikke tilføje en ny til sin kreds"
+--   Man kunne slet ikke sende en venneanmodning. add_friend fejlede HVER gang med
+--     function app_hidden.notify_push(uuid, unknown, text, unknown) does not exist
+--   Migrationen push_deeplink_payload gjorde notify_push 7-args og droppede den
+--   gamle 4-args udgave, men tg_push_friend_request og tg_push_friendship kaldte
+--   den stadig med 4. tg_push_friendship havde en fejlvagt (venskabet blev oprettet,
+--   men uden push), tg_push_friend_request havde INGEN, så hele indsættelsen væltede.
+--   Og da man kun kan invitere VENNER ind i en kreds, kunne man ikke tilføje nogen ny.
+--
+--   Rettelsen er dobbelt: kaldene bruger nu 7 argumenter, OG alle push-triggere har
+--   fået en fejlvagt. Princippet: en push må aldrig kunne vælte brugerens handling.
+--   (tg_push_like, tg_push_comment, tg_push_comment_like, tg_push_invite og
+--   tg_push_chat_msg manglede den også.)
+--
+-- FEJL 2: afstemnings-banneret var altid tomt
+--   my_membership_votes fejlede hver gang med
+--     column reference "post_id" is ambiguous
+--   Funktionen er RETURNS TABLE(..., post_id bigint, ...), og et OUT-navn er en
+--   variabel inde i kroppen. I underforespørgslen
+--     (select id from poll_options where post_id = mp.post_id and idx = 0)
+--   kunne "post_id" derfor både være kolonnen og OUT-parameteren.
+--   Rettelsen: kolonnerne kvalificeres (po.post_id, po.idx). OUT-navnene beholdes,
+--   for klienten læser dem (js/notifications.js loadAdmissionVotes).
+--   Klienten slugte fejlen i en try/catch, så den var usynlig udefra: banneret stod
+--   bare tomt, og en foreslået optagelse i en kreds kunne aldrig ses.
+--
+-- Den fulde SQL står i migrationen i Supabase (list_migrations). Kernen:
+--   · alle app_hidden.tg_push_* har nu "exception when others then return NEW"
+--   · de to 4-args kald er nu 7-args
+--   · my_membership_votes kvalificerer poll_options-kolonnerne
+--
+-- EFTERPRØVET (rollback-blok, som deniz.filikci):
+--   1 add_friend til en fremmed: OK, rækken oprettes
+--   2 modtageren ser anmodningen
+--   3 accept giver venskab begge veje (2 af 2 rækker)
+--   4 my_membership_votes: OK
+--   5 invitation til kredsen: OK
+--   samt at my_admission_results, activity_of, friends_of, kredse_of og
+--   close_due_votes stadig er sunde.
+-- =============================================================================

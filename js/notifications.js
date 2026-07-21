@@ -505,6 +505,58 @@ export async function loadNotifs(){
    selve kommentar-rækken; et minde i app'en åbner det native kommentar-sheet fokuseret
    på kommentaren (inline-kommentarer findes ikke for minder dér). Mangler kommentaren
    (slettet), lander vi blot på opslaget som før. */
+/* Hop præcist, også mens feedet stadig henter billeder.
+   Et feed-billede har ingen kendt højde før det er hentet (.pmedia img er
+   width:100% uden fast højde, og et minde er fuld-bleed height:auto), så hver gang
+   et billede OVER målet lander, skubbes alt nedenunder flere hundrede pixels ned.
+   Hopper vi i samme øjeblik listen er tegnet, ender vi derfor et helt andet sted
+   end det opslag notifikationen handlede om.
+   Derfor: vent på de medier der ligger FØR målet (med kort frist, så et dødt
+   billede ikke spærrer), hop, og ret efter hvis noget stadig flytter sig. Rører
+   brugeren selv skærmen undervejs, holder vi op med at rette. */
+function mediaOverTarget(target){
+  const ud = [];
+  document.querySelectorAll("#feed img, #feed video").forEach(function(m){
+    if(target.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_PRECEDING) ud.push(m);
+  });
+  return ud;
+}
+function mediaKlar(m){
+  if(m.tagName === "IMG" ? m.complete : m.readyState >= 1) return Promise.resolve();
+  return new Promise(function(res){
+    let gjort = false;
+    const ok = function(){ if(!gjort){ gjort = true; res(); } };
+    m.addEventListener("load", ok, { once:true });
+    m.addEventListener("loadedmetadata", ok, { once:true });
+    m.addEventListener("error", ok, { once:true });
+  });
+}
+function vent(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+
+async function hopPraecist(target){
+  const medier = mediaOverTarget(target).map(mediaKlar);
+  if(medier.length) await Promise.race([Promise.all(medier), vent(1200)]);
+  target.scrollIntoView({ block:"center" });
+
+  // Efterjustering: så længe målet driver (billeder der lander sent), hop igen.
+  let afbrudt = false;
+  const stop = function(){ afbrudt = true; };
+  const app = el("app");
+  ["touchstart", "wheel"].forEach(function(ev){
+    if(app) app.addEventListener(ev, stop, { once:true, passive:true });
+  });
+  const frist = Date.now() + 1500;
+  let sidst = target.getBoundingClientRect().top;
+  while(!afbrudt && Date.now() < frist){
+    await vent(120);
+    if(afbrudt) break;
+    const nu = target.getBoundingClientRect().top;
+    if(Math.abs(nu - sidst) > 2) target.scrollIntoView({ block:"center" });
+    sidst = target.getBoundingClientRect().top;
+  }
+  if(app){ ["touchstart", "wheel"].forEach(function(ev){ app.removeEventListener(ev, stop); }); }
+}
+
 export async function openNotifPost(pid, isCmt, cid){
   const { data, error } = await sb.from("posts").select("id, feed_id").eq("id", pid).maybeSingle();
   if(error){ console.error(error); toast(t("err.generic")); return false; }
@@ -523,11 +575,12 @@ export async function openNotifPost(pid, isCmt, cid){
   const node = document.querySelector('#feed .post[data-id="'+data.id+'"]');
   if(!node){ toast(t("notif.post_not_visible")); return false; }
   const crow = (!nativeMemCmts && !thoughtCmts && cid) ? node.querySelector('.crow[data-cid="'+cid+'"]') : null;
-  (crow || node).scrollIntoView({ block:"center" });
-  resetBarHide(); // programmatisk hop må ikke skjule topbaren — genstart fra landingspositionen
   const hl = crow || node;
+  // Fremhæv FØR hoppet, så man kan se målet mens billederne falder på plads
   hl.classList.add("flash");
-  setTimeout(function(){ hl.classList.remove("flash"); }, 1600);
+  setTimeout(function(){ hl.classList.remove("flash"); }, 2600);
+  await hopPraecist(hl);
+  resetBarHide(); // programmatisk hop må ikke skjule topbaren — genstart fra landingspositionen
   if(nativeMemCmts){ openNativeComments(pid, cid); return true; }
   if(thoughtCmts){
     if(window.__vfNative && window.__vfPostPage){
