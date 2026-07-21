@@ -1,25 +1,29 @@
 -- =============================================================================
--- Privat bøtte til stories og billeder i beskeder (signerede URL'er).
--- Migration: private_media_bucket
+-- Privat bøtte til stories. Migration: private_media_bucket (kørt 2026-07-21)
 --
--- I DAG er alt medie offentligt: js/helpers.js imgUrl() bruger getPublicUrl, og
--- der findes ikke ét createSignedUrl i koden. Kender man stien, kan man hente en
--- privat DM-besked eller en story uden at være logget ind. RLS beskytter kun
--- DATABASEN, ikke filerne. Det passer dårligt med at privat betyder privat.
+-- PROBLEMET: alt medie lå i en OFFENTLIG bøtte (js/helpers.js imgUrl bruger
+-- getPublicUrl), så kendte man stien, kunne man hente en story uden at være logget
+-- ind. RLS beskytter databasen, ikke filerne.
 --
--- Denne migration laver den private bøtte og dens adgangsregler. Læsereglen er
--- den pæne del: Storage-API'et laver kun en signeret URL hvis brugeren må lave
--- select på filen, og select-policyen slår filen op i den række der ejer den.
--- Rækkens EGEN RLS gælder inde i det opslag, så synligheden på filen bliver
--- automatisk den samme som på storyen/beskeden. Ingen dobbeltbogføring.
+-- STI-KONVENTION: filer i den private bøtte hedder 'priv/{auth.uid()}/{uuid}.ext',
+-- og PRÆCIS den streng gemmes også i databasekolonnen. Så kan både klienten og
+-- oprydningen se på stien alene hvilken bøtte filen bor i, uden ekstra kolonner,
+-- og gamle stier uden præfiks bliver liggende i post-images og virker uændret.
+-- Ingen migrering af eksisterende filer, ingen brudte billeder.
 --
--- OPRYDNING ER ALLEREDE PÅ PLADS: køen i 2026-07-21_media_cleanup.sql har en
--- bucket-kolonne, og edge-funktionen media-sweeper grupperer efter bøtte, så
--- filer i vf-private ryddes uden ændringer i fejeren. Husk blot at
--- app_hidden.enqueue_media i dag hardcoder 'post-images': den skal have bøtten
--- med, når web-delen begynder at lægge stier i den private bøtte.
+-- LÆSEREGLEN er den pæne del: Storage-API'et laver kun en signeret URL hvis
+-- brugeren må lave select på filen, og select-policyen slår filen op i den række
+-- der ejer den. Rækkens EGEN RLS gælder inde i det opslag, så synligheden på filen
+-- bliver automatisk den samme som på storyen. Ingen dobbeltbogføring.
 --
--- WEB-DELEN MANGLER STADIG (bevidst, se noten nederst).
+-- HVORFOR KUN STORIES: chat-beskeder har i dag ingen egne billeder (nul rækker med
+-- image_path i kreds_messages; medier deles som minder via post_id), og minder og
+-- tanker vises i feedet, hvor en signeret URL pr. billede ville koste for meget.
+-- Reglen for kreds_messages står der allerede, så beskedbilleder kan tændes senere
+-- uden en ny migration.
+--
+-- INGEN APP-OPDATERING: web'en bygger selv upload-URL'en og sender den til native
+-- (js/compose.js nativeMemoryPost), så bøtteskiftet er en ren web-ændring.
 -- =============================================================================
 
 begin;
@@ -28,28 +32,33 @@ insert into storage.buckets (id, name, public)
 values ('vf-private', 'vf-private', false)
 on conflict (id) do update set public = false;
 
--- ---- Upload: kun i sin egen mappe ({auth.uid()}/...) ----
+-- Upload kun i sin egen mappe under priv/
 drop policy if exists vf_private_insert_own on storage.objects;
 create policy vf_private_insert_own on storage.objects
   for insert to authenticated
-  with check (bucket_id = 'vf-private' and (storage.foldername(name))[1] = auth.uid()::text);
+  with check (
+    bucket_id = 'vf-private'
+    and (storage.foldername(name))[1] = 'priv'
+    and (storage.foldername(name))[2] = (select auth.uid())::text
+  );
 
--- ---- Sletning: kun sine egne filer (trigger'en i media_cleanup rydder resten) ----
 drop policy if exists vf_private_delete_own on storage.objects;
 create policy vf_private_delete_own on storage.objects
   for delete to authenticated
-  using (bucket_id = 'vf-private' and (storage.foldername(name))[1] = auth.uid()::text);
+  using (
+    bucket_id = 'vf-private'
+    and (storage.foldername(name))[1] = 'priv'
+    and (storage.foldername(name))[2] = (select auth.uid())::text
+  );
 
--- ---- Læsning: må jeg se den række filen hører til? ----
--- stories og kreds_messages har hver deres RLS, og den gælder inde i opslagene
--- her, så en signeret URL kun kan laves til medier man i forvejen må se.
+-- Læsning: må jeg se den række filen hører til?
 drop policy if exists vf_private_read_owned_rows on storage.objects;
 create policy vf_private_read_owned_rows on storage.objects
   for select to authenticated
   using (
     bucket_id = 'vf-private'
     and (
-      (storage.foldername(name))[1] = auth.uid()::text   -- egne filer altid
+      (storage.foldername(name))[2] = (select auth.uid())::text   -- egne filer altid
       or exists (select 1 from public.stories s
                   where s.image_path = storage.objects.name
                      or s.video_path = storage.objects.name)
@@ -59,27 +68,92 @@ create policy vf_private_read_owned_rows on storage.objects
     )
   );
 
+-- ---- Oprydningen skal kende begge bøtter ----
+create or replace function app_hidden.media_bucket(p_path text)
+returns text
+language sql
+immutable
+as $$ select case when p_path like 'priv/%' then 'vf-private' else 'post-images' end $$;
+
+-- Ejer-segmentet i en sti: 'priv/{uid}/fil' eller '{uid}/fil'.
+create or replace function app_hidden.media_owner(p_path text)
+returns text
+language sql
+immutable
+as $$ select case when p_path like 'priv/%' then split_part(p_path, '/', 2) else split_part(p_path, '/', 1) end $$;
+
+-- enqueue_media hardcodede 'post-images'; nu udledes bøtten af stien.
+create or replace function app_hidden.enqueue_media(p_path text)
+returns void
+language plpgsql
+security definer
+set search_path to 'app_hidden', 'public'
+as $$
+begin
+  if p_path is null or btrim(p_path) = '' then return; end if;
+  insert into app_hidden.deleted_media (bucket, path)
+  values (app_hidden.media_bucket(p_path), p_path)
+  on conflict (bucket, path) do nothing;
+exception when others then
+  return;
+end;
+$$;
+
+-- Ejerskabs-værnet i tg_media_cleanup (se 2026-07-21_media_cleanup.sql) skal se
+-- forbi priv-præfikset, ellers ville private filer ALDRIG blive ryddet op, fordi
+-- værnet ville tro at ejeren hed 'priv'. Derfor app_hidden.media_owner i stedet for
+-- split_part(old_path, '/', 1). Resten af funktionen er uændret.
+create or replace function app_hidden.tg_media_cleanup()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'app_hidden', 'public'
+as $$
+declare
+  owner_col text; owner_id text; col text; old_path text; new_path text; i int;
+begin
+  owner_col := tg_argv[0];
+  execute format('select ($1).%I::text', owner_col) into owner_id using old;
+  if owner_id is null then return null; end if;
+
+  for i in 1 .. (array_upper(tg_argv, 1)) loop
+    col := tg_argv[i];
+    execute format('select ($1).%I::text', col) into old_path using old;
+    if old_path is null or btrim(old_path) = '' then continue; end if;
+
+    if tg_op = 'UPDATE' then
+      execute format('select ($1).%I::text', col) into new_path using new;
+      if new_path is not distinct from old_path then continue; end if;
+    end if;
+
+    if app_hidden.media_owner(old_path) is distinct from owner_id then continue; end if;
+
+    perform app_hidden.enqueue_media(old_path);
+  end loop;
+  return null;
+exception when others then
+  return null;
+end;
+$$;
+
+revoke all on function app_hidden.media_bucket(text)  from public;
+revoke all on function app_hidden.media_owner(text)   from public;
+revoke all on function app_hidden.enqueue_media(text) from public;
+revoke all on function app_hidden.tg_media_cleanup()  from public;
+
 commit;
 
 -- =============================================================================
--- SÅDAN TAGES BØTTEN I BRUG (web-delen, næste skridt)
+-- WEB-DELEN (bygget samme dag)
+--   js/helpers.js  : PRIV_PREFIX, isPrivatePath, mediaBucket, signedUrls (ét kald
+--                    for alle stier), removeMedia (sletter i den rigtige bøtte).
+--   js/compose.js  : stories uploades til vf-private med priv/-præfiks; upload-URL
+--                    bygges af web'en, så native ikke skal ændres.
+--   js/stories.js  : loadStories henter signerede URL'er i ét kald (24 timer, en
+--                    storys levetid); gamle offentlige stier hentes som før.
 --
--- 1. Stier i den private bøtte gemmes i databasen med præfikset "priv/", så en
---    sti alene fortæller hvilken bøtte den bor i. Gamle stier uden præfiks
---    bliver liggende i post-images og virker uændret. Ingen migrering af
---    eksisterende filer, ingen brudte billeder.
--- 2. helpers.js får en signedUrl(path)-funktion ved siden af imgUrl(path):
---    "priv/"-stier → createSignedUrl (24 timer for stories, som deres levetid;
---    12 timer for beskeder), alt andet → getPublicUrl som nu.
--- 3. Upload-stederne der skal skifte bøtte: stories (compose.js) og billeder i
---    beskeder (chat.js). Opslag, kommentarer, profilbilleder og bannere BLIVER
---    i den offentlige bøtte: de deles i forvejen bredt, og en signeret URL i
---    feedet ville koste et kald pr. billede.
--- 4. Læsestederne er allerede asynkrone (loadStories og chattens beskedhentning),
---    så de kan hente signerede URL'er i én omgang pr. hentning.
---
--- Hvorfor ikke skrevet endnu: bøtten skal FØRST findes, ellers kan flowet ikke
--- afprøves, og en fejl i upload-vejen ville ramme rigtige brugeres stories og
--- beskeder med det samme. Kør denne migration, og web-delen bygges og testes
--- mod den rigtige bøtte.
+-- AFPRØVET MOD PRODUKTION (rollback-blok, 5 af 5):
+--   1 ejeren ser sin egen private fil · 2 en ven ser filen, fordi hun må se storyen
+--   · 3 en fremmed ser den ikke · 4 en fremmed kan ikke uploade i en andens mappe
+--   · 5 en sti uden priv-præfiks afvises i den private bøtte.
 -- =============================================================================

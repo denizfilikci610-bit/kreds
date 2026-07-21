@@ -1,6 +1,6 @@
 import { sb, SB_URL, SB_KEY } from "./config.js";
 import { me, state } from "./store.js";
-import { el, esc, toast, uuid } from "./helpers.js";
+import { el, esc, toast, uuid, PRIV_PREFIX, mediaBucket, removeMedia } from "./helpers.js";
 import { t } from "./i18n.js";
 import { feedById, setFeed, switchTab } from "./feed.js";
 import { loadStories } from "./stories.js";
@@ -187,12 +187,19 @@ export async function nativeMemoryPost(obj){
     if(!token) throw new Error("no_session");
     const dest = obj.dest || "all";
     const ext = obj.ext || (obj.isVideo ? "mp4" : "jpg");
-    const path = me.id + "/" + uuid() + "." + ext;
+    // Stories er kortlivede og kun for kredsen: de lægges i den PRIVATE bøtte og
+    // hentes med signerede URL'er. Minder og tanker deles bredt i feedet og bliver
+    // i den offentlige bøtte, hvor et signeret kald pr. billede ville koste for
+    // meget. Bøtten kendes alene på "priv/"-præfikset i stien.
+    // Native uploader til den URL web'en angiver her, så skiftet kræver INGEN
+    // app-opdatering.
+    const priv = !!obj.isStory;
+    const path = (priv ? PRIV_PREFIX : "") + me.id + "/" + uuid() + "." + ext;
     pendingMemory = { path: path, isVideo: !!obj.isVideo, caption: obj.caption || "", dest: dest, forCompose: !!obj.forCompose, isStory: !!obj.isStory };
     const mh = vfmh();
     if(!mh) throw new Error("no_bridge");
     mh.postMessage({ type: "photolib", upload: {
-      url: SB_URL + "/storage/v1/object/post-images/" + path,
+      url: SB_URL + "/storage/v1/object/" + mediaBucket(path) + "/" + path,
       token: token, apikey: SB_KEY, contentType: obj.mime || (obj.isVideo ? "video/mp4" : "image/jpeg")
     }});
   }catch(err){ console.error(err); pendingMemory = null; toast(t("compose.share_failed")); ackMemory("err"); }
@@ -215,7 +222,7 @@ export async function nativeMemoryUploaded(){
       video_path: m.isVideo ? m.path : null,
       kind: "memory"
     });
-    if(ins.error){ sb.storage.from("post-images").remove([m.path]).catch(function(){}); throw ins.error; }
+    if(ins.error){ removeMedia([m.path]); throw ins.error; }
     ackMemory("ok");
     switchTab("feed"); setFeed(m.dest);
     const df = feedById(m.dest);
@@ -239,7 +246,7 @@ async function insertStory(m){
       image_path: m.isVideo ? null : m.path,
       video_path: m.isVideo ? m.path : null
     });
-    if(ins.error){ sb.storage.from("post-images").remove([m.path]).catch(function(){}); throw ins.error; }
+    if(ins.error){ removeMedia([m.path]); throw ins.error; }
     ackMemory("ok");
     loadStories(); // egen ring dukker op med det samme (uden at vente på realtime/poll)
     const df = feedById(m.dest);

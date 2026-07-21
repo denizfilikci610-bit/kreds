@@ -106,8 +106,52 @@ export function fmtTime(iso){
 export function fmtDate(iso){
   return new Date(iso).toLocaleDateString(dateLocale(), { day:"numeric", month:"long", year:"numeric" });
 }
+/* ================= Medier: offentlig bøtte vs. privat bøtte =================
+   Stier med præfikset "priv/" bor i den PRIVATE bøtte (vf-private) og kan kun
+   hentes med en signeret URL, hvor RLS på storage afgør om den overhovedet kan
+   laves. Alt andet ligger som før i post-images og hentes med en offentlig URL.
+   Præfikset i stien er hele kendetegnet, så der ikke skal føres bog andre steder,
+   og så gamle stier virker uændret. */
+export const PRIV_PREFIX = "priv/";
+export function isPrivatePath(p){ return typeof p === "string" && p.indexOf(PRIV_PREFIX) === 0; }
+export function mediaBucket(p){ return isPrivatePath(p) ? "vf-private" : "post-images"; }
+
 export function imgUrl(path){
   return sb.storage.from("post-images").getPublicUrl(path).data.publicUrl;
+}
+
+/* Signerede URL'er til private stier, hentet i ét kald. Returnerer et Map fra sti
+   til URL; stier der ikke kunne signeres (ingen adgang) udelades, så kaldstedet selv
+   bestemmer hvad der så skal ske. secs default 24 timer = en storys levetid. */
+export async function signedUrls(paths, secs){
+  const list = (paths || []).filter(isPrivatePath);
+  const out = new Map();
+  if(!list.length) return out;
+  try{
+    const { data, error } = await sb.storage.from("vf-private")
+      .createSignedUrls(list, secs || 60*60*24);
+    if(error || !data) return out;
+    data.forEach(function(r){
+      if(r && r.path && r.signedUrl && !r.error) out.set(r.path, r.signedUrl);
+    });
+  }catch(_e){ /* uden URL vises mediet bare ikke */ }
+  return out;
+}
+
+/* Sletter mediefiler i den rigtige bøtte. Fire-and-forget som før: databasens egen
+   oprydningskø (app_hidden.deleted_media + edge-funktionen media-sweeper) er
+   sikkerhedsnettet, så et fejlet kald her ikke længere efterlader filen for evigt. */
+export function removeMedia(paths){
+  const list = (paths || []).filter(Boolean);
+  if(!list.length) return;
+  const byBucket = {};
+  list.forEach(function(p){
+    const b = mediaBucket(p);
+    (byBucket[b] = byBucket[b] || []).push(p);
+  });
+  Object.keys(byBucket).forEach(function(b){
+    try{ sb.storage.from(b).remove(byBucket[b]).catch(function(){}); }catch(_e){}
+  });
 }
 export function uuid(){
   if(window.crypto && crypto.randomUUID) return crypto.randomUUID();

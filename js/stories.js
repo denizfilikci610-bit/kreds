@@ -1,6 +1,6 @@
 import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state } from "./store.js";
-import { el, esc, imgUrl, avaHTML, registerProfile, toast, fmtTime, user } from "./helpers.js";
+import { el, esc, imgUrl, avaHTML, registerProfile, toast, fmtTime, user, isPrivatePath, signedUrls, removeMedia } from "./helpers.js";
 import { t } from "./i18n.js";
 import { renderStories, doBlockUser } from "./profile.js";
 import { KREDS_SVG, feedById, setFeed, switchTab } from "./feed.js";
@@ -25,6 +25,15 @@ export async function loadStories(){
     const { error: rerr } = await sb.from("story_reports").select("story_id").limit(1);
     state.storyReportReady = !rerr;
   }catch(_e){ state.storyReportReady = false; }
+  // Nye stories ligger i den PRIVATE bøtte ("priv/"-præfiks) og kræver en signeret
+  // URL. Alle hentes i ét kald, så en kreds med mange stories ikke koster et kald
+  // pr. billede. Gamle, offentlige stier hentes som før.
+  const signed = await signedUrls(
+    rows.map(function(r){ return r.video_path || r.image_path; }).filter(isPrivatePath),
+    60 * 60 * 24 // en storys levetid
+  );
+  const mediaUrl = function(p){ return isPrivatePath(p) ? (signed.get(p) || "") : imgUrl(p); };
+
   const byAuthor = new Map();
   rows.forEach(function(r){
     const p = r.profiles || {};
@@ -37,7 +46,7 @@ export async function loadStories(){
     }
     const isVideo = !!r.video_path;
     byAuthor.get(r.author).items.push({
-      id: r.id, url: imgUrl(isVideo ? r.video_path : r.image_path), isVideo: isVideo,
+      id: r.id, url: mediaUrl(isVideo ? r.video_path : r.image_path), isVideo: isVideo,
       path: isVideo ? r.video_path : r.image_path, // rå sti (storage-oprydning ved sletning)
       feedId: r.feed_id, // kreds-story → kchip i vieweren (navnet slås op i state.feeds, RLS garanterer medlemskab)
       seen: seenSet.has(r.id)
@@ -357,7 +366,7 @@ async function deleteCurrentStory(){
   clearTimer();
   const { error } = await sb.from("stories").delete().eq("id", it.id);
   if(error){ console.error(error); toast(t("err.generic")); showItem(); return; }
-  if(it.path) sb.storage.from("post-images").remove([it.path]).catch(function(){});
+  if(it.path) removeMedia([it.path]); // rigtig bøtte; DB-køen er sikkerhedsnettet
   g.items.splice(vw.ii, 1);
   toast(t("story.deleted"));
   if(!g.items.length){
