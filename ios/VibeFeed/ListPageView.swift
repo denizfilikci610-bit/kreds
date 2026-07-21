@@ -126,7 +126,7 @@ struct ListPageView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(vfBackground)
         .ignoresSafeArea(.container)
         .offset(x: max(0, dragX))
         // Swipe mod højre hvor som helst → tilbage (samme gestus som de andre sider)

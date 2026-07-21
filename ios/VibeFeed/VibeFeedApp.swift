@@ -81,10 +81,8 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             // Match the app's background so the notch/home areas blend in
-            Color(UIColor { trait in
-                trait.userInterfaceStyle == .dark ? .black : .white
-            })
-            .ignoresSafeArea()
+            vfBackground
+                .ignoresSafeArea()
 
             // The web view fills the ENTIRE screen (edge-to-edge). iOS reports the real
             // safe-area insets to the page via env(safe-area-inset-*), and the web owns
@@ -112,7 +110,7 @@ struct ContentView: View {
                         .tint(Color(red: 0xE0 / 255, green: 0x40 / 255, blue: 0x2F / 255))
                     }
                     .padding(30)
-                    .background(Color(UIColor.systemBackground))
+                    .background(vfBackground)
                 }
 
                 InlineAdsOverlay()

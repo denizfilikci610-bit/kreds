@@ -229,7 +229,7 @@ struct EditProfilePage: View {
                 .transition(.opacity)
             }
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(vfBackground)
         .ignoresSafeArea(.container) // kun skærm-kanterne — tastaturet skubber stadig felterne op
         .offset(x: max(0, dragX))
         // Swipe mod højre hvor som helst → tilbage (samme gestus som opslags-siden).
@@ -485,7 +485,7 @@ struct EditProfilePage: View {
                 let on = selected == value
                 Button { pick(value) } label: {
                     Text(label).font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(on ? Color(.systemBackground) : Color.primary)
+                        .foregroundStyle(on ? vfBackground : Color.primary)
                         .frame(maxWidth: .infinity).padding(.vertical, 11)
                         .background(
                             Group {

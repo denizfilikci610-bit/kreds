@@ -7,6 +7,14 @@ import SwiftUI
 
 let vfRed = Color(red: 0xE0 / 255, green: 0x40 / 255, blue: 0x2F / 255)
 
+/// Appens baggrund. SKAL matche webbens --bg (css/app.css): off-white i lys, #161616 i mørk.
+/// Bruges alle steder native ellers ville vise systemBackground (rent hvid/sort).
+let vfBackground = Color(UIColor { trait in
+    trait.userInterfaceStyle == .dark
+        ? UIColor(red: 0x16 / 255, green: 0x16 / 255, blue: 0x16 / 255, alpha: 1)
+        : UIColor(red: 0xFA / 255, green: 0xF9 / 255, blue: 0xF6 / 255, alpha: 1)
+})
+
 /// Parse a web hex color ("#RRGGBB" / "#RGB") to a SwiftUI Color.
 func vfColor(_ hex: String) -> Color {
     var s = hex.trimmingCharacters(in: .whitespaces)

@@ -305,7 +305,7 @@ struct PostPageView: View {
             composer
                 .padding(.bottom, kb.height > 0 ? kb.height : insets.bottom)
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(vfBackground)
         .ignoresSafeArea()
         .offset(x: max(0, dragX))
         // Swipe anywhere towards the right → back (plus the header's back button). The gesture

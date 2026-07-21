@@ -132,7 +132,7 @@ struct NativeKredsBar: View {
             }
         } label: {
             content(item)
-                .foregroundStyle(item.active ? Color(.systemBackground)
+                .foregroundStyle(item.active ? vfBackground
                                  : (item.kind == "new" ? Color.red : Color.primary))
                 .modifier(ChipBackground(active: item.active))
         }
