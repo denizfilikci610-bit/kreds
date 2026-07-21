@@ -43,11 +43,11 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>VibeFeed bruger kameraet, når du vælger at tage et billede eller optage en video til et opslag eller en kommentar.</string>
+	<string>VibeFeed bruger kameraet, når du selv vælger at tage et billede eller optage en video til et minde, en story, en kommentar eller en besked.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>VibeFeed bruger mikrofonen, når du optager en video til et opslag.</string>
+	<string>VibeFeed bruger mikrofonen, når du selv optager en video med lyd til et minde, en story eller en besked.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>VibeFeed viser dine billeder og videoer i appen, så du kan vælge et minde at dele.</string>
+	<string>VibeFeed viser dine billeder og videoer i appen, så du selv kan vælge hvad du vil dele som minde, story, kommentar eller besked. Vi henter aldrig noget af os selv.</string>
 	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
 	<true/>
 	<key>NSUserTrackingUsageDescription</key>

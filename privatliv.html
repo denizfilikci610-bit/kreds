@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-<title>Privatlivspolitik — VibeFeed</title>
+<title>Privatlivspolitik · VibeFeed</title>
 <link rel="icon" type="image/png" href="/favicon.png">
 <style>
   :root{
@@ -47,7 +47,7 @@
   <div class="langswitch"><b>Dansk</b> · <a href="/privacy.html">English</a></div>
 
   <h1>Privatlivspolitik</h1>
-  <p class="updated">Senest opdateret 7. juli 2026</p>
+  <p class="updated">Senest opdateret 21. juli 2026</p>
   <p>VibeFeed er en lille social app til lukkede vennekredse. Her kan du læse enkelt og ærligt, hvilke oplysninger vi behandler, hvorfor, og hvilke rettigheder du har.</p>
 
   <h2>Dataansvarlig</h2>
@@ -56,27 +56,46 @@
 
   <h2>Hvilke data behandler vi</h2>
   <ul>
-    <li><b>Konto:</b> navn, brugernavn, e-mail, adgangskode (gemmes kun som hash), samt profilbillede og bio, hvis du tilføjer dem.</li>
-    <li><b>Indhold:</b> dine opslag, kommentarer, billeder, korte videoer (6 sekunder), stemmer i meningsmålinger, likes, kreds-medlemskaber, venskaber og aktivitet.</li>
-    <li><b>Teknisk:</b> enhedens sprogvalg, et notifikations-token pr. enhed (til push-notifikationer) og anmeldelser af opslag.</li>
+    <li><b>Konto:</b> navn, brugernavn, e-mail, adgangskode (gemmes kun som hash), samt profilbillede, banner og bio, hvis du tilføjer dem.</li>
+    <li><b>Indhold:</b> dine tanker og minder, kommentarer, billeder, korte videoer, stories, stemmer i meningsmålinger, likes, gemte opslag, omtaler med @, kreds-medlemskaber, venskaber og aktivitet.</li>
+    <li><b>Beskeder:</b> beskeder i kreds-chatten og i private samtaler, herunder billeder du sender, reaktioner, citat-svar og hvornår en besked er set.</li>
+    <li><b>Teknisk:</b> enhedens sprogvalg, et notifikations-token pr. enhed, tallet på app-ikonet, anmeldelser, blokeringer og hvem der har set dine stories.</li>
   </ul>
 
   <h2>Formål og retsgrundlag</h2>
-  <p>Vi behandler dine oplysninger for at levere selve tjenesten — din konto, dit feed, dine kredse og notifikationer. Retsgrundlaget er aftalen med dig (GDPR artikel 6, stk. 1, litra b).</p>
-  <p>Personaliserede reklamer viser vi kun med dit samtykke (GDPR artikel 6, stk. 1, litra a). Du kan altid trække samtykket tilbage i appen — reklamerne bliver så ikke-personlige.</p>
+  <p>Vi behandler dine oplysninger for at levere selve tjenesten: din konto, dit feed, dine kredse, dine beskeder og dine notifikationer. Retsgrundlaget er aftalen med dig (GDPR artikel 6, stk. 1, litra b).</p>
+  <p>Anmeldelser og blokeringer behandler vi for at kunne holde tjenesten fri for krænkende indhold. Retsgrundlaget er vores legitime interesse i et trygt fællesskab (GDPR artikel 6, stk. 1, litra f).</p>
 
   <h2>Databehandlere</h2>
   <ul>
-    <li><b>Supabase</b> — database og fillagring. Data ligger i EU (regionen Stockholm).</li>
-    <li><b>Vercel</b> — hosting af selve appen.</li>
-    <li><b>Appodeal &amp; Google AdMob</b> — reklamer i appen. Dit samtykke styrer, om reklamerne må være personlige.</li>
+    <li><b>Supabase.</b> Database og fillagring. Data ligger i EU, regionen Stockholm.</li>
+    <li><b>Vercel.</b> Hosting af selve appen.</li>
+    <li><b>Apple.</b> Leverer push-notifikationer til din iPhone. En notifikation kan indeholde afsenderens navn og et uddrag af beskeden, fordi den skal kunne læses på låseskærmen.</li>
+    <li><b>Google.</b> Sender bekræftelses- og nulstillingsmails fra vores mailkonto til din e-mailadresse.</li>
   </ul>
+  <p>Selve databasen og filerne forlader ikke EU. Apple og Google behandler kun det, der skal til for at levere henholdsvis notifikationer og e-mail, og kan i den forbindelse behandle oplysninger uden for EU på deres standardvilkår.</p>
+
+  <h2>Beskeder</h2>
+  <p>Beskeder i VibeFeed er ikke ende-til-ende-krypterede. De sendes krypteret (TLS) og gemmes hos Supabase, og kun deltagerne i en samtale kan se dem i appen. Men vi vil hellere sige det ligeud: som ansvarlig for databasen har vi teknisk adgang til indholdet. Vi læser ikke med, og vi bruger ikke dine beskeder til noget som helst andet end at levere dem, men skriv ikke noget i en app som denne, du ikke kan bære at have liggende hos en tjeneste.</p>
+
+  <h2>Stories</h2>
+  <p>En story forsvinder automatisk efter 24 timer. Du kan selv slette den før. Så længe den er der, kan du se hvem i din kreds der har set den, og de kan se din.</p>
 
   <h2>Reklamer</h2>
-  <p>Appen viser reklamer via Appodeal og Google AdMob. Reklamer kan ikke fravælges, men personalisering kan: uden samtykke vises kun ikke-personlige reklamer. Du vælger første gang du åbner appen, og du kan altid ændre valget under <b>Rediger profil → Privatliv</b>.</p>
+  <p>VibeFeed viser <b>ingen</b> reklamer. Der kører intet reklame-SDK i appen, vi sporer dig ikke på tværs af apps og hjemmesider, og du bliver derfor heller ikke bedt om sporingstilladelse. Skulle det en dag ændre sig, opdaterer vi denne politik, og du bliver spurgt inden.</p>
+
+  <h2>Anmeldelser og blokering</h2>
+  <p>Du kan anmelde opslag, kommentarer, beskeder og stories. En anmeldelse skjuler indholdet for dig med det samme, og når nok anmelder det samme, skjules det for alle. Du kan også blokere en bruger: så ser I ikke længere hinandens indhold, og jeres venskab og anmodninger fjernes. Personen får ikke besked om det.</p>
+
+  <h2>Alder</h2>
+  <p>Du skal være mindst 13 år for at bruge VibeFeed. Se <a href="/vilkaar.html">vilkårene</a>.</p>
+
+  <h2>Kamera, mikrofon og billeder</h2>
+  <p>Appen beder om adgang til kamera, mikrofon og dit billedbibliotek, når du selv vælger at tage eller vælge et billede eller en video til et minde, en story, en kommentar eller en besked. Vi henter aldrig noget fra dit billedbibliotek af os selv.</p>
 
   <h2>Opbevaring og sletning</h2>
-  <p>Vi gemmer dine oplysninger, indtil du selv sletter dem — enkelte opslag/kommentarer kan slettes løbende. Vælger du <b>Slet konto</b> i appen, fjernes din profil, dine opslag, kommentarer, billeder, videoer og alle øvrige oplysninger permanent.</p>
+  <p>Vi gemmer dine oplysninger, indtil du selv sletter dem. Enkelte opslag, kommentarer, beskeder og stories kan du slette løbende, og stories forsvinder af sig selv efter 24 timer. Opretter du en konto uden at bekræfte din e-mail, slettes den automatisk efter 24 timer.</p>
+  <p>Vælger du <b>Slet konto</b> i appen, fjernes din profil, dine opslag, kommentarer, beskeder, billeder, videoer og alle øvrige oplysninger permanent. Beskeder du har sendt ind i andres samtaler, forsvinder også.</p>
 
   <h2>Dine rettigheder</h2>
   <p>Du har ret til indsigt i dine oplysninger, ret til at få rettet forkerte oplysninger og ret til sletning. Skriv til <a href="mailto:official@vibefeed.dk">official@vibefeed.dk</a>, så hjælper vi.</p>
@@ -85,11 +104,13 @@
   <h2>Cookies og lokal lagring</h2>
   <p>Vi bruger ikke sporings-cookies. Appen gemmer kun disse ting lokalt på din enhed:</p>
   <ul>
+    <li>din login-session, så du ikke skal logge ind hver gang</li>
     <li>dit sprogvalg (<code>vf_lang</code>)</li>
-    <li>dit reklame-samtykkevalg (<code>vf_consent</code>)</li>
-    <li>din login-session (så du ikke skal logge ind hver gang)</li>
-    <li>enhedens notifikations-token (<code>vf_device_secret</code>)</li>
-    <li>hvornår du sidst har åbnet dine kredse (<code>vf_feed_seen</code>)</li>
+    <li>enhedens nøgle og token til notifikationer (<code>vf_device_secret</code>, <code>vf_push_token</code>, <code>vf_last_check</code>)</li>
+    <li>hvad du har set, så prikker og ringe er rigtige (<code>vf_feed_seen</code>, <code>vf_post_seen</code>, <code>vf_notif_seen</code>)</li>
+    <li>hvor du var i appen, så et genindlæs lander samme sted (<code>vf_cur_tab</code>, <code>vf_cur_feed</code>)</li>
+    <li>tastaturets højde, så feltet ikke hopper (<code>vf_kbh-p</code>, <code>vf_kbh-l</code>)</li>
+    <li>et gammelt reklame-samtykke (<code>vf_consent</code>), hvis du har brugt appen før. Det bliver ikke brugt til noget, så længe der ingen reklamer er.</li>
   </ul>
 
   <h2>Kontakt</h2>
