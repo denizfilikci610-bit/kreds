@@ -859,6 +859,8 @@
   /* De native glas-sheets erstatter web-sheet'et i app'en → skjul web-#fsheet/#msheet
      (klasserne nfs/nms sættes af main.js når __vfFsheet/__vfMemberSheet er sat). */
   /* (nfs/nms-skjulningen er væk: Ny kreds + Medlemmer er hele sider overalt) */
+  /* Ny kreds + Medlemmer: helt STREG-FRIE sider (ingen linje under headeren) */
+  #fsheet .pv-head, #msheet .pv-head{border-bottom:none}
   body.nep #esheet{display:none}
   .tabbar button{
     position:relative;
@@ -923,12 +925,13 @@
   }
   .fsheet.on{transform:translateY(0)}
   .fs-name{
-    margin:8px 16px 2px;
+    margin:10px 16px 2px;
     display:flex;align-items:center;
-    background:var(--inputbg);
-    border:1px solid var(--line);
-    border-radius:10px;
-    padding:12px 14px;
+    /* Samme look som søgefeltet i Beskeder: blødt gråt felt uden kant */
+    background:var(--chip);
+    border:none;
+    border-radius:15px;
+    padding:13px 14px;
   }
   .fs-name input{flex:1;min-width:0;border:none;background:transparent;font-size:16px;font-weight:600}
   .fs-name input:focus{outline:none}
