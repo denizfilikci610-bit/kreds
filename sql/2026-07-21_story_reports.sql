@@ -67,7 +67,10 @@ $$;
 -- fejler ENHVER læsning af stories med "permission denied for function".
 -- Samme grants som app_hidden.can_see_post.
 grant execute on function app_hidden.can_see_story(uuid)   to authenticated, service_role;
-grant execute on function app_hidden.is_hidden_story(uuid) to authenticated, service_role;
+grant execute on function app_hidden.is_hidden_story(uuid) to authenticated, service_role, anon;
+-- anon skal med på is_hidden_story, fordi gaten nedenfor gælder {public} som alle de
+-- øvrige policies på stories. Samme grund til at app_hidden.is_blocked_between har
+-- anon: stories_block_gate er også {public}.
 
 -- Man ser, laver og fortryder kun sine EGNE anmeldelser, og man kan kun anmelde
 -- en story man faktisk må se.
@@ -92,8 +95,10 @@ grant select, insert, delete on public.story_reports to authenticated;
 -- kombineres med AND, så synligheden kun indsnævres). Samme udtryk som anden
 -- halvdel af posts_select, blot i sin egen policy for ikke at røre noget der virker.
 drop policy if exists stories_report_gate on public.stories;
+-- Gælder {public} (ingen 'to'-liste), præcis som stories_select og
+-- stories_block_gate, så gaten ikke kan springes over af en anden rolle.
 create policy stories_report_gate on public.stories
-  as restrictive for select to authenticated
+  as restrictive for select
   using (
     author = (select auth.uid())
     or (
