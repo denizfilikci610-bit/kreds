@@ -182,7 +182,7 @@ const DOTS_SVG = '<svg viewBox="0 0 24 24"><g class="fillic"><circle cx="5" cy="
 /* Kreds-mærke på opslag i "Hele kredsen": lille pille med kreds-ikon + kredsens navn.
    Tap skifter til kredsen (håndteres i timelineClick). Inde i en specifik kreds er
    mærket redundant og udelades — derfor gates der på state.currentFeed. */
-const KREDS_SVG = '<svg viewBox="0 0 24 24"><circle class="stroke" cx="12" cy="12" r="7.3"/><g class="fillic"><circle cx="12" cy="4.7" r="2.1"/><circle cx="5.7" cy="15.7" r="2.1"/><circle cx="18.3" cy="15.7" r="2.1"/></g></svg>';
+export const KREDS_SVG = '<svg viewBox="0 0 24 24"><circle class="stroke" cx="12" cy="12" r="7.3"/><g class="fillic"><circle cx="12" cy="4.7" r="2.1"/><circle cx="5.7" cy="15.7" r="2.1"/><circle cx="18.3" cy="15.7" r="2.1"/></g></svg>';
 /* Pillen i egen række lige OVER handlingsrækken (kommentar/like/del) — i headeren blev
    kreds-navnet klemt til "Br…" ved lange navne. Tom streng når opslaget ikke har kreds. */
 function kredsChipRow(p){

@@ -1,8 +1,9 @@
 import { sb } from "./config.js";
 import { me, state } from "./store.js";
-import { el, esc, imgUrl, avaHTML, registerProfile, toast } from "./helpers.js";
+import { el, esc, imgUrl, avaHTML, registerProfile, toast, fmtTime } from "./helpers.js";
 import { t } from "./i18n.js";
 import { renderStories } from "./profile.js";
+import { KREDS_SVG, feedById, setFeed, switchTab } from "./feed.js";
 
 /* ================= Stories: data ================= */
 /* Hent stories (RLS-filtreret: egen, venner uden kreds, eller kredse man er medlem af) +
@@ -10,7 +11,7 @@ import { renderStories } from "./profile.js";
 export async function loadStories(){
   if(!me){ state.storyGroups = []; return; }
   const { data: rows, error } = await sb.from("stories")
-    .select("id, author, image_path, video_path, created_at, profiles!stories_author_fkey(handle, name, avatar_path)")
+    .select("id, author, feed_id, image_path, video_path, created_at, profiles!stories_author_fkey(handle, name, avatar_path)")
     .order("created_at", { ascending: true });
   if(error || !rows){ state.storyGroups = []; return; }
   const seenSet = new Set();
@@ -32,6 +33,7 @@ export async function loadStories(){
     byAuthor.get(r.author).items.push({
       id: r.id, url: imgUrl(isVideo ? r.video_path : r.image_path), isVideo: isVideo,
       path: isVideo ? r.video_path : r.image_path, // rå sti (storage-oprydning ved sletning)
+      feedId: r.feed_id, // kreds-story → kchip i vieweren (navnet slås op i state.feeds, RLS garanterer medlemskab)
       seen: seenSet.has(r.id)
     });
   });
@@ -73,12 +75,19 @@ function showItem(){
   const media = it.isVideo
     ? '<video src="' + esc(it.url) + '" playsinline autoplay></video>'
     : '<img src="' + esc(it.url) + '" alt="">';
+  // Kreds-story: samme kchip-pille som på feed-opslag (ikon + navn, tap = åbn kredsen)
+  const kf = it.feedId ? feedById(it.feedId) : null;
+  const kchip = kf
+    ? '<button class="kchip" data-sv="kreds" data-feed="' + esc(kf.id) + '">' + KREDS_SVG + '<span>' + esc(kf.name) + '</span></button>'
+    : '';
   el("storyview").innerHTML =
     '<div class="sv-media">' + media + '</div>' +
     '<div class="sv-bars">' + bars + '</div>' +
     '<div class="sv-head">' +
       '<span class="sv-ava">' + avaHTML(g.author.handle, 30) + '</span>' +
-      '<span class="sv-name">' + esc(g.author.name || g.author.handle) + '</span>' +
+      '<span class="sv-hcol">' +
+        '<span class="sv-name">' + esc(g.author.name || g.author.handle) + '</span>' + kchip +
+      '</span>' +
       (g.isMe
         ? '<button class="sv-del" data-sv="del" aria-label="' + esc(t("story.delete")) + '">' +
             '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4.5 6.5h15M9.5 6V4.5h5V6M6.5 6.5l1 13h9l1-13M10 10.5v6M14 10.5v6"/></g></svg>' +
@@ -86,10 +95,71 @@ function showItem(){
         : '') +
       '<button class="sv-close" data-sv="close" aria-label="Luk">✕</button>' +
     '</div>' +
+    (g.isMe
+      ? '<button class="sv-seen" data-sv="views" aria-label="' + esc(t("story.seenby", { n: "" })) + '">' + EYE_SVG + '<span class="sv-seen-n"></span></button>'
+      : '') +
     '<button class="sv-tap sv-left" data-sv="prev" aria-label="Forrige"></button>' +
     '<button class="sv-tap sv-right" data-sv="next" aria-label="Næste"></button>';
   markSeen(it);
+  if(g.isMe) loadViews(it);   // "Set af N" (kun egne stories)
   vw.timer = setTimeout(next, 6000);   // 6 sek pr. story (billede + video)
+}
+
+const EYE_SVG = '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.6"/></g></svg>';
+
+/* Hent hvem der har set storyen (RLS: kun forfatteren kan læse andres visninger).
+   Egen visning tælles ikke med (man "ser" selv storyen når vieweren åbner). */
+async function loadViews(it){
+  try{
+    const { data } = await sb.from("story_views")
+      .select("viewer, seen_at, profiles!story_views_viewer_fkey(handle, name, avatar_path)")
+      .eq("story_id", it.id).neq("viewer", me.id)
+      .order("seen_at", { ascending: false });
+    it.viewsData = data || [];
+    it.viewsData.forEach(function(v){
+      const p = v.profiles || {};
+      if(p.handle) registerProfile({ id: v.viewer, handle: p.handle, name: p.name, avatar_path: p.avatar_path });
+    });
+    // Er vi stadig på samme story? Ellers lander tallet på den forkerte.
+    const g = vw.groups[vw.gi];
+    if(!el("storyview").classList.contains("on") || !g || g.items[vw.ii] !== it) return;
+    const n = el("storyview").querySelector(".sv-seen-n");
+    if(n) n.textContent = String(it.viewsData.length);
+  }catch(_e){}
+}
+
+/* Seer-listen (mørkt bundkort). Fremdriften står på pause mens den er åben;
+   luk genopbygger den viste story (showItem) og starter forfra på de 6 sek. */
+async function openViewers(){
+  const g = vw.groups[vw.gi];
+  const it = g && g.items[vw.ii];
+  if(!g || !it || !g.isMe) return;
+  clearTimer();
+  const v = el("storyview").querySelector("video");
+  if(v) v.pause();
+  if(!it.viewsData) await loadViews(it);   // åbnet før hentningen blev færdig
+  const rows = (it.viewsData || []).map(function(x){
+    const p = x.profiles || {};
+    return '<div class="sv-vrow">' + avaHTML(p.handle, 36) +
+      '<span class="vname">' + esc(p.name || p.handle || "") + '</span>' +
+      '<span class="vtime">' + fmtTime(x.seen_at) + '</span></div>';
+  }).join("");
+  const wrap = document.createElement("div");
+  wrap.className = "sv-vwrap";
+  wrap.innerHTML =
+    '<div class="sv-vback" data-sv="vclose"></div>' +
+    '<div class="sv-viewers">' +
+      '<header><span>' + esc(t("story.seenby", { n: (it.viewsData || []).length })) + '</span>' +
+      '<button class="sv-vx" data-sv="vclose" aria-label="Luk">✕</button></header>' +
+      '<div class="sv-vlist">' + (rows || '<div class="sv-vempty">' + esc(t("story.noviews")) + '</div>') + '</div>' +
+    '</div>';
+  el("storyview").appendChild(wrap);
+}
+function closeViewers(){
+  const w = el("storyview").querySelector(".sv-vwrap");
+  if(!w) return;
+  w.remove();
+  showItem();
 }
 
 function next(){
@@ -159,6 +229,15 @@ export function initStories(){
     if(a === "close") closeStoryViewer();
     else if(a === "next") next();
     else if(a === "prev") prev();
+    else if(a === "views") openViewers();
+    else if(a === "vclose") closeViewers();
+    else if(a === "kreds"){
+      // Som kchip på feedet: hop til kredsen (vieweren lukkes først)
+      const fid = b.dataset.feed;
+      closeStoryViewer();
+      switchTab("feed");
+      setFeed(fid);
+    }
     else if(a === "del"){
       if(!b.classList.contains("arm")){
         b.classList.add("arm");

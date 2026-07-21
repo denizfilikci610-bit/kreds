@@ -200,6 +200,33 @@
   .storyview .sv-head .sv-ava img,.storyview .sv-head .sv-ava > div{width:30px;height:30px;border-radius:50%}
   .storyview .sv-name{flex:1;font-size:14px;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.5)}
   .storyview .sv-close{color:#fff;font-size:22px;line-height:1;padding:4px 10px}
+  /* Navn + evt. kreds-kchip i en kolonne; kchip'en er samme pille som på feedet, i mørk glas-udgave */
+  .storyview .sv-hcol{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+  .storyview .sv-hcol .sv-name{flex:0 0 auto;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .storyview .kchip{background:rgba(255,255,255,.24);color:#fff;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  /* "Set af N" (kun egne stories): øje + tal nederst til venstre; tap åbner seer-listen */
+  .sv-seen{
+    position:absolute;left:14px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:3;
+    display:flex;align-items:center;gap:7px;color:#fff;
+    font-size:14px;font-weight:800;text-shadow:0 1px 3px rgba(0,0,0,.5);
+  }
+  .sv-seen svg{width:21px;height:21px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5))}
+  /* Seer-listen: mørkt bundkort over storyen (fremdriften er på pause imens) */
+  .sv-vback{position:absolute;inset:0;z-index:4;background:rgba(0,0,0,.45)}
+  .sv-viewers{
+    position:absolute;left:0;right:0;bottom:0;z-index:5;
+    background:#161616;color:#fff;
+    border-radius:20px 20px 0 0;
+    max-height:62%;display:flex;flex-direction:column;
+    padding-bottom:calc(8px + env(safe-area-inset-bottom));
+  }
+  .sv-viewers header{display:flex;align-items:center;justify-content:space-between;padding:15px 16px 10px;font-size:15px;font-weight:800}
+  .sv-vx{color:#fff;font-size:18px;line-height:1;padding:2px 8px}
+  .sv-vlist{overflow-y:auto;padding:0 14px 8px}
+  .sv-vrow{display:flex;align-items:center;gap:11px;padding:8px 2px}
+  .sv-vrow .vname{min-width:0;font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sv-vrow .vtime{margin-left:auto;flex:0 0 auto;color:rgba(255,255,255,.55);font-size:12.5px}
+  .sv-vempty{padding:18px 4px 14px;color:rgba(255,255,255,.6);font-size:14px}
   .storyview .sv-tap{position:absolute;top:0;bottom:0;z-index:2;background:transparent}
   .storyview .sv-left{left:0;width:35%}
   .storyview .sv-right{right:0;width:65%}
