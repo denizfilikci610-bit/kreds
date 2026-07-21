@@ -69,7 +69,8 @@ function timelineHTML(posts, tab, emptyHTML, withSaved){
   } else if(tab === "grid"){
     body = gridHTML(posts, t("memories.empty"));
   } else {
-    const thoughts = posts.filter(function(p){ return p.kind !== "memory"; }); // Tanker: minder vises IKKE her
+    // Tanker: minder vises IKKE her, og AFSTEMNINGER hører til i feedet, ikke på profiler
+    const thoughts = posts.filter(function(p){ return p.kind !== "memory" && !p.poll; });
     body = thoughts.length ? thoughts.map(postHTML).join("") : emptyHTML;
   }
   return bar + body;

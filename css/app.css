@@ -281,7 +281,8 @@
   .post{
     display:flex;gap:10px;
     padding:12px 16px;
-    border-bottom:1px solid var(--line);
+    /* Skillelinjen mellem opslag er bevidst mere utydelig end de øvrige streger */
+    border-bottom:1px solid color-mix(in srgb, var(--line) 42%, transparent);
   }
   /* Fastgjort-label (officielt opslag øverst i 'Hele kredsen') */
   .pinlabel{padding:10px 16px 0;font-size:12px;font-weight:700;color:var(--gray)}
