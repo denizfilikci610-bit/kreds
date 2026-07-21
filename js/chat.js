@@ -96,6 +96,15 @@ function lastVisible(f){
   if(m && pf.clearedAt && new Date(m.created).getTime() <= new Date(pf.clearedAt).getTime()) return null;
   return m || null;
 }
+/* Spøgelses-DM: den anden har slettet sin konto, og profil-slet-triggeren nåede ikke
+   at rydde tråden (kanttilfælde). En DM SKAL have to medlemmer og en gyldig modpart;
+   uden det viser listen ellers en tom tråd med ens eget ansigt/navn. Kredse er aldrig
+   spøgelser (de må gerne stå med ét medlem). */
+function ghostDm(f){
+  if(!f || !f.isDm) return false;
+  if((f.memberIds || []).length < 2) return true;
+  return (f.members || []).filter(function(h){ return !me || h !== me.handle; }).length === 0;
+}
 
 /* ---- Beskeder-fanen: én række pr. tråd, fastgjorte øverst, så nyeste aktivitet ---- */
 /* Seneste beskeder på tværs (RLS = kun mine tråde; første række pr. tråd er nyeste)
@@ -143,6 +152,7 @@ export async function renderChatList(fetchLasts){
   refreshChatDot();
   if(searchQ) return; // en aktiv søgning ejer listen
   const feeds = allThreads().filter(function(f){
+    if(ghostDm(f)) return false; // modparten har slettet sin konto → skjul spøgelses-tråden
     // En DM-tråd vises kun med indhold: tom eller ryddet ("Slet chatten") = ude af
     // listen, indtil en ny besked lander. Kredse vises altid (tråden ER kredsen).
     return !f.isDm || !!lastVisible(f);
@@ -214,7 +224,7 @@ export function refreshChatDot(){
 /* ---- Én tråd (fuldskærms-siden #chatview) ---- */
 export async function openKredsChat(feedId){
   const f = threadById(feedId);
-  if(!f || !me){ toast(t("err.generic")); return; }
+  if(!f || !me || ghostDm(f)){ toast(t("err.generic")); return; } // ingen spøgelses-DM
   if(pendingShare && pendingShare.feed !== feedId) pendingShare = null; // kontekst følger sin tråd
   pendingReply = null; editingMsg = null;
   chatFeed = feedId;
@@ -758,6 +768,7 @@ function renderSearchResults(q, msgRows){
   const box = el("chat-list");
   const ql = q.toLowerCase();
   const matched = allThreads().filter(function(f){
+    if(ghostDm(f)) return false; // spøgelses-DM (slettet modpart) skjules også i søgningen
     if(threadName(f).toLowerCase().indexOf(ql) < 0) return false;
     // Samme regel som selve listen: en ryddet/slettet DM-tråd må ikke dukke op igen
     // i søgningen, før der lander en ny besked.
@@ -1049,7 +1060,16 @@ async function sendChatMsg(){
     if(chatFeed !== feedId) return;
     if(error || !data){
       console.error(error);
-      toast(t("err.generic"));
+      // 0 rammede rækker (PGRST116) = 15-min-vinduet er lukket (RLS blokerer opdateringen).
+      // Send-vejen giver teksten tilbage ved fejl; det skal redigeringen også, ellers taber
+      // brugeren det, hun lige skrev. Gendan redigerings-tilstanden så intet mistes.
+      const tooOld = !data || (error && error.code === "PGRST116");
+      editingMsg = mid;
+      inp.value = text;
+      growInput();
+      renderCtxBar();
+      inp.focus();
+      toast(t(tooOld ? "chat.edit_too_old" : "err.generic"));
       return;
     }
     const upd = mapMsg(data);
