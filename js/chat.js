@@ -82,6 +82,7 @@ function mapPref(r){
 function setPref(feedId, patch){
   const next = Object.assign({}, prefs[feedId] || {}, patch);
   prefs[feedId] = next;
+  refreshChatDot(); // markér-som-ulæst/åbning flytter fane-prikken med det samme
   sb.from("kreds_chat_prefs").upsert({
     feed_id: feedId, user_id: me.id,
     pinned: !!next.pinned, muted: !!next.muted,
@@ -97,39 +98,49 @@ function lastVisible(f){
 }
 
 /* ---- Beskeder-fanen: én række pr. tråd, fastgjorte øverst, så nyeste aktivitet ---- */
+/* Seneste beskeder på tværs (RLS = kun mine tråde; første række pr. tråd er nyeste)
+   + mine læse-mærker (ulæst-prikker) + mine tråd-præferencer (pin/mute/ryd) */
+async function fetchChatState(){
+  const [mres, rres, pres] = await Promise.all([
+    sb.from("kreds_messages")
+      .select(MSG_SELECT)
+      .order("created_at", { ascending: false })
+      .limit(120),
+    sb.from("kreds_chat_reads").select("feed_id, last_read_at").eq("user_id", me.id),
+    sb.from("kreds_chat_prefs").select("*").eq("user_id", me.id)
+  ]);
+  if(mres.error){ console.error(mres.error); }
+  else {
+    lastByFeed = {};
+    (mres.data || []).forEach(function(r){ if(!lastByFeed[r.feed_id]) lastByFeed[r.feed_id] = mapMsg(r); });
+  }
+  if(!rres.error){
+    myReadsOk = true;
+    myReads = {};
+    (rres.data || []).forEach(function(r){ myReads[r.feed_id] = new Date(r.last_read_at).getTime(); });
+  }
+  if(!pres.error){
+    prefs = {};
+    (pres.data || []).forEach(function(r){ prefs[r.feed_id] = mapPref(r); });
+  }
+}
+/* Boot/baggrund: hent chat-tilstanden og tænd/sluk fane-prikken UDEN at røre listen —
+   prikken skal kunne lyse selvom Beskeder-fanen aldrig har været åbnet */
+export async function refreshChatUnread(){
+  if(!me) return;
+  await fetchChatState();
+  refreshChatDot();
+}
 export async function renderChatList(fetchLasts){
   if(!me) return;
   const box = el("chat-list");
   if(!allThreads().length){
     box.innerHTML = '<div class="emptynote">'+t("chat.empty")+'</div>';
+    refreshChatDot();
     return;
   }
-  if(fetchLasts !== false){
-    // Seneste beskeder på tværs (RLS = kun mine tråde; første række pr. tråd er nyeste)
-    // + mine læse-mærker (ulæst-prikker) + mine tråd-præferencer (pin/mute/ryd)
-    const [mres, rres, pres] = await Promise.all([
-      sb.from("kreds_messages")
-        .select(MSG_SELECT)
-        .order("created_at", { ascending: false })
-        .limit(120),
-      sb.from("kreds_chat_reads").select("feed_id, last_read_at").eq("user_id", me.id),
-      sb.from("kreds_chat_prefs").select("*").eq("user_id", me.id)
-    ]);
-    if(mres.error){ console.error(mres.error); }
-    else {
-      lastByFeed = {};
-      (mres.data || []).forEach(function(r){ if(!lastByFeed[r.feed_id]) lastByFeed[r.feed_id] = mapMsg(r); });
-    }
-    if(!rres.error){
-      myReadsOk = true;
-      myReads = {};
-      (rres.data || []).forEach(function(r){ myReads[r.feed_id] = new Date(r.last_read_at).getTime(); });
-    }
-    if(!pres.error){
-      prefs = {};
-      (pres.data || []).forEach(function(r){ prefs[r.feed_id] = mapPref(r); });
-    }
-  }
+  if(fetchLasts !== false) await fetchChatState();
+  refreshChatDot();
   if(searchQ) return; // en aktiv søgning ejer listen
   const feeds = allThreads().filter(function(f){
     // En DM-tråd vises kun med indhold: tom eller ryddet ("Slet chatten") = ude af
@@ -170,10 +181,8 @@ function chatRowHTML(f){
     const what = m.postId ? "📷 " + t("chat.shared_memory") : (m.text ? esc(m.text) : "📷");
     sub = esc(who) + ": " + what + " · " + esc(m.t);
   }
-  // Ulæst: nyeste besked er fra en anden og nyere end mit læse-mærke, eller tråden er
-  // markeret som ulæst manuelt → fed + rød prik
-  const unread = !!pf.markedUnread || !!(m && myReadsOk && me && m.authorId !== me.id &&
-                    new Date(m.created).getTime() > (myReads[f.id] || 0));
+  // Ulæst → fed + rød prik (reglen er delt med fane-prikken, se threadUnread)
+  const unread = threadUnread(f);
   return '<button class="chatrow'+(unread ? " unread" : "")+'" data-feed="'+esc(f.id)+'">'+
     chatAvaHTML(f, 52)+
     '<span class="lcol">'+
@@ -184,6 +193,22 @@ function chatRowHTML(f){
     (pf.pinned ? '<span class="cv-flag">'+PIN_SVG+'</span>' : '')+
     (unread ? '<span class="cv-udot"></span>' : '')+
   '</button>';
+}
+
+/* Ulæst-reglen (delt af liste-rækkerne og fane-prikken): nyeste synlige besked er fra en
+   anden og nyere end mit læse-mærke, eller tråden er markeret som ulæst manuelt */
+function threadUnread(f){
+  const pf = prefs[f.id] || {};
+  const m = lastVisible(f);
+  return !!pf.markedUnread || !!(m && myReadsOk && me && m.authorId !== me.id &&
+    new Date(m.created).getTime() > (myReads[f.id] || 0));
+}
+/* Rød prik på Beskeder-fanen: web-tabbarens #chatdot; den native bar spejler den via
+   syncNative-payloaden (chatDot) i main.js. Kaldes alle steder chat-tilstanden ændrer sig. */
+export function refreshChatDot(){
+  const d = el("chatdot");
+  if(!d) return;
+  d.classList.toggle("on", !!me && allThreads().some(threadUnread));
 }
 
 /* ---- Én tråd (fuldskærms-siden #chatview) ---- */
@@ -379,6 +404,7 @@ function markThreadRead(){
   myReadSent = ts;
   reads[me.id] = newest;
   myReads[chatFeed] = ts; // ulæst-prikken i listen slukker med det samme
+  refreshChatDot();
   if(el("view-chat").classList.contains("active")) renderChatList(false);
   sb.from("kreds_chat_reads")
     .upsert({ feed_id: chatFeed, user_id: me.id, last_read_at: newest })
@@ -1029,6 +1055,7 @@ export function chatRealtime(payload){
       msgs = msgs.filter(function(x){ return x.id !== oldId; });
       if(el("chatview").classList.contains("on")) renderThread(false);
       refreshLastFromThread();
+      refreshChatDot();
       return;
     }
     // Var den slettede besked et liste-preview, hentes previews friskt
@@ -1036,7 +1063,10 @@ export function chatRealtime(payload){
     Object.keys(lastByFeed).forEach(function(fid){
       if(lastByFeed[fid] && lastByFeed[fid].id === oldId){ delete lastByFeed[fid]; stale = true; }
     });
-    if(stale && el("view-chat").classList.contains("active")) renderChatList(true);
+    if(stale){
+      if(el("view-chat").classList.contains("active")) renderChatList(true);
+      else refreshChatUnread(); // preview-tabellen skal friskes, ellers regner prikken på en slettet besked
+    }
     return;
   }
   const row = payload.new;
@@ -1052,6 +1082,7 @@ export function chatRealtime(payload){
       if(lastByFeed[m.feed] && lastByFeed[m.feed].id === m.id){
         lastByFeed[m.feed] = m;
         if(el("view-chat").classList.contains("active")) renderChatList(false);
+        refreshChatDot();
       }
       return;
     }
@@ -1065,6 +1096,7 @@ export function chatRealtime(payload){
           markThreadRead(); // tråden er åben og synlig → den nye besked er læst
         }
       }
+      refreshChatDot(); // ny besked tænder fane-prikken, uanset hvilken fane der er aktiv
     };
     // Besked i en tråd vi ikke kender endnu (fx en NY DM-tråd startet af den anden,
     // eller en auto-deling fra et hele kredsen-minde) → hent trådene først
@@ -1095,6 +1127,7 @@ export function chatReadsRealtime(payload){
     // Mit eget mærke (fx fra en anden enhed) → slukker også ulæst-prikken i listen
     if(ts > (myReads[row.feed_id] || 0)){
       myReads[row.feed_id] = ts;
+      refreshChatDot();
       if(el("view-chat").classList.contains("active")) renderChatList(false);
     }
   }

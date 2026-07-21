@@ -172,10 +172,11 @@ if(window.__vfNative){
     const av = document.querySelector(".view.active");
     const active = av ? av.id.replace("view-", "") : "feed";
     const dot = !!(el("tabdot") && el("tabdot").classList.contains("on"));
-    const tabKey = active + "|" + dot + "|" + compact + "|" + visible;
+    const chatDot = !!(el("chatdot") && el("chatdot").classList.contains("on"));
+    const tabKey = active + "|" + dot + "|" + chatDot + "|" + compact + "|" + visible;
     if(tabKey !== lastTabKey){
       lastTabKey = tabKey;
-      mh.postMessage({ type: "tab", active: active, dot: dot, compact: compact, visible: visible });
+      mh.postMessage({ type: "tab", active: active, dot: dot, chatDot: chatDot, compact: compact, visible: visible });
     }
     // --- Kreds-bar (kun på feed-fanen; søgning er native, så baren bliver synlig hele tiden) ---
     const ks = nativeKredsState();

@@ -6,6 +6,7 @@ final class TabBarModel: ObservableObject {
     static let shared = TabBarModel()
     @Published var active: String = "feed"   // feed | search | chat | akt | profil
     @Published var dot: Bool = false          // notification dot on the bell
+    @Published var chatDot: Bool = false      // unread dot on the chat tab
     @Published var compact: Bool = false      // scrolled down → shrink
     @Published var visible: Bool = true       // hidden while a sheet/lightbox/profile is on top
     /// Native → web. Set by ContentView to evaluate `window.vfTab(name)` on the web view.
@@ -14,6 +15,7 @@ final class TabBarModel: ObservableObject {
     func apply(_ dict: [String: Any]) {
         if let a = dict["active"] as? String { active = a }
         if let d = dict["dot"] as? Bool { dot = d }
+        if let cd = dict["chatDot"] as? Bool { chatDot = cd }
         if let c = dict["compact"] as? Bool { compact = c }
         if let v = dict["visible"] as? Bool { visible = v }
     }
@@ -72,7 +74,7 @@ struct NativeTabBar: View {
                             .font(.system(size: 21, weight: .semibold))
                             .foregroundStyle(Color.primary)
                             .overlay(alignment: .topTrailing) {
-                                if item.id == "akt" && model.dot {
+                                if (item.id == "akt" && model.dot) || (item.id == "chat" && model.chatDot) {
                                     Circle().fill(Color.red)
                                         .frame(width: 8, height: 8)
                                         .offset(x: 6, y: -3)

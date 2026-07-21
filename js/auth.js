@@ -7,7 +7,7 @@ import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPo
 import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet, closeListSheet, closeNativeListPage, resetSaved, closeUnfriendMenu, closeBlockMenu } from "./profile.js";
 import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
 import { closeNativePostPage } from "./comments.js";
-import { resetChat } from "./chat.js";
+import { resetChat, refreshChatUnread } from "./chat.js";
 import { closeLightbox } from "./lightbox.js";
 import { subscribeRealtime, unsubscribeRealtime } from "./realtime.js";
 import { refreshNotifDot } from "./notifications.js";
@@ -150,6 +150,7 @@ export async function boot(session){
   renderComposeDest();
   renderStories();
   renderFeed();
+  refreshChatUnread(); // fane-prikken på Beskeder kan lyse fra første frame (ingen await — blokerer ikke boot)
   // Gendan den fane brugeren var på før et reload (pull-to-refresh); tom/ugyldig → feed.
   // Alle data er hentet ovenfor, så det er sikkert at åbne enhver fane her.
   let savedTab; try{ savedTab = sessionStorage.getItem("vf_cur_tab"); }catch(_e){}
