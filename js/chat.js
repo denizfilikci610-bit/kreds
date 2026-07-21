@@ -232,7 +232,9 @@ export async function openKredsChat(feedId){
   el("chatview").classList.toggle("dm", !!f.isDm);
   el("chatview").classList.add("on");
   // Tråden er sin egen side: alt bagved (feedet/besked-listen) skjules helt, så intet
-  // skinner igennem, heller ikke mens tastaturet åbner/lukker
+  // skinner igennem, heller ikke mens tastaturet åbner/lukker. Klassen skal på BÅDE
+  // html og body — iOS respekterer først "dokumentet kan ikke rulle" når begge er låst.
+  document.documentElement.classList.add("chat-open");
   document.body.classList.add("chat-open");
   const seq = ++chatSeq;
   // Beskeder + set-kvitteringer hentes parallelt. Kvitteringerne er fail-soft: findes
@@ -416,51 +418,89 @@ export function closeKredsChat(){
   renderCtxBar();
   leaveTyping();
   el("cv-input").blur();
-  unpinChat();
+  unpinChat();   // rydder --vvh FØR låsen fjernes, så intet står krympet bagefter
   el("chatview").classList.remove("on");
+  document.documentElement.classList.remove("chat-open");
   document.body.classList.remove("chat-open");
   el("cv-body").innerHTML = "";
 }
 
-/* ---- iOS-tastaturet: pin tråden til den synlige viewport (Messenger-adfærd) ----
-   WKWebView/Safari ændrer ikke sidens layout når tastaturet åbner — den panorerer bare
-   den visuelle viewport. Tråden låses derfor til top 0 i visualViewport-HØJDEN, og
-   selve panoreringen annulleres (scrollTo 0,0): headeren står bomfast, composeren
-   klæber lige over tastaturet, beskederne holder sig i bunden. Ved tastatur-ned/luk
-   fjernes inline-målene igen. */
-let kbRaf = 0, kbOpen = false;
-function fitChatToViewport(){
-  kbRaf = 0;
-  const vv = window.visualViewport;
+/* ---- iOS-tastaturet: tråden lever i den SYNLIGE viewport ----
+   WKWebView ændrer ikke sidens layout når tastaturet åbner. Den krymper kun den
+   visuelle viewport og RULLER sin ydre scroller for at "afsløre" det fokuserede felt
+   bag tastaturet — netop den rulning var hoppet i toppen. window.scrollTo() rammer den
+   ikke: dokument-scroll kan stå på 0 imens. Tre lag fjerner hoppet:
+     1) html/body.chat-open + --vvh (CSS) gør dokumentet præcis lige så højt som det
+        synlige område: intet rulle-rum, og composeren ligger allerede OVER tastaturet,
+        så iOS har intet at afsløre.
+     2) Krympningen sker på focusin — synkront i web-processen, før iOS overhovedet når
+        at beslutte sig — ud fra sidste kendte tastaturhøjde (huskes i localStorage).
+     3) Den native bro __vfKb (ny app-build) melder den PRÆCISE højde inden animationen,
+        og visualViewport retter bagefter hvis gættet var skævt. */
+let kbRaf = 0, kbOpen = false, kbPreTimer = 0;
+function kbKey(){ return "vf_kbh-" + (window.innerWidth > window.innerHeight ? "l" : "p"); }
+function cachedKbH(){
+  try{
+    const v = parseFloat(localStorage.getItem(kbKey()) || "0");
+    return (v > 120 && v < window.innerHeight * 0.8) ? v : 0;
+  }catch(_e){ return 0; }
+}
+function rememberKbH(h){
+  try{
+    if(h > 120 && h < window.innerHeight * 0.8) localStorage.setItem(kbKey(), String(Math.round(h)));
+  }catch(_e){}
+}
+/* Annullér enhver panorering iOS måtte have nået at lave — alle tre mulige scrollere */
+function killPan(){
+  const p = el("chatview").parentElement;
+  if(p && p.scrollTop) p.scrollTop = 0;
+  const doc = document.scrollingElement || document.documentElement;
+  if(doc && doc.scrollTop) doc.scrollTop = 0;
+  if(window.scrollY) window.scrollTo(0, 0);
+}
+/* overlap = hvor mange px tastaturet dækker af skærmen (0 = tastatur nede) */
+function applyKb(overlap){
   const cv = el("chatview");
-  const open = vv && cv.classList.contains("on") &&
-               document.documentElement.clientHeight - vv.height > 60;
-  if(!open){ if(kbOpen) unpinChat(); return; }
-  // iOS kan scrolle selv overflow:hidden-containere for at vise det fokuserede felt —
-  // nulstil .phone, ellers forskydes hele appen bag den pinnede tråd
-  if(cv.parentElement && cv.parentElement.scrollTop) cv.parentElement.scrollTop = 0;
-  // Headeren skal stå BOMFAST: i stedet for at følge iOS' panorering (top = vv.pageTop,
-  // som gav et synligt hop når tastaturet åbnede) låses siden til top 0 i den krympede
-  // højde, og panoreringen ANNULLERES med scrollTo(0,0). iOS accepterer det, fordi
-  // feltet allerede er synligt i den krympede side — vv.scroll-lytteren nulstiller igen,
-  // hvis iOS alligevel prøver at panorere (fx ved caret-flyt).
-  cv.style.top = "0px";
-  cv.style.height = vv.height + "px";
-  cv.style.bottom = "auto";
-  cv.classList.add("kb");
-  if(vv.pageTop > 0.5 || window.scrollY) window.scrollTo(0, 0);
+  if(!cv.classList.contains("on")) return;
+  clearTimeout(kbPreTimer);
+  const vis = Math.max(220, window.innerHeight - Math.max(0, overlap));
+  document.documentElement.style.setProperty("--vvh", Math.round(vis) + "px");
+  cv.classList.toggle("kb", overlap > 60);
+  killPan();
   const body = el("cv-body");
   const nearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 80;
   if(!kbOpen || nearBottom) body.scrollTop = body.scrollHeight;
-  kbOpen = true;
+  kbOpen = overlap > 60;
+}
+/* Krymp FØR tastaturet er fremme (kaldes på focusin), ud fra sidste kendte højde.
+   Kommer tastaturet aldrig — fx fysisk tastatur — ruller timeren krympningen tilbage. */
+function preShrinkForKeyboard(){
+  if(kbOpen) return;
+  const h = cachedKbH();
+  if(!h) return;
+  applyKb(h);
+  kbPreTimer = setTimeout(function(){
+    const vv = window.visualViewport;
+    if(!vv || window.innerHeight - vv.height < 60) unpinChat();
+  }, 700);
+}
+function fitChatToViewport(){
+  kbRaf = 0;
+  const vv = window.visualViewport;
+  if(!vv || !el("chatview").classList.contains("on")) return;
+  const overlap = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+  if(overlap > 120) rememberKbH(overlap);   // næste gang kan vi krympe på forhånd
+  if(overlap > 60) applyKb(overlap);
+  else unpinChat();
 }
 function unpinChat(){
   kbOpen = false;
+  clearTimeout(kbPreTimer);
   const cv = el("chatview");
-  cv.style.top = cv.style.height = cv.style.bottom = "";
+  cv.style.top = cv.style.height = cv.style.bottom = "";   // ryd evt. gamle inline-mål
   cv.classList.remove("kb");
-  if(cv.parentElement && cv.parentElement.scrollTop) cv.parentElement.scrollTop = 0;
-  window.scrollTo(0, 0); // ryd evt. rest-panorering fra tastaturet
+  document.documentElement.style.removeProperty("--vvh");
+  killPan();
 }
 function queueFit(){ if(!kbRaf) kbRaf = requestAnimationFrame(fitChatToViewport); }
 export function resetChat(){
@@ -1160,11 +1200,21 @@ export function chatReadsRealtime(payload){
 }
 
 export function initChat(){
-  // Tastaturet ind/ud + iOS' panorering af den visuelle viewport → genplacér tråden
+  // Tastaturet ind/ud + iOS' panorering af den visuelle viewport → genberegn rammen
   if(window.visualViewport){
     window.visualViewport.addEventListener("resize", queueFit);
     window.visualViewport.addEventListener("scroll", queueFit);
   }
+  /* Native bro (ny app-build): Swift melder tastaturets ENDELIGE højde allerede ved
+     keyboardWillChangeFrame, altså inden animationen begynder — præcist, også ved
+     emoji-tastatur, diktering og eksternt tastatur. Findes hverken i browseren eller i
+     ældre builds; dér klarer focusin-krympningen og visualViewport det alene. */
+  window.__vfKb = function(h){
+    if(!el("chatview").classList.contains("on")) return;
+    const ov = Math.max(0, Math.round(h || 0));
+    if(ov > 60){ rememberKbH(ov); applyKb(ov); }
+    else unpinChat();
+  };
   // Tilbage i forgrunden med en åben tråd → det sete er nu læst
   document.addEventListener("visibilitychange", function(){
     if(!document.hidden) markThreadRead();
@@ -1185,17 +1235,21 @@ export function initChat(){
     openMemoryFor(chatFeed);
   });
   el("cv-send").addEventListener("click", sendChatMsg);
-  // Fokus-vagt: fra allerFØRSTE frame af tastatur-animationen annulleres iOS' panorering
-  // (før visualViewport overhovedet har meldt resize) — ellers kunne hele siden nå at
-  // blive skubbet ned et øjeblik med et hul over headeren (set i ejerens optagelse).
-  let panRaf = 0;
+  // Tastatur-vagt: krymp rammen SYNKRONT i samme øjeblik feltet får fokus (før iOS når
+  // at beslutte at noget skal "afsløres"), og annullér enhver panorering de første ~700
+  // ms indtil visualViewport har meldt de rigtige mål. Løkken er BEVIDST tidsbegrænset
+  // — den forrige kørte en frame-løkke hele tiden mens feltet havde fokus.
+  let panRaf = 0, panUntil = 0;
   function holdPan(){
-    if(document.activeElement !== el("cv-input")){ panRaf = 0; return; }
-    const vv = window.visualViewport;
-    if(window.scrollY || (vv && vv.pageTop > 0.5)) window.scrollTo(0, 0);
+    if(Date.now() > panUntil || document.activeElement !== el("cv-input")){ panRaf = 0; return; }
+    killPan();
     panRaf = requestAnimationFrame(holdPan);
   }
-  el("cv-input").addEventListener("focusin", function(){ if(!panRaf) panRaf = requestAnimationFrame(holdPan); });
+  el("cv-input").addEventListener("focusin", function(){
+    preShrinkForKeyboard();
+    panUntil = Date.now() + 700;
+    if(!panRaf) panRaf = requestAnimationFrame(holdPan);
+  });
   el("cv-input").addEventListener("input", function(){ growInput(); sendTyping(); });
   el("cv-input").addEventListener("keydown", function(e){
     // Enter sender (shift+enter = ny linje på desktop); preventDefault så textarea'en

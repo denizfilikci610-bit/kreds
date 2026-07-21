@@ -1333,6 +1333,21 @@
   /* En åben tråd er sin EGEN side: alt bagved skjules helt, så hverken feedet eller
      besked-listen skinner igennem mens tastaturet åbner/lukker */
   body.chat-open .app{visibility:hidden}
+  /* ---- Tastatur-lås: dokumentet må ALDRIG kunne rulle mens en tråd er åben ----
+     WKWebView krymper ikke layoutet når tastaturet åbner; den ruller sin ydre scroller
+     for at "afsløre" det fokuserede felt bag tastaturet, og dét var hoppet i toppen.
+     Modtrækket: gør dokumentet præcis lige så højt som det SYNLIGE område (--vvh, sat
+     af js/chat.js allerede når feltet får fokus). Så er der hverken rulle-rum eller
+     noget at afsløre, og headeren i toppen af .phone kan ikke flytte sig. Uden tastatur
+     er --vvh ikke sat, og alt falder tilbage til de normale 100dvh. */
+  html.chat-open, body.chat-open{
+    height:var(--vvh, 100%);
+    min-height:0;
+    overflow:hidden;
+    overscroll-behavior:none;
+  }
+  body.chat-open{position:fixed;top:0;left:0;right:0;width:100%}
+  body.chat-open .phone{height:var(--vvh, 100dvh)}
   .chatview .pv-body{padding:12px 12px 6px;display:flex;flex-direction:column}
   .cv-msg{display:flex;gap:8px;align-items:flex-end;max-width:86%;margin-top:2px}
   .cv-msg.first{margin-top:12px}

@@ -99,6 +99,8 @@ struct WebView: UIViewRepresentable {
         // what revealed a black gap + spinner and pushed the whole UI down). Pull-to-
         // refresh is now a clean in-app gesture handled in the web (js/pullrefresh.js).
         webView.scrollView.bounces = false
+        // Klem den ydre scroller fast: se scrollViewDidScroll i Coordinator.
+        webView.scrollView.delegate = context.coordinator
 
         hideKeyboardAccessoryBar(of: webView)
 
@@ -117,11 +119,56 @@ struct WebView: UIViewRepresentable {
         Coordinator(model: model)
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, UIScrollViewDelegate {
         let model: WebViewModel
 
         init(model: WebViewModel) {
             self.model = model
+            super.init()
+            let nc = NotificationCenter.default
+            nc.addObserver(self, selector: #selector(kbWillChange(_:)),
+                           name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
+            nc.addObserver(self, selector: #selector(kbWillHide(_:)),
+                           name: UIResponder.keyboardWillHideNotification, object: nil)
+        }
+
+        deinit { NotificationCenter.default.removeObserver(self) }
+
+        // MARK: - Tastaturet må ALDRIG flytte siden
+        //
+        // WKWebView krymper ikke layoutet når tastaturet åbner. Den ruller i stedet sin
+        // ydre scroller for at "afsløre" det fokuserede felt bag tastaturet — og dét var
+        // hoppet i toppen af chat-tråden. JavaScript kan hverken se eller skrive den
+        // scrollers contentOffset (window.scrollY kan stå på 0 imens), så klemmen SKAL
+        // ligge her. Dokumentet ruller aldrig af sig selv: alt indhold bor i webbens egne
+        // scrollere (#app, .pv-body, .cv-body).
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            // Kun når dokumentet slet ikke ER rulbart. Bliver en fremtidig side reelt
+            // højere end skærmen, slår klemmen automatisk fra.
+            let maxY = scrollView.contentSize.height - scrollView.bounds.height
+            if maxY <= 1, scrollView.contentOffset != .zero {
+                scrollView.setContentOffset(.zero, animated: false)
+            }
+        }
+
+        /// Tastaturets ENDELIGE ramme kendes allerede her, altså FØR animationen begynder.
+        /// Websiden krymper sin ramme i samme åndedrag (window.__vfKb), så composeren
+        /// aldrig ligger bag tastaturet — og så har iOS intet at afsløre.
+        @objc private func kbWillChange(_ note: Notification) {
+            guard let webView = model.webView,
+                  let end = (note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
+            else { return }
+            let local = webView.convert(end, from: nil)
+            pushKeyboard(max(0, webView.bounds.maxY - local.minY))
+        }
+
+        @objc private func kbWillHide(_ note: Notification) { pushKeyboard(0) }
+
+        private func pushKeyboard(_ overlap: CGFloat) {
+            guard let webView = model.webView else { return }
+            // Punkter == CSS-px (initial-scale=1, user-scalable=no)
+            webView.evaluateJavaScript("window.__vfKb && window.__vfKb(\(Int(overlap.rounded())))",
+                                       completionHandler: nil)
         }
 
         // keep VibeFeed (and its Supabase backend) inside the app;
