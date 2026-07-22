@@ -202,7 +202,10 @@
   .storyview .sv-bar{flex:1;height:2.5px;border-radius:2px;background:rgba(255,255,255,.35);overflow:hidden}
   .storyview .sv-bar i{display:block;height:100%;width:0;background:#fff;border-radius:2px}
   .storyview .sv-bar.done i{width:100%}
-  .storyview .sv-bar.active i{animation:svfill 6s linear forwards}
+  /* Bjælken er PAUSET indtil mediet er synligt (.storyview.playing) — så de 6 sek ikke
+     løber mens storyen stadig loader. */
+  .storyview .sv-bar.active i{animation:svfill 6s linear forwards;animation-play-state:paused}
+  .storyview.playing .sv-bar.active i{animation-play-state:running}
   @keyframes svfill{from{width:0}to{width:100%}}
   .storyview .sv-head{
     position:absolute;top:calc(20px + env(safe-area-inset-top));left:12px;right:12px;

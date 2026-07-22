@@ -72,10 +72,9 @@ function preloadStoryMedia(groups){
     const it = g.items && g.items[0];
     if(!it || !it.url) return;
     if(it.isVideo){
-      const v = document.createElement("video");
-      v.preload = "auto"; v.muted = true; v.playsInline = true; v.src = it.url;
-      try{ v.load(); }catch(_e){}
-      keep.push(v);
+      // Detached <video> downloader IKKE pålideligt i WKWebView. fetch varmer HTTP-cachen,
+      // så <video>'ens GET bagefter rammer cachen og storyen kan spille straks.
+      try{ fetch(it.url).catch(function(){}); }catch(_e){}
     }else{
       const im = new Image();
       im.src = it.url;
@@ -142,22 +141,32 @@ function showItem(){
       : '') +
     '<button class="sv-tap sv-left" data-sv="prev" aria-label="Forrige"></button>' +
     '<button class="sv-tap sv-right" data-sv="next" aria-label="Næste"></button>';
-  // Sikkerhedsnet: vis en indlæsnings-prik indtil mediet er klar (i stedet for helt sort).
+  // Sikkerhedsnet + synkronisering: vis en indlæsnings-prik og hold fremdriften (bjælke + de
+  // 6 sek) PAUSET indtil mediet er synligt. Ellers løber tiden mens storyen stadig loader.
+  el("storyview").classList.remove("playing");
   const mediaBox = el("storyview").querySelector(".sv-media");
   const mediaEl = mediaBox && mediaBox.querySelector("img, video");
+  let started = false;
+  const startProgress = function(){
+    if(started) return; started = true;         // video fyrer både loadeddata OG canplay
+    if(mediaBox) mediaBox.classList.add("loaded");
+    el("storyview").classList.add("playing");   // bjælken starter NU
+    clearTimer();
+    vw.timer = setTimeout(next, 6000);          // 6 sek tælles FØRST når storyen er synlig
+  };
   if(mediaBox && mediaEl){
-    const done = function(){ mediaBox.classList.add("loaded"); };
     if(it.isVideo){
-      if(mediaEl.readyState >= 2) done();
-      else { mediaEl.addEventListener("loadeddata", done, { once: true }); mediaEl.addEventListener("canplay", done, { once: true }); }
+      if(mediaEl.readyState >= 2) startProgress();
+      else { mediaEl.addEventListener("loadeddata", startProgress, { once: true }); mediaEl.addEventListener("canplay", startProgress, { once: true }); }
     }else{
-      if(mediaEl.complete && mediaEl.naturalWidth) done();
-      else { mediaEl.addEventListener("load", done, { once: true }); mediaEl.addEventListener("error", done, { once: true }); }
+      if(mediaEl.complete && mediaEl.naturalWidth) startProgress();
+      else { mediaEl.addEventListener("load", startProgress, { once: true }); mediaEl.addEventListener("error", startProgress, { once: true }); }
     }
+  }else{
+    startProgress();   // intet medie-element (fallback) → start alligevel
   }
   markSeen(it);
   if(g.isMe) loadViews(it);   // "Set af N" (kun egne stories)
-  vw.timer = setTimeout(next, 6000);   // 6 sek pr. story (billede + video)
 }
 
 const EYE_SVG = '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.6"/></g></svg>';
@@ -193,6 +202,7 @@ async function openViewers(){
   const it = g && g.items[vw.ii];
   if(!g || !it || !g.isMe) return;
   clearTimer();
+  el("storyview").classList.remove("playing");   // pause fremdrifts-bjælken mens seer-listen er åben
   const v = el("storyview").querySelector("video");
   if(v) v.pause();
   if(!it.viewsData) await loadViews(it);   // åbnet før hentningen blev færdig
@@ -234,6 +244,7 @@ function canModerate(g){
 /* Stil storyen i bero (menu/ark fremme). showItem() sætter den i gang igen. */
 function pauseStory(){
   clearTimer();
+  el("storyview").classList.remove("playing");   // stop også fremdrifts-bjælken
   const v = el("storyview").querySelector("video");
   if(v) v.pause();
 }
