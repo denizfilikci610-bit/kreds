@@ -572,6 +572,7 @@ struct MemoryGalleryScreen: View {
             vfBackground.ignoresSafeArea()   // matcher appens tema (#161616/off-white) — kameraet har sit eget sorte chrome
             if model.step == .camera {
                 MemoryCameraScreen()   // fuldskærm, eget kamera-chrome
+                    .transition(.opacity)
             } else {
                 VStack(spacing: 0) {
                     navBar
@@ -586,8 +587,13 @@ struct MemoryGalleryScreen: View {
                     case .caption: caption
                     }
                 }
+                .background(vfBackground.ignoresSafeArea())   // uigennemsigtig mens den glider op
+                // Galleriet/beskæreren glider op nedefra over kameraet (iOS-foto-vælger-agtigt).
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        // Kun kamera↔galleri-grænsen animeres (indre trin skifter som før, uden animation).
+        .animation(.spring(response: 0.42, dampingFraction: 0.86), value: model.step == .camera)
     }
 
     private var navBar: some View {
@@ -1344,9 +1350,12 @@ struct LoopingVideoView: UIViewRepresentable {
 struct MemoryCameraScreen: View {
     @ObservedObject private var model = PhotoLibModel.shared
 
-    /// Minde/Story-knappen: den valgte tilstand står hvid og fed, den anden dæmpet
+    /// Minde/Story-knappen: den valgte tilstand står hvid og fed, den anden dæmpet.
+    /// Skift animerer preview-rammen: story UDVIDER sig til fuld skærm, minde SAMLER sig til 4:5.
     private func modeButton(_ label: String, story: Bool) -> some View {
-        Button { model.isStory = story } label: {
+        Button {
+            withAnimation(.spring(response: 0.44, dampingFraction: 0.82)) { model.isStory = story }
+        } label: {
             Text(label.uppercased())
                 .font(.system(size: 13, weight: .bold))
                 .kerning(0.7)
