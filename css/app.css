@@ -425,6 +425,9 @@
     transition:opacity .12s ease;
   }
   .pmedia:active{opacity:.82}
+  /* Minde-billeder må IKKE dæmpes/få skygge når man rører dem (enkelt-tryk gør intet,
+     man pincher for at zoome). Tryk-dæmp beholdes kun på tanke-medier (tap = åbn). */
+  .post.memory .pmedia:active{opacity:1}
   .pmedia img,.pmedia video{
     display:block;width:100%;max-height:510px;object-fit:cover;
     -webkit-touch-callout:none;
