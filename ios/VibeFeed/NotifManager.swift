@@ -39,8 +39,12 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
             if let s = dict["secret"] as? String, !s.isEmpty {
                 UserDefaults.standard.set(s, forKey: secretKey)
                 UserDefaults.standard.set(isoNow(), forKey: lastCheckKey)
-                if let lang = dict["lang"] as? String {
-                    UserDefaults.standard.set(lang == "en" ? "en" : "da", forKey: langKey)
+                if let lang = dict["lang"] as? String, !lang.isEmpty {
+                    // Gem HELE sprogkoden (fx "de", "zh-hans"), ikke kun en/da. Push- og
+                    // poll-notifikationerne findes nu på alle 32 sprog; en ukendt kode falder
+                    // selv tilbage til engelsk i edge-funktionerne. Så en tysk bruger får tyske
+                    // notifikationer i stedet for danske.
+                    UserDefaults.standard.set(lang, forKey: langKey)
                 }
                 requestPermission()
                 scheduleRefresh()
