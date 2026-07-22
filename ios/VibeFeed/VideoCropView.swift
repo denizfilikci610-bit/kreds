@@ -26,6 +26,7 @@ struct VFVideoCropView: View {
     @State private var zoomAnchor: CGFloat = 1
     @State private var offset: CGSize = .zero
     @State private var offsetAnchor: CGSize = .zero
+    @State private var interacting = false
 
     init(asset: AVAsset, trimStart: Double, trimDuration: Double, orientedSize: CGSize,
          aspect: CGFloat, cancelLabel: String, useLabel: String,
@@ -56,38 +57,17 @@ struct VFVideoCropView: View {
                     .offset(off)
                     .allowsHitTesting(false)
 
-                CropMaskShape(frame: frame, circular: false, center: CGPoint(x: geo.size.width / 2, y: geo.size.height / 2))
-                    .fill(Color.black.opacity(0.62), style: FillStyle(eoFill: true))
-                    .allowsHitTesting(false)
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .stroke(Color.white.opacity(0.9), lineWidth: 1.5)
-                    .frame(width: frame.width, height: frame.height)
-                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
-                    .allowsHitTesting(false)
-                ThirdsGrid()
-                    .stroke(Color.white.opacity(0.35), lineWidth: 0.5)
-                    .frame(width: frame.width, height: frame.height)
-                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
-                    .allowsHitTesting(false)
+                // Dæmpning udenfor + ramme + hjørne-markører + gitter (samme pynt som billed-beskæreren).
+                CropChrome(frame: frame, circular: false,
+                           center: CGPoint(x: geo.size.width / 2, y: geo.size.height / 2),
+                           interacting: interacting)
 
                 VStack {
                     Spacer()
-                    HStack {
-                        Button { onCancel() } label: {
-                            Text(cancelLabel)
-                                .font(.system(size: 16, weight: .semibold)).foregroundStyle(.white)
-                                .padding(.vertical, 12).padding(.horizontal, 22)
-                                .background(Capsule().fill(Color.white.opacity(0.16)))
-                        }.buttonStyle(.plain)
-                        Spacer()
-                        Button { onDone(normalizedCrop(frame: frame, t: t, off: off)) } label: {
-                            Text(useLabel)
-                                .font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
-                                .padding(.vertical, 12).padding(.horizontal, 26)
-                                .background(Capsule().fill(vfRed))
-                        }.buttonStyle(.plain)
-                    }
-                    .padding(.horizontal, 22).padding(.bottom, 16)
+                    CropButtons(cancelLabel: cancelLabel, useLabel: useLabel,
+                                onCancel: onCancel,
+                                onUse: { onDone(normalizedCrop(frame: frame, t: t, off: off)) })
+                        .padding(.bottom, 16)
                 }
                 .padding(.bottom, safeInsets.bottom)
             }
@@ -96,19 +76,33 @@ struct VFVideoCropView: View {
                 SimultaneousGesture(
                     DragGesture()
                         .onChanged { v in
+                            interacting = true
                             offset = CGSize(width: offsetAnchor.width + v.translation.width,
                                             height: offsetAnchor.height + v.translation.height)
                         }
-                        .onEnded { _ in offset = clampedOffset(offset, frame: frame, t: t); offsetAnchor = offset },
+                        .onEnded { _ in
+                            offset = clampedOffset(offset, frame: frame, t: t); offsetAnchor = offset
+                            withAnimation(.easeOut(duration: 0.25)) { interacting = false }
+                        },
                     MagnificationGesture()
-                        .onChanged { v in zoom = min(5, max(1, zoomAnchor * v)) }
+                        .onChanged { v in interacting = true; zoom = min(5, max(1, zoomAnchor * v)) }
                         .onEnded { _ in
                             zoomAnchor = zoom
                             offset = clampedOffset(offset, frame: frame, t: coverScale(frame) * zoom)
                             offsetAnchor = offset
+                            withAnimation(.easeOut(duration: 0.25)) { interacting = false }
                         }
                 )
             )
+            // Dobbelt-tryk zoomer ind/ud (touch-venligt, som Fotos).
+            .onTapGesture(count: 2) {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    if zoom > 1.01 { zoom = 1 } else { zoom = 2 }
+                    zoomAnchor = zoom
+                    offset = .zero
+                    offsetAnchor = .zero
+                }
+            }
         }
         .ignoresSafeArea()
         .onDisappear { loop.stop() }

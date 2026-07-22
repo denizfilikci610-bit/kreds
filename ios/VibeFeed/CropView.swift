@@ -21,6 +21,7 @@ struct VFCropView: View {
     @State private var zoomAnchor: CGFloat = 1
     @State private var offset: CGSize = .zero
     @State private var offsetAnchor: CGSize = .zero
+    @State private var interacting = false
 
     var body: some View {
         GeometryReader { geo in
@@ -37,31 +38,10 @@ struct VFCropView: View {
                     .position(x: geo.size.width / 2, y: geo.size.height / 2)
                     .offset(off)
 
-                // Dim everything outside the crop frame (even-odd hole) + a thin frame line
-                CropMaskShape(frame: frame, circular: circular, center: CGPoint(x: geo.size.width / 2, y: geo.size.height / 2))
-                    .fill(Color.black.opacity(0.62), style: FillStyle(eoFill: true))
-                    .allowsHitTesting(false)
-                Group {
-                    if circular {
-                        Circle().stroke(Color.white.opacity(0.85), lineWidth: 1.5)
-                            .frame(width: frame.width, height: frame.height)
-                    } else {
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .stroke(Color.white.opacity(0.9), lineWidth: 1.5)
-                            .frame(width: frame.width, height: frame.height)
-                    }
-                }
-                .position(x: geo.size.width / 2, y: geo.size.height / 2)
-                .allowsHitTesting(false)
-
-                // Rule-of-thirds-gitter (kun rektangulær beskæring) — hjælper med at komponere.
-                if !circular {
-                    ThirdsGrid()
-                        .stroke(Color.white.opacity(0.35), lineWidth: 0.5)
-                        .frame(width: frame.width, height: frame.height)
-                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
-                        .allowsHitTesting(false)
-                }
+                // Dæmpning udenfor + ramme + hjørne-markører + gitter (fælles pynt).
+                CropChrome(frame: frame, circular: circular,
+                           center: CGPoint(x: geo.size.width / 2, y: geo.size.height / 2),
+                           interacting: interacting)
 
                 VStack {
                     Text(title)
@@ -69,27 +49,10 @@ struct VFCropView: View {
                         .foregroundStyle(.white)
                         .padding(.top, 16)
                     Spacer()
-                    HStack {
-                        Button { onCancel() } label: {
-                            Text(cancelLabel)
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .padding(.vertical, 12).padding(.horizontal, 22)
-                                .background(Capsule().fill(Color.white.opacity(0.16)))
-                        }
-                        .buttonStyle(.plain)
-                        Spacer()
-                        Button { onDone(cropped(frame: frame, t: t, off: off)) } label: {
-                            Text(useLabel)
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(.vertical, 12).padding(.horizontal, 26)
-                                .background(Capsule().fill(vfRed))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.horizontal, 22)
-                    .padding(.bottom, 16)
+                    CropButtons(cancelLabel: cancelLabel, useLabel: useLabel,
+                                onCancel: onCancel,
+                                onUse: { onDone(cropped(frame: frame, t: t, off: off)) })
+                        .padding(.bottom, 16)
                 }
                 .padding(.top, safeInsets.top)
                 .padding(.bottom, safeInsets.bottom)
@@ -99,24 +62,37 @@ struct VFCropView: View {
                 SimultaneousGesture(
                     DragGesture()
                         .onChanged { v in
+                            interacting = true
                             offset = CGSize(width: offsetAnchor.width + v.translation.width,
                                             height: offsetAnchor.height + v.translation.height)
                         }
                         .onEnded { _ in
                             offset = clampedOffset(offset, frame: frame, t: t)
                             offsetAnchor = offset
+                            withAnimation(.easeOut(duration: 0.25)) { interacting = false }
                         },
                     MagnificationGesture()
                         .onChanged { v in
+                            interacting = true
                             zoom = min(5, max(1, zoomAnchor * v))
                         }
                         .onEnded { _ in
                             zoomAnchor = zoom
                             offset = clampedOffset(offset, frame: frame, t: coverScale(frame) * zoom)
                             offsetAnchor = offset
+                            withAnimation(.easeOut(duration: 0.25)) { interacting = false }
                         }
                 )
             )
+            // Dobbelt-tryk zoomer ind/ud (touch-venligt, som Fotos).
+            .onTapGesture(count: 2) {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    if zoom > 1.01 { zoom = 1 } else { zoom = 2 }
+                    zoomAnchor = zoom
+                    offset = .zero
+                    offsetAnchor = .zero
+                }
+            }
         }
         .ignoresSafeArea()
     }
@@ -201,5 +177,88 @@ struct ThirdsGrid: Shape {
             p.move(to: CGPoint(x: 0, y: y)); p.addLine(to: CGPoint(x: rect.width, y: y))
         }
         return p
+    }
+}
+
+/// L-formede hjørne-markører i rammens fire hjørner (kraftige, som en rigtig beskærer).
+struct CropCorners: Shape {
+    var len: CGFloat = 26
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let L = min(len, min(rect.width, rect.height) / 3)
+        // øverste venstre
+        p.move(to: CGPoint(x: rect.minX, y: rect.minY + L)); p.addLine(to: CGPoint(x: rect.minX, y: rect.minY)); p.addLine(to: CGPoint(x: rect.minX + L, y: rect.minY))
+        // øverste højre
+        p.move(to: CGPoint(x: rect.maxX - L, y: rect.minY)); p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY)); p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + L))
+        // nederste højre
+        p.move(to: CGPoint(x: rect.maxX, y: rect.maxY - L)); p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY)); p.addLine(to: CGPoint(x: rect.maxX - L, y: rect.maxY))
+        // nederste venstre
+        p.move(to: CGPoint(x: rect.minX + L, y: rect.maxY)); p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY)); p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - L))
+        return p
+    }
+}
+
+/// Fælles beskærings-"pynt": blød dæmpning udenfor rammen, tynd ramme + kraftige hjørne-markører,
+/// og et tredjedels-gitter der kun toner frem mens man trækker/knibzoomer. Bruges af både billed-
+/// og video-beskæreren, så de ser ens ud.
+struct CropChrome: View {
+    let frame: CGSize
+    let circular: Bool
+    let center: CGPoint
+    let interacting: Bool
+    var body: some View {
+        ZStack {
+            CropMaskShape(frame: frame, circular: circular, center: center)
+                .fill(Color.black.opacity(0.55), style: FillStyle(eoFill: true))
+                .allowsHitTesting(false)
+            Group {
+                if circular {
+                    Circle().stroke(Color.white.opacity(0.9), lineWidth: 2)
+                        .frame(width: frame.width, height: frame.height)
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(Color.white.opacity(0.4), lineWidth: 1)
+                            .frame(width: frame.width, height: frame.height)
+                        ThirdsGrid()
+                            .stroke(Color.white.opacity(0.55), lineWidth: 0.75)
+                            .frame(width: frame.width, height: frame.height)
+                            .opacity(interacting ? 1 : 0)
+                        CropCorners()
+                            .stroke(Color.white, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                            .frame(width: frame.width, height: frame.height)
+                    }
+                }
+            }
+            .position(center)
+            .allowsHitTesting(false)
+            .shadow(color: .black.opacity(0.3), radius: 3)
+        }
+    }
+}
+
+/// Fælles handlingslinje nederst i beskæreren: to fuldbredde-knapper (Annuller + brug).
+struct CropButtons: View {
+    let cancelLabel: String
+    let useLabel: String
+    let onCancel: () -> Void
+    let onUse: () -> Void
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onCancel) {
+                Text(cancelLabel)
+                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(.white)
+                    .frame(maxWidth: .infinity).padding(.vertical, 15)
+                    .background(Capsule().fill(.ultraThinMaterial))
+                    .overlay(Capsule().stroke(Color.white.opacity(0.16), lineWidth: 1))
+            }.buttonStyle(.plain)
+            Button(action: onUse) {
+                Text(useLabel)
+                    .font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
+                    .frame(maxWidth: .infinity).padding(.vertical, 15)
+                    .background(Capsule().fill(vfRed))
+            }.buttonStyle(.plain)
+        }
+        .padding(.horizontal, 20)
     }
 }
