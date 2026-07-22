@@ -788,8 +788,12 @@ struct MemoryGalleryScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 if let vurl = model.capturedVideoURL {
+                    // Rammen følger posterens format (1080×566 vandret, ellers 4:5), så en
+                    // vandret video ikke klemmes ind i en 4:5-boks. Posteren er allerede
+                    // beskåret til det færdige format, og afspilleren fylder (resizeAspectFill).
+                    let vAspect: CGFloat = (model.capturedImage.map { $0.size.height > 0 ? $0.size.width / $0.size.height : 4.0 / 5.0 }) ?? 4.0 / 5.0
                     LoopingVideoView(url: vurl)       // loop af den optagne video (neutral, som eksporten)
-                        .aspectRatio(4.0 / 5.0, contentMode: .fit)
+                        .aspectRatio(vAspect, contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.5)
                         .clipped()
                         .padding(.bottom, 6)
@@ -1355,8 +1359,10 @@ struct MemoryCameraScreen: View {
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width
-            // Minde: 4:5-optageområde (1080x1350). Story: HELE skærmen (1080x1920).
-            let fh = model.isStory ? geo.size.height : w * 5.0 / 4.0
+            // Minde: 4:5-optageområde (1080x1350), eller 1080×566 når telefonen holdes
+            // vandret. Story: HELE skærmen (1080x1920).
+            let fh = model.isStory ? geo.size.height
+                                   : (cam.captureLandscape ? w / VF_LANDSCAPE_ASPECT : w * 5.0 / 4.0)
             ZStack {
                 Color.black.ignoresSafeArea()
 
@@ -1385,9 +1391,11 @@ struct MemoryCameraScreen: View {
                 }
                 .overlay(Rectangle().strokeBorder(Color.white.opacity(model.isStory ? 0 : 0.22), lineWidth: 1).frame(width: w, height: fh))
                 // Minde: 4:5-rammen ligger ØVERST (under top-kontrollerne), så den ikke
-                // rammer udløser-knappen og Minde/Story-vælgeren. Story: fuld skærm.
-                .padding(.top, model.isStory ? 0 : 106)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: model.isStory ? .center : .top)
+                // rammer udløser-knappen og Minde/Story-vælgeren. En lav vandret ramme
+                // (1080×566) centreres i stedet, ligesom en story. Story: fuld skærm.
+                .padding(.top, (model.isStory || cam.captureLandscape) ? 0 : 106)
+                .frame(maxWidth: .infinity, maxHeight: .infinity,
+                       alignment: (model.isStory || cam.captureLandscape) ? .center : .top)
                 .gesture(
                     MagnificationGesture()
                         .onChanged { scale in cam.setZoom(baseZoom * scale) }
