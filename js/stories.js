@@ -10,8 +10,12 @@ import { KREDS_SVG, feedById, setFeed, switchTab } from "./feed.js";
    min set-status, grupperet pr. forfatter. Fylder state.storyGroups; rækken tegnes af renderStories. */
 export async function loadStories(){
   if(!me){ state.storyGroups = []; return; }
+  // En story lever kun i 24 timer: ældre stories vises ALDRIG (uafhængigt af om de
+  // allerede er slettet i databasen). Filtreret på created_at, så rækken kun har friske.
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data: rows, error } = await sb.from("stories")
     .select("id, author, feed_id, image_path, video_path, created_at, profiles!stories_author_fkey(handle, name, avatar_path)")
+    .gte("created_at", cutoff)
     .order("created_at", { ascending: true });
   if(error || !rows){ state.storyGroups = []; return; }
   const seenSet = new Set();
@@ -150,9 +154,18 @@ function showItem(){
   const startProgress = function(){
     if(started) return; started = true;         // video fyrer både loadeddata OG canplay
     if(mediaBox) mediaBox.classList.add("loaded");
-    el("storyview").classList.add("playing");   // bjælken starter NU
+    // Billeder: fast 6 sek. Video: dens EGEN længde (stories er ≤6 s), så en kort video
+    // ikke står og fryser resten af de 6 sek — den skifter når videoen er slut.
+    let dur = 6;
+    if(it.isVideo && mediaEl){
+      const d = mediaEl.duration;
+      if(isFinite(d) && d > 0.2) dur = Math.min(d, 6);
+    }
+    const barI = el("storyview").querySelector(".sv-bar.active i");
+    if(barI) barI.style.animationDuration = dur + "s";   // bjælken matcher fremvisningstiden
+    el("storyview").classList.add("playing");   // bjælke + timer starter NU
     clearTimer();
-    vw.timer = setTimeout(next, 6000);          // 6 sek tælles FØRST når storyen er synlig
+    vw.timer = setTimeout(next, dur * 1000);     // fremvisningstiden tælles FØRST når storyen er synlig
   };
   if(mediaBox && mediaEl){
     if(it.isVideo){
