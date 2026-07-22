@@ -164,10 +164,10 @@ struct ListPageView: View {
                 .padding(.horizontal, 60)
             HStack {
                 Button {
-                    // Samme glide-ud som det virkende swipe (en .transition-fjernelse udløses
-                    // ikke pålideligt her, men en dragX-forskydning gør — den er bulletproof).
-                    withAnimation(.easeOut(duration: 0.25)) { dragX = UIScreen.main.bounds.width }
-                    model.dismiss()
+                    // Glid hele siden ud til højre via dragX (som det virkende swipe), og fjern
+                    // den FØRST når glidet er FÆRDIGT (completion) — ellers river dismiss() siden
+                    // væk med det samme, så den "hopper" i stedet for at glide.
+                    withAnimation(.easeOut(duration: 0.28)) { dragX = UIScreen.main.bounds.width } completion: { model.dismiss() }
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 20, weight: .medium))

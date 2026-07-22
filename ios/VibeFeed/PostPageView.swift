@@ -340,10 +340,9 @@ struct PostPageView: View {
     private var header: some View {
         HStack(spacing: 16) {
             Button {
-                // Samme glide-ud som det virkende swipe (dragX-forskydning er bulletproof,
-                // en .transition-fjernelse udløses ikke pålideligt her).
-                withAnimation(.easeOut(duration: 0.25)) { dragX = UIScreen.main.bounds.width }
-                model.dismiss()
+                // Glid siden ud via dragX og fjern den FØRST når glidet er FÆRDIGT (completion),
+                // ellers "hopper" den i stedet for at glide.
+                withAnimation(.easeOut(duration: 0.28)) { dragX = UIScreen.main.bounds.width } completion: { model.dismiss() }
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 20, weight: .medium))

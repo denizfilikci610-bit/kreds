@@ -280,9 +280,8 @@ struct EditProfilePage: View {
                 Button {
                     if model.deleteStep { model.deleteStep = false }
                     else {
-                        // Samme glide-ud som det virkende swipe (bulletproof dragX-forskydning).
-                        withAnimation(.easeOut(duration: 0.25)) { dragX = UIScreen.main.bounds.width }
-                        model.dismiss()
+                        // Glid siden ud via dragX og fjern den FØRST når glidet er FÆRDIGT.
+                        withAnimation(.easeOut(duration: 0.28)) { dragX = UIScreen.main.bounds.width } completion: { model.dismiss() }
                     }
                 } label: {
                     Image(systemName: "chevron.left")
