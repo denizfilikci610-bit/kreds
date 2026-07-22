@@ -36,7 +36,7 @@ final class ListPageModel: ObservableObject {
     func L(_ k: String) -> String { labels[k] ?? "" }
 
     func apply(_ dict: [String: Any]) {
-        if (dict["close"] as? Bool) == true { withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) { open = false }; query = ""; return }
+        if (dict["close"] as? Bool) == true { open = false; query = ""; return }
         guard (dict["open"] as? Bool) == true else { return }
         let newTitle = dict["title"] as? String ?? ""
         // Frisk åbning (anden profil eller lukket) nulstiller fane + søgning; en
@@ -75,14 +75,6 @@ final class ListPageModel: ObservableObject {
     func kreds(_ id: String) { send(["kind": "kreds", "id": id]) }
     func kredsReq(_ id: String, _ on: Bool) { send(["kind": "kredsreq", "id": id, "on": on]) }
     func dismiss() { send(["kind": "dismiss"]) }
-
-    /// Native-lokal luk: glid siden ud MED DET SAMME (samme fjeder som ind), og giv web besked.
-    /// Web-ekkoet {close:true} rammer bagefter og er idempotent (open er allerede false).
-    func close() {
-        guard open else { return }
-        withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) { open = false }
-        dismiss()
-    }
 
     private func send(_ obj: [String: Any]) {
         guard let d = try? JSONSerialization.data(withJSONObject: obj),
@@ -171,7 +163,12 @@ struct ListPageView: View {
                 .lineLimit(1)
                 .padding(.horizontal, 60)
             HStack {
-                Button { model.close() } label: {
+                Button {
+                    // Samme glide-ud som det virkende swipe (en .transition-fjernelse udløses
+                    // ikke pålideligt her, men en dragX-forskydning gør — den er bulletproof).
+                    withAnimation(.easeOut(duration: 0.25)) { dragX = UIScreen.main.bounds.width }
+                    model.dismiss()
+                } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(Color.primary)

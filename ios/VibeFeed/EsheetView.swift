@@ -79,7 +79,7 @@ final class EsheetModel: ObservableObject {
     var canSave: Bool { !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     func apply(_ dict: [String: Any]) {
-        if (dict["close"] as? Bool) == true { withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) { open = false }; deleteStep = false; return }
+        if (dict["close"] as? Bool) == true { open = false; deleteStep = false; return }
         if (dict["update"] as? Bool) == true {
             if let s = dict["saving"] as? Bool { saving = s }
             if let d = dict["deleting"] as? Bool { deleting = d }
@@ -130,14 +130,6 @@ final class EsheetModel: ObservableObject {
               "bio": bio, "share": share, "lang": lang, "consent": consent])
     }
     func dismiss() { send(["kind": "dismiss"]) }
-
-    /// Native-lokal luk: glid siden ud MED DET SAMME (samme fjeder som ind), og giv web besked.
-    /// Web-ekkoet {close:true} rammer bagefter og er idempotent (open er allerede false).
-    func close() {
-        guard open else { return }
-        withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) { open = false }
-        dismiss()
-    }
     func chooseLang(_ v: String) { lang = v }
     func chooseConsent(_ v: String) { consent = v }
     /// Åbner privatlivspolitikken i i-app-browseren OVENPÅ siden — brugeren bliver i
@@ -286,7 +278,12 @@ struct EditProfilePage: View {
                 .padding(.horizontal, 84)
             HStack {
                 Button {
-                    if model.deleteStep { model.deleteStep = false } else { model.close() }
+                    if model.deleteStep { model.deleteStep = false }
+                    else {
+                        // Samme glide-ud som det virkende swipe (bulletproof dragX-forskydning).
+                        withAnimation(.easeOut(duration: 0.25)) { dragX = UIScreen.main.bounds.width }
+                        model.dismiss()
+                    }
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 20, weight: .medium))

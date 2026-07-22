@@ -78,7 +78,7 @@ final class PostPageModel: ObservableObject {
 
     func apply(_ dict: [String: Any]) {
         if (dict["close"] as? Bool) == true {
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) { open = false }
+            open = false
             text = ""; replyingToId = nil; replyingToHandle = ""
             return
         }
@@ -206,14 +206,6 @@ final class PostPageModel: ObservableObject {
     func cancelReply() { replyingToId = nil; replyingToHandle = "" }
 
     func dismiss() { send(["kind": "dismiss", "postId": postId]) }
-
-    /// Native-lokal luk: glid siden ud MED DET SAMME (samme fjeder som ind), og giv web besked.
-    /// Web-ekkoet {close:true} rammer bagefter og er idempotent (open er allerede false).
-    func close() {
-        guard open else { return }
-        withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) { open = false }
-        dismiss()
-    }
 
     private func send(_ obj: [String: Any]) {
         guard let d = try? JSONSerialization.data(withJSONObject: obj),
@@ -347,7 +339,12 @@ struct PostPageView: View {
 
     private var header: some View {
         HStack(spacing: 16) {
-            Button { model.close() } label: {
+            Button {
+                // Samme glide-ud som det virkende swipe (dragX-forskydning er bulletproof,
+                // en .transition-fjernelse udløses ikke pålideligt her).
+                withAnimation(.easeOut(duration: 0.25)) { dragX = UIScreen.main.bounds.width }
+                model.dismiss()
+            } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(Color.primary)
