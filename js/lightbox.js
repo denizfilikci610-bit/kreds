@@ -270,19 +270,27 @@ export function openLightbox(kind, src, pid){
   el("app").classList.add("lb-lock");
 }
 export function closeLightbox(){
-  el("lightbox").classList.remove("on", "zoomed");
-  el("lightbox").setAttribute("aria-hidden", "true");
-  stage().innerHTML = ""; // stopper videoen og fjerner elementets lyttere
-  el("lb-info").innerHTML = "";
-  el("lb-info").style.display = "none";
-  el("lb-dots").style.display = "none";
-  el("lb-sound").style.display = "none";
+  const lb = el("lightbox");
+  lb.classList.remove("on", "zoomed");   // starter fade+zoom-ud
+  lb.setAttribute("aria-hidden", "true");
   lbPid = null;
-  imgEl = null;
-  pointers.clear(); pinch = null; pan = null;
-  scale = 1; tx = 0; ty = 0;
   document.body.classList.remove("lb-lock");
   el("app").classList.remove("lb-lock");
+  // Stop lyden straks, men lad selve medie-elementet blive til fade+zoom-ud er spillet
+  // (ellers rives indholdet ned FØR overgangen, så et tomt panel fader).
+  const v = stage().querySelector("video");
+  if (v) { try { v.pause(); } catch(e){} }
+  setTimeout(function(){
+    if (lb.classList.contains("on")) return;   // genåbnet i mellemtiden → rør ikke
+    stage().innerHTML = ""; // stopper videoen og fjerner elementets lyttere
+    el("lb-info").innerHTML = "";
+    el("lb-info").style.display = "none";
+    el("lb-dots").style.display = "none";
+    el("lb-sound").style.display = "none";
+    imgEl = null;
+    pointers.clear(); pinch = null; pan = null;
+    scale = 1; tx = 0; ty = 0;
+  }, 220);
 }
 
 export function initLightbox(){

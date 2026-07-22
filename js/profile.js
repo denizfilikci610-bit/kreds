@@ -124,9 +124,11 @@ export function openPostView(p){
 export function closeMemView(){
   // Detalje-sidens udfoldede tråd deler expandedCmts med feedet (samme pid) — klap den
   // sammen igen ved luk, ellers stod hele tråden pludselig fremme i feedet bagved.
+  const mv = el("memview");
   const node = el("mv-body").querySelector(".post[data-id]");
-  el("memview").classList.remove("on");
-  el("mv-body").innerHTML = ""; // stop evt. videoafspilning + frigiv
+  mv.classList.remove("on");   // starter udgliddet (.postview translateX)
+  const vid = el("mv-body").querySelector("video");
+  if(vid){ try{ vid.pause(); }catch(e){} }   // stop lyden straks
   if(node){
     const pid = Number(node.dataset.id);
     if(expandedCmts.has(pid)){
@@ -135,6 +137,11 @@ export function closeMemView(){
     }
   }
   applyFeedSound(); // lyd-prioriteten tilbage til den aktive fanes kopi
+  // Ryd først indholdet NÅR panelet er gledet ud (ellers glider et tomt panel ud).
+  setTimeout(function(){
+    if (mv.classList.contains("on")) return;   // genåbnet i mellemtiden
+    el("mv-body").innerHTML = ""; // frigiv medie + lyttere
+  }, 300);
 }
 
 export async function renderMyPosts(){

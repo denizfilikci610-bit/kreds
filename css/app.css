@@ -1143,10 +1143,12 @@
   .modal{
     position:absolute;inset:0;z-index:120;
     background:var(--scrim);
-    display:none;align-items:center;justify-content:center;
+    display:flex;align-items:center;justify-content:center;
     padding:28px;
+    opacity:0;visibility:hidden;pointer-events:none;
+    transition:opacity .18s ease, visibility .18s ease;   /* symmetrisk fade ind/ud */
   }
-  .modal.on{display:flex}
+  .modal.on{opacity:1;visibility:visible;pointer-events:auto}
   /* Basis-kort (ét frostet glas-kort): bruges af #mediamenu + #delmodal (tekstfelt).
      Report/opslag-menu/fjern-ven bruger .modal.sheet nedenfor (grupperede glas-"pills"). */
   .modal-card{
@@ -1158,7 +1160,10 @@
     border-radius:14px;
     overflow:hidden;
     box-shadow:0 12px 40px rgba(0,0,0,.18);
+    transform:scale(.96) translateY(8px);
+    transition:transform .2s cubic-bezier(.32,.72,.25,1);   /* løfter sig ind/ud sammen med fade */
   }
+  .modal.on .modal-card{transform:none}
   .mrow{
     display:block;width:100%;
     padding:14px 16px;
@@ -1535,17 +1540,23 @@
   .pz-clone{position:fixed;z-index:241;object-fit:cover;pointer-events:none;will-change:transform}
 
   /* ---- Fuldskærms-lightbox (billede/video) ---- */
+  /* Symmetrisk ind/ud: fade på baggrunden + let zoom på medie-scenen (samme begge veje). */
   .lightbox{
     position:fixed;inset:0;z-index:300; /* over alt — også tabbar og sheets */
     background:#000;
-    display:none;
+    display:block;
+    opacity:0;visibility:hidden;pointer-events:none;
+    transition:opacity .2s ease, visibility .2s ease;
   }
-  .lightbox.on{display:block}
+  .lightbox.on{opacity:1;visibility:visible;pointer-events:auto}
   .lb-stage{
     position:absolute;inset:0;
     display:flex;align-items:center;justify-content:center;
     overflow:hidden;
+    transform:scale(.94);
+    transition:transform .22s cubic-bezier(.32,.72,.25,1);
   }
+  .lightbox.on .lb-stage{transform:none}
   .lb-stage img{
     max-width:100%;max-height:100%;object-fit:contain;
     will-change:transform;
