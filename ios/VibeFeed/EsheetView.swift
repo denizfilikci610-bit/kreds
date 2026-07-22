@@ -313,7 +313,7 @@ struct EditProfilePage: View {
         }
         .frame(height: 52)
         .padding(.top, topInset)
-        .overlay(alignment: .bottom) { Rectangle().fill(hairline).frame(height: 0.5) }
+        // Ingen skillelinje under redigér-profil-headeren (ejer-ønske)
     }
 
     // MARK: - Form (Instagram-agtigt: centreret avatar + link, label/værdi-rækker, sektioner)
