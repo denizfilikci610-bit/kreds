@@ -79,7 +79,7 @@ final class EsheetModel: ObservableObject {
     var canSave: Bool { !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     func apply(_ dict: [String: Any]) {
-        if (dict["close"] as? Bool) == true { open = false; deleteStep = false; return }
+        if (dict["close"] as? Bool) == true { withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) { open = false }; deleteStep = false; return }
         if (dict["update"] as? Bool) == true {
             if let s = dict["saving"] as? Bool { saving = s }
             if let d = dict["deleting"] as? Bool { deleting = d }
@@ -130,6 +130,14 @@ final class EsheetModel: ObservableObject {
               "bio": bio, "share": share, "lang": lang, "consent": consent])
     }
     func dismiss() { send(["kind": "dismiss"]) }
+
+    /// Native-lokal luk: glid siden ud MED DET SAMME (samme fjeder som ind), og giv web besked.
+    /// Web-ekkoet {close:true} rammer bagefter og er idempotent (open er allerede false).
+    func close() {
+        guard open else { return }
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) { open = false }
+        dismiss()
+    }
     func chooseLang(_ v: String) { lang = v }
     func chooseConsent(_ v: String) { consent = v }
     /// Åbner privatlivspolitikken i i-app-browseren OVENPÅ siden — brugeren bliver i
@@ -220,7 +228,7 @@ struct EditProfilePage: View {
                     title: cropIsBanner ? model.bannerLabel : model.picLabel,
                     cancelLabel: model.cancelLabel,
                     useLabel: model.useLabel,
-                    onCancel: { cropImage = nil; pickerItem = nil; bannerItem = nil },
+                    onCancel: { withAnimation(.easeOut(duration: 0.2)) { cropImage = nil }; pickerItem = nil; bannerItem = nil },
                     onDone: { cropped in
                         if cropIsBanner {
                             if let dataURL = vfImageDataURL(cropped, maxEdge: 1600) {
@@ -229,7 +237,7 @@ struct EditProfilePage: View {
                         } else if let dataURL = vfImageDataURL(cropped) {
                             model.stagePickedImage(cropped, dataURL: dataURL)
                         }
-                        cropImage = nil; pickerItem = nil; bannerItem = nil
+                        withAnimation(.easeOut(duration: 0.2)) { cropImage = nil }; pickerItem = nil; bannerItem = nil
                     }
                 )
                 .transition(.opacity)
@@ -278,7 +286,7 @@ struct EditProfilePage: View {
                 .padding(.horizontal, 84)
             HStack {
                 Button {
-                    if model.deleteStep { model.deleteStep = false } else { model.dismiss() }
+                    if model.deleteStep { model.deleteStep = false } else { model.close() }
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 20, weight: .medium))
@@ -534,7 +542,7 @@ struct EditProfilePage: View {
         Task {
             if let data = try? await item.loadTransferable(type: Data.self), let img = UIImage(data: data) {
                 let small = vfDownscaled(img, maxEdge: 2400)
-                await MainActor.run { cropIsBanner = false; cropImage = small }
+                await MainActor.run { cropIsBanner = false; withAnimation(.easeOut(duration: 0.2)) { cropImage = small } }
             }
         }
     }
@@ -544,7 +552,7 @@ struct EditProfilePage: View {
         Task {
             if let data = try? await item.loadTransferable(type: Data.self), let img = UIImage(data: data) {
                 let small = vfDownscaled(img, maxEdge: 2400)
-                await MainActor.run { cropIsBanner = true; cropImage = small }
+                await MainActor.run { cropIsBanner = true; withAnimation(.easeOut(duration: 0.2)) { cropImage = small } }
             }
         }
     }
