@@ -572,10 +572,16 @@ struct MemoryGalleryScreen: View {
     var body: some View {
         ZStack {
             vfBackground.ignoresSafeArea()   // matcher appens tema (#161616/off-white) — kameraet har sit eget sorte chrome
-            if model.step == .camera {
+            // Kameraet holdes MONTERET så længe vi er på kamera- ELLER galleri-trinnet, så
+            // galleriet glider ned over et LEVENDE preview når man lukker det (samme som når
+            // det åbner — ingen sort genstart). Sessionen stoppes først når man går dybere
+            // (beskær/billedtekst) eller lukker komposeren. allowsHitTesting: kun aktivt tryk
+            // på kameraet når det faktisk er det synlige trin.
+            if model.step == .camera || model.step == .gallery {
                 MemoryCameraScreen()   // fuldskærm, eget kamera-chrome
-                    .transition(.opacity)
-            } else {
+                    .allowsHitTesting(model.step == .camera)
+            }
+            if model.step != .camera {
                 VStack(spacing: 0) {
                     navBar
                     Divider().opacity(0.4)
@@ -590,7 +596,8 @@ struct MemoryGalleryScreen: View {
                     }
                 }
                 .background(vfBackground.ignoresSafeArea())   // uigennemsigtig mens den glider op
-                // Galleriet/beskæreren glider op nedefra over kameraet (iOS-foto-vælger-agtigt).
+                // Galleriet/beskæreren glider op nedefra over kameraet (iOS-foto-vælger-agtigt)
+                // og NED igen når man lukker — symmetrisk, og nu over et levende kamera.
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
