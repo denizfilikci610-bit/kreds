@@ -795,31 +795,47 @@ struct MemoryGalleryScreen: View {
     private var caption: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                if let vurl = model.capturedVideoURL {
-                    // Rammen følger posterens format (1080×566 vandret, ellers 4:5), så en
-                    // vandret video ikke klemmes ind i en 4:5-boks. Posteren er allerede
-                    // beskåret til det færdige format, og afspilleren fylder (resizeAspectFill).
-                    let vAspect: CGFloat = (model.capturedImage.map { $0.size.height > 0 ? $0.size.width / $0.size.height : 4.0 / 5.0 }) ?? 4.0 / 5.0
-                    LoopingVideoView(url: vurl)       // loop af den optagne video (neutral, som eksporten)
-                        .aspectRatio(vAspect, contentMode: .fit)
-                        .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.5)
-                        .clipped()
-                        .padding(.bottom, 6)
-                } else if let shot = model.capturedImage {
-                    Image(uiImage: shot).resizable().scaledToFit()   // hele 4:5, ikke beskåret
-                        .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.5)
-                        .padding(.bottom, 6)
-                } else if let ci = model.croppedImage {
-                    Image(uiImage: ci).resizable().scaledToFit()   // det godkendte 1080-udsnit
-                        .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.5)
-                        .padding(.bottom, 6)
-                } else if let sel = model.selected {
-                    PreviewPane(asset: sel).frame(height: UIScreen.main.bounds.height * 0.34).padding(.bottom, 6)
+                // Kreds-vælgeren ligger ØVERST (over preview) — man vælger hvor mindet deles først.
+                if !model.isStory {
+                    Text(model.destLabel.uppercased()).font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.secondary).kerning(0.4)
+                        .padding(.leading, 16).padding(.top, 14).padding(.bottom, 8)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            destPill("all", model.allLabel)
+                            ForEach(model.feeds) { f in destPill(f.id, f.name) }
+                        }.padding(.horizontal, 16)
+                    }
+                    Divider().opacity(0.4).padding(.top, 14)
                 }
+
+                // Preview
+                Group {
+                    if let vurl = model.capturedVideoURL {
+                        // Rammen følger posterens format (1080×566 vandret, ellers 4:5), så en
+                        // vandret video ikke klemmes ind i en 4:5-boks. Posteren er allerede
+                        // beskåret til det færdige format, og afspilleren fylder (resizeAspectFill).
+                        let vAspect: CGFloat = (model.capturedImage.map { $0.size.height > 0 ? $0.size.width / $0.size.height : 4.0 / 5.0 }) ?? 4.0 / 5.0
+                        LoopingVideoView(url: vurl)       // loop af den optagne video (neutral, som eksporten)
+                            .aspectRatio(vAspect, contentMode: .fit)
+                            .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.4)
+                            .clipped()
+                    } else if let shot = model.capturedImage {
+                        Image(uiImage: shot).resizable().scaledToFit()   // hele formatet, ikke beskåret
+                            .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.4)
+                    } else if let ci = model.croppedImage {
+                        Image(uiImage: ci).resizable().scaledToFit()   // det godkendte 1080-udsnit
+                            .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height * 0.4)
+                    } else if let sel = model.selected {
+                        PreviewPane(asset: sel).frame(height: UIScreen.main.bounds.height * 0.34)
+                    }
+                }
+                .padding(.top, model.isStory ? 0 : 12)
+
                 if !model.isStory {   // en story har ingen billedtekst
                 TextField(model.captionPlaceholder, text: $model.caption, axis: .vertical)
                     .font(.system(size: 16)).lineLimit(1...5)
-                    .padding(.horizontal, 16).padding(.vertical, 12)
+                    .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 12)
                 if !mentionHits.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
@@ -842,17 +858,12 @@ struct MemoryGalleryScreen: View {
                     .padding(.bottom, 8)
                 }
                 }
-                Divider().opacity(0.4)
-                Text(model.destLabel.uppercased()).font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.secondary).kerning(0.4).padding(.leading, 16).padding(.top, 14).padding(.bottom, 6)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        destPill("all", model.allLabel)
-                        ForEach(model.feeds) { f in destPill(f.id, f.name) }
-                    }.padding(.horizontal, 16)
-                }
             }
         }
+        // Siden er LÅST: den "glider" ikke når indholdet passer skærmen. Kun når tastaturet er
+        // oppe (og indholdet fylder mere) kan man trække — og et swipe ned trækker tastaturet væk.
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.interactively)
     }
 
     /// @-kandidater der matcher det token brugeren er ved at skrive i captionen
