@@ -1396,18 +1396,11 @@ function timelineClick(e){
       // Dobbelttryk = like — det afventende enkelt-tryk (lightbox) annulleres
       clearTimeout(tapTimer);
       tapTimer = null;
-      // Pop KUN det store hjerte når mindet faktisk går fra ikke-liket til liket.
-      // Ellers ville gentagne hurtige tryk (minde-billeder åbner intet på enkelt-tryk)
-      // poppe hjertet igen og igen = det "blinker"/strober. Nu: præcis ét rent pop.
-      const mp = findPost(id);
-      const wasLiked = !!(mp && mp.liked);
       setLike(id, true);
       const bh = media.querySelector(".bigheart");
-      if(bh && !wasLiked){
-        bh.classList.remove("go");
-        void bh.offsetWidth;
-        bh.classList.add("go");
-      }
+      bh.classList.remove("go");
+      void bh.offsetWidth;
+      bh.classList.add("go");
       lastTap = { id:null, t:0 };
     } else {
       lastTap = { id:id, t:now };
