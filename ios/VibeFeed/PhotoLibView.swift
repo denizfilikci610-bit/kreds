@@ -446,19 +446,6 @@ final class PhotoLibModel: NSObject, ObservableObject {
         }
     }
 
-    /// Transform: orientér kildesporet og aspect-fill-beskær det ind i 4:5-render-størrelsen.
-    private func aspectFill45(track: AVAssetTrack, render: CGSize) -> CGAffineTransform {
-        let pt = track.preferredTransform
-        let oriented = track.naturalSize.applying(pt)
-        let ow = abs(oriented.width), oh = abs(oriented.height)
-        guard ow > 0, oh > 0 else { return pt }
-        let scale = max(render.width / ow, render.height / oh)
-        let tx = (render.width - ow * scale) / 2, ty = (render.height - oh * scale) / 2
-        return pt
-            .concatenating(CGAffineTransform(scaleX: scale, y: scale))
-            .concatenating(CGAffineTransform(translationX: tx, y: ty))
-    }
-
     /// Export the chosen ≤6 s window (or the whole clip if it was already short) to a small H.264 mp4.
     /// Trimming keeps the upload tiny + fast (a full-length video would blow the Storage size limit —
     /// that was the "can't share video" symptom).
@@ -962,7 +949,6 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
     // horisont-plan, og capture-vinklen bages ind i foto/video ved optagelse, så et vandret
     // motiv kommer ud i landscape (1080×566) korrekt vendt. Preview-RAMMEN skifter ikke form.
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
-    private var rotationObs: NSKeyValueObservation?
 
     /// Bed om kamera- (og mikrofon-) adgang og start sessionen. Callbacks kaldes på main-tråden.
     func start(onCapture: @escaping (UIImage) -> Void, onVideo: @escaping (URL) -> Void) {
@@ -1026,19 +1012,12 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
         setupRotation(for: device)
     }
 
-    /// Følg telefonens FYSISKE orientering (uafhængigt af app'ens portrait-lås) via
-    /// RotationCoordinator. Vi renderer selv videoDataOutput-bufferen i et fast Metal-view
-    /// (ikke et AVCaptureVideoPreviewLayer), så vi bruger CAPTURE-vinklen (horisont-plan for
-    /// optaget medie, layer-uafhængig) til BÅDE søgeren og selve optagelsen. Preview-vinklen
-    /// forudsætter et preview-layer og gav forkert rotation (lodret vistes sidelæns).
+    /// RotationCoordinator bruges KUN til capture-vinklen, som læses i optage-øjeblikket
+    /// (applyCaptureRotation) så et vandret-holdt foto/video kommer ud i landscape. Søgeren
+    /// roterer bevidst IKKE med telefonen — den er låst til fast oprejst portræt, så preview'et
+    /// aldrig zoomer/forvrænges når man drejer. AL orientering håndteres EFTER optagelsen.
     private func setupRotation(for device: AVCaptureDevice) {
-        rotationObs = nil
-        let coord = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
-        rotationCoordinator = coord
-        rotationObs = coord.observe(\.videoRotationAngleForHorizonLevelCapture, options: [.initial, .new]) { [weak self] _, _ in
-            guard let self else { return }
-            self.queue.async { self.updatePreviewConnection() }
-        }
+        rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
     }
 
     /// Sæt en capture-forbindelse (foto/video) til horisont-plan-vinklen, så det tagne medie
@@ -1065,12 +1044,12 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
         }
     }
 
-    /// Søger-forbindelsen: rotationsvinklen følger telefonens orientering (capture horisont-plan),
-    /// så motivet altid vises oprejst (lodret = oprejst, vandret = oprejst). Front-kameraet spejles.
+    /// Søger-forbindelsen er LÅST til fast oprejst portræt (90°). Den roterer ALDRIG med
+    /// telefonen, så preview'et er stabilt og aldrig forvrænget/zoomet. Orienteringen bages
+    /// først ind i det TAGNE medie (applyCaptureRotation). Front-kameraet spejles.
     private func updatePreviewConnection() {
         guard let c = videoDataOutput.connection(with: .video) else { return }
-        let angle = rotationCoordinator?.videoRotationAngleForHorizonLevelCapture ?? 90
-        if c.isVideoRotationAngleSupported(angle) { c.videoRotationAngle = angle }
+        if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
         c.automaticallyAdjustsVideoMirroring = false
         if c.isVideoMirroringSupported { c.isVideoMirrored = (position == .front) }
     }
