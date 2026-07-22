@@ -191,7 +191,7 @@ struct ListPageView: View {
             tabButton("friends", model.L("friendsTab"))
             tabButton("kredse", model.L("kredseTab"))
         }
-        .overlay(alignment: .bottom) { Rectangle().fill(hairline).frame(height: 0.5) }
+        // Ingen skillelinje under fane-rækken (ejer-ønske; aktiv fane har stadig sin egen understregning)
     }
 
     private func tabButton(_ id: String, _ label: String) -> some View {
