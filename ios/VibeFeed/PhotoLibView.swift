@@ -43,12 +43,15 @@ enum VFFilmLook {
 /// window.vfMemory. Fully native compose; the web owns only the Supabase upload/insert. Browser + the
 /// pre-flag build keep the web file-picker fallback (gated on window.__vfPhotoLib).
 
+/// Landscape-minde: 1080×566 (≈1.91:1). Tredje format ved siden af 1:1 og 4:5.
+let VF_LANDSCAPE_ASPECT: CGFloat = 1080.0 / 566.0
+
 struct PLFeed: Identifiable, Equatable { let id: String; let name: String }
 
 final class PhotoLibModel: NSObject, ObservableObject {
     static let shared = PhotoLibModel()
 
-    enum Step { case camera, gallery, trim, crop, caption }
+    enum Step { case camera, gallery, trim, crop, videocrop, caption }
     @Published var open = false
     @Published var forCompose = false   // åbnet fra en TANKE (Tag med kamera) → hæft medie, opret ikke minde
     @Published var isStory = false      // STORY-tilstand → indsæt i stories (24t), ingen billedtekst, 9:16
@@ -63,6 +66,13 @@ final class PhotoLibModel: NSObject, ObservableObject {
     var curShare: String { isStory ? (shareStory.isEmpty ? shareLabel : shareStory) : (shareMemory.isEmpty ? shareLabel : shareMemory) }
     /// Output-pixelmål: story fylder hele skærmen (9:16), minde er 4:5
     func outSize() -> CGSize { isStory ? CGSize(width: 1080, height: 1920) : CGSize(width: 1080, height: 1350) }
+    /// Output-pixelmål for et minde-udsnit ud fra det VALGTE format (1:1 / 4:5 / landscape).
+    func memTarget(_ aspect: CGFloat) -> CGSize {
+        if isStory { return CGSize(width: 1080, height: 1920) }
+        if abs(aspect - 1) < 0.02 { return CGSize(width: 1080, height: 1080) }   // 1:1
+        if aspect > 1.4 { return CGSize(width: 1080, height: 566) }              // landscape (1.91:1)
+        return CGSize(width: 1080, height: 1350)                                 // 4:5
+    }
     @Published var step: Step = .camera
     @Published var status: PHAuthorizationStatus = .notDetermined
     @Published var assets: [PHAsset] = []
@@ -74,6 +84,9 @@ final class PhotoLibModel: NSObject, ObservableObject {
     @Published var cropAspect: CGFloat = 4.0 / 5.0
     @Published var fitLabel = ""
     @Published var capturedVideoURL: URL?    // en video optaget med det indbyggede kamera (≤6 s)
+    // Galleri-video → beskærings-trin (fuld træk/zoom, samme som billeder)
+    @Published var videoCropRect: CGRect?    // valgt udsnit (0-1, top-venstre, oprejst video-rum); nil = ingen crop
+    @Published var videoOriented: CGSize = .zero  // videosporets oprejste pixel-størrelse
     @Published var caption = ""
     @Published var dest = "all"
     @Published var mentionables: [String: [MentionCard]] = [:] // @-kandidater pr. destination (fra web)
@@ -159,6 +172,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
         videoAsset = nil; videoDuration = 0; trimStart = 0; trimDuration = VF_MAX_VID; showTrimStep = false; preparingTrim = false
         pendingData = nil; exportSession = nil; trimReqSeq += 1
         cropSource = nil; croppedImage = nil; cropAspect = 4.0 / 5.0
+        videoCropRect = nil; videoOriented = .zero
         open = true
         requestAndLoad()
     }
@@ -255,16 +269,20 @@ final class PhotoLibModel: NSObject, ObservableObject {
             DispatchQueue.main.async {
                 guard seq == self.trimReqSeq else { return } // superseded by a newer request / reopen
                 self.preparingTrim = false
-                guard let avAsset else { self.showTrimStep = false; if self.forCompose { self.share() } else { self.step = .caption }; return }
+                guard let avAsset else { self.showTrimStep = false; self.afterVideoReady(); return }
                 self.videoAsset = avAsset
+                // Oprejst pixel-størrelse (til video-beskæreren) — samme rum som req.sourceImage i eksporten.
+                if let vt = avAsset.tracks(withMediaType: .video).first {
+                    let os = vt.naturalSize.applying(vt.preferredTransform)
+                    self.videoOriented = CGSize(width: abs(os.width), height: abs(os.height))
+                } else { self.videoOriented = .zero }
                 let dur = CMTimeGetSeconds(avAsset.duration)
                 self.videoDuration = (dur.isFinite && dur > 0) ? dur : 0
                 self.trimDuration = min(VF_MAX_VID, max(0.1, self.videoDuration))
                 self.trimStart = 0
                 self.showTrimStep = self.videoDuration > VF_MAX_VID + 0.05
                 if self.showTrimStep { self.step = .trim }
-                else if self.forCompose { self.share() }
-                else { self.step = .caption }
+                else { self.afterVideoReady() }
             }
         }
         // Safety: never leave the "Videre" spinner stuck if the callback is dropped (rare iCloud edge).
@@ -321,9 +339,24 @@ final class PhotoLibModel: NSObject, ObservableObject {
         step = .caption
     }
 
-    /// Et foto taget med kameraet → beskær til præcis 4:5 (1080x1350). Tanke: upload straks; minde: billedtekst.
+    /// Efter en galleri-video er klar (asset loadet, evt. trimmet): minde → video-beskærer,
+    /// tanke → upload straks, story → billedtekst (uændret adfærd for de to sidste).
+    func afterVideoReady() {
+        if forCompose { share() }
+        else if isStory { step = .caption }
+        else { cropAspect = 4.0 / 5.0; step = .videocrop }
+    }
+
+    /// Video-udsnit godkendt (normaliseret rect) → billedtekst. exportTrimmedVideo beskærer efter.
+    func useVideoCrop(_ rect: CGRect) {
+        videoCropRect = rect
+        step = .caption
+    }
+
+    /// Et foto taget med kameraet → beskær til minde-formatet (4:5 lodret, 1080×566 vandret).
+    /// Tanke: upload straks; minde: billedtekst.
     func useCaptured(_ image: UIImage) {
-        capturedImage = cropTo45(image)
+        capturedImage = cropToSize(image, cameraTarget(image))
         capturedVideoURL = nil
         selected = nil; videoAsset = nil; showTrimStep = false
         cropSource = nil; croppedImage = nil
@@ -338,10 +371,8 @@ final class PhotoLibModel: NSObject, ObservableObject {
         if forCompose { share() } else { step = .caption }
     }
 
-    /// Center-beskær + skalér til det aktuelle format (minde 4:5, story 9:16).
-    /// draw(in:) respekterer orienteringen.
-    private func cropTo45(_ image: UIImage) -> UIImage {
-        let out = outSize()
+    /// Center-beskær (aspectFill) + skalér et billede til et givet output-format. draw respekterer orienteringen.
+    private func cropToSize(_ image: UIImage, _ out: CGSize) -> UIImage {
         let fmt = UIGraphicsImageRendererFormat.default(); fmt.scale = 1; fmt.opaque = true
         return UIGraphicsImageRenderer(size: out, format: fmt).image { _ in
             let iw = image.size.width, ih = image.size.height
@@ -351,6 +382,12 @@ final class PhotoLibModel: NSObject, ObservableObject {
             image.draw(in: CGRect(x: (out.width - dw) / 2, y: (out.height - dh) / 2, width: dw, height: dh))
         }
     }
+    /// Kamera-output-format ud fra billedets orientering: vandret → landscape (1080×566),
+    /// lodret → 4:5; en story er altid 9:16.
+    private func cameraTarget(_ image: UIImage) -> CGSize {
+        if isStory { return CGSize(width: 1080, height: 1920) }
+        return image.size.width > image.size.height ? CGSize(width: 1080, height: 566) : CGSize(width: 1080, height: 1350)
+    }
 
     /// Første frame af en video som poster (til billedtekst-forhåndsvisningen).
     private func posterFrame(_ url: URL) -> UIImage? {
@@ -358,14 +395,18 @@ final class PhotoLibModel: NSObject, ObservableObject {
         gen.appliesPreferredTrackTransform = true
         gen.maximumSize = CGSize(width: 1080, height: 1920)
         guard let cg = try? gen.copyCGImage(at: CMTime(seconds: 0.1, preferredTimescale: 600), actualTime: nil) else { return nil }
-        return cropTo45(VFFilmLook.applyStill(UIImage(cgImage: cg)))   // poster matcher den færdige video
+        let ui = VFFilmLook.applyStill(UIImage(cgImage: cg))
+        return cropToSize(ui, cameraTarget(ui))   // poster matcher den færdige video (samme orientering)
     }
 
     /// Beskær den optagne video til 4:5 (1080x1350) via en video-composition og upload som mp4.
     private func export45Video(_ url: URL) {
         let asset = AVURLAsset(url: url)
-        guard asset.tracks(withMediaType: .video).first != nil else { sharing = false; onUploadFailed?(); return }
-        let render = outSize()   // minde 1080x1350, story 1080x1920
+        guard let vt = asset.tracks(withMediaType: .video).first else { sharing = false; onUploadFailed?(); return }
+        // Vandret optaget video → landscape-output (1080×566); ellers 4:5 (story = 9:16).
+        let os = vt.naturalSize.applying(vt.preferredTransform)
+        let landscape = abs(os.width) > abs(os.height)
+        let render = (landscape && !isStory) ? CGSize(width: 1080, height: 566) : outSize()
         // CI-pipeline pr. frame: aspect-fill-beskær til render-størrelsen
         // (sourceImage kommer allerede opret — preferredTransform er anvendt)
         let comp = AVMutableVideoComposition(asset: asset) { req in
@@ -436,6 +477,28 @@ final class PhotoLibModel: NSObject, ObservableObject {
         export.outputURL = out
         export.outputFileType = .mp4
         export.shouldOptimizeForNetworkUse = true
+        // Minde-video: beskær til det VALGTE udsnit + format (samme oplevelse som billeder).
+        // req.sourceImage er allerede oprejst (preferredTransform anvendt), så crop-rect'en
+        // (0-1, top-venstre i det oprejste rum) mapper 1:1 til extent'en; Y flippes til CIImage.
+        if let crop = videoCropRect {
+            let render = memTarget(cropAspect)
+            let comp = AVMutableVideoComposition(asset: avAsset) { req in
+                let src = req.sourceImage
+                let e = src.extent
+                let W = max(1, e.width), H = max(1, e.height)
+                let cw = max(1, crop.width * W), ch = max(1, crop.height * H)
+                let cx = e.origin.x + crop.origin.x * W
+                let cy = e.origin.y + (H - crop.origin.y * H - ch)
+                var img = src.cropped(to: CGRect(x: cx, y: cy, width: cw, height: ch))
+                img = img.transformed(by: CGAffineTransform(translationX: -cx, y: -cy))
+                img = img.transformed(by: CGAffineTransform(scaleX: render.width / cw, y: render.height / ch))
+                img = img.cropped(to: CGRect(origin: .zero, size: render))
+                req.finish(with: img, context: VFFilmLook.context)
+            }
+            comp.renderSize = render
+            comp.frameDuration = CMTime(value: 1, timescale: 30)
+            export.videoComposition = comp
+        }
         export.timeRange = CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 600),
                                        duration: CMTime(seconds: length, preferredTimescale: 600))
         export.exportAsynchronously { [weak self] in
@@ -531,6 +594,7 @@ struct MemoryGalleryScreen: View {
                     case .trim:
                         if let a = model.videoAsset { VideoTrimView(asset: a) } else { gallery }
                     case .crop: cropStep
+                    case .videocrop: videoCropStep
                     case .caption: caption
                     }
                 }
@@ -546,9 +610,11 @@ struct MemoryGalleryScreen: View {
                 case .gallery: if model.forCompose { model.dismiss() } else { model.step = .camera }  // tanke: annuller lukker; minde: tilbage til kameraet
                 case .trim: model.step = .gallery
                 case .crop: model.step = .gallery
+                case .videocrop: model.step = model.showTrimStep ? .trim : .gallery
                 case .caption:
                     if model.capturedImage != nil { model.step = .camera }
                     else if model.croppedImage != nil { model.step = .crop } // tilbage til beskæringen
+                    else if model.videoCropRect != nil { model.step = .videocrop } // tilbage til video-beskæringen
                     else { model.step = model.showTrimStep ? .trim : .gallery }
                 }
             }
@@ -569,10 +635,10 @@ struct MemoryGalleryScreen: View {
                 }
                 .disabled(model.selected == nil || model.preparingTrim || model.sharing)
             case .trim:
-                Button(model.nextLabel) { if model.forCompose { model.share() } else { model.step = .caption } }
+                Button(model.nextLabel) { model.afterVideoReady() }
                     .font(.system(size: 16, weight: .bold)).foregroundStyle(vfRed)
-            case .crop:
-                EmptyView()   // beskærings-trinnet har sine egne knapper
+            case .crop, .videocrop:
+                EmptyView()   // beskærings-trinnene har deres egne knapper
             case .caption:
                 Button { model.share() } label: {
                     if model.sharing { ProgressView() } else {
@@ -647,11 +713,7 @@ struct MemoryGalleryScreen: View {
                     image: src,
                     aspect: model.cropAspect,
                     circular: false,
-                    targetSize: model.isStory
-                        ? CGSize(width: 1080, height: 1920)
-                        : (model.cropAspect == 1
-                            ? CGSize(width: 1080, height: 1080)
-                            : CGSize(width: 1080, height: 1350)),
+                    targetSize: model.memTarget(model.cropAspect),
                     title: "",
                     cancelLabel: model.cancelLabel,
                     useLabel: model.nextLabel,
@@ -664,29 +726,62 @@ struct MemoryGalleryScreen: View {
                 if !model.fitLabel.isEmpty {
                     Text(model.fitLabel)
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.primary.opacity(0.9))   // tema-bevidst (skærmen er ikke sort længere)
+                        .foregroundStyle(.white)   // crop-baggrunden (VFCropView) er sort
                 }
                 if !model.isStory {   // story er ALTID fuldskærms 9:16 — ingen format-valg
-                    HStack(spacing: 8) {
-                        aspectPill("1:1", value: 1)
-                        aspectPill("4:5", value: 4.0 / 5.0)
-                    }
+                    aspectPills   // 1:1 / 4:5 / landscape
                 }
             }
             .padding(.top, 10)
         }
     }
 
-    private func aspectPill(_ label: String, value: CGFloat) -> some View {
-        let on = abs(model.cropAspect - value) < 0.01
+    /// Format-piller som ikoner (kvadrat / stående / liggende) — ingen tekst at oversætte.
+    private var aspectPills: some View {
+        HStack(spacing: 8) {
+            aspectPill("square", value: 1)
+            aspectPill("rectangle.portrait", value: 4.0 / 5.0)
+            aspectPill("rectangle", value: VF_LANDSCAPE_ASPECT)   // landscape 1080×566
+        }
+    }
+
+    private func aspectPill(_ symbol: String, value: CGFloat) -> some View {
+        let on = abs(model.cropAspect - value) < 0.02
         return Button { model.cropAspect = value } label: {
-            Text(label)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(on ? .white : Color.primary)   // inaktiv følger temaet (før hvid-på-sort)
-                .padding(.horizontal, 18).padding(.vertical, 8)
-                .background(Capsule().fill(on ? vfRed : Color.primary.opacity(0.12)))
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(on ? .white : .white.opacity(0.85))   // crop-baggrunden er sort
+                .frame(width: 30, height: 26)
+                .background(Capsule().fill(on ? vfRed : Color.white.opacity(0.18)))
         }
         .buttonStyle(.plain)
+    }
+
+    /// Video-beskærings-trinnet: fuld træk/zoom af den loopende video, samme format-piller.
+    private var videoCropStep: some View {
+        ZStack(alignment: .top) {
+            if let a = model.videoAsset {
+                VFVideoCropView(
+                    asset: a,
+                    trimStart: model.trimStart,
+                    trimDuration: model.trimDuration,
+                    orientedSize: model.videoOriented,
+                    aspect: model.cropAspect,
+                    cancelLabel: model.cancelLabel,
+                    useLabel: model.nextLabel,
+                    onCancel: { model.step = model.showTrimStep ? .trim : .gallery },
+                    onDone: { model.useVideoCrop($0) }
+                )
+                .id(model.cropAspect)   // frisk ramme + afspiller når formatet skiftes
+            }
+            VStack(spacing: 7) {
+                if !model.fitLabel.isEmpty {
+                    Text(model.fitLabel).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                }
+                if !model.isStory { aspectPills }
+            }
+            .padding(.top, 10)
+        }
     }
 
     private var caption: some View {
@@ -858,7 +953,13 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
     @Published var secondsLeft = 0                    // nedtælling under optagelse (6 → 0)
     @Published var zoomFactor: CGFloat = 1.0          // aktuel zoom (1x → maks)
     @Published var position: AVCaptureDevice.Position = .back
+    @Published var captureLandscape = false           // telefonen holdes vandret → landscape-output
     private var countdownTimer: Timer?
+    // Fysisk orientering (uafhængig af app'ens portrait-lås). Roterer capture + preview
+    // så et vandret foto/video kommer ud i landscape (1080×566) korrekt vendt.
+    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
+    private var previewAngleObs: NSKeyValueObservation?
+    private var captureAngleObs: NSKeyValueObservation?
 
     /// Bed om kamera- (og mikrofon-) adgang og start sessionen. Callbacks kaldes på main-tråden.
     func start(onCapture: @escaping (UIImage) -> Void, onVideo: @escaping (URL) -> Void) {
@@ -919,6 +1020,32 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
               let newInput = try? AVCaptureDeviceInput(device: device),
               session.canAddInput(newInput) else { return }
         session.addInput(newInput); videoInput = newInput
+        setupRotation(for: device)
+    }
+
+    /// Følg telefonens FYSISKE orientering (uafhængigt af app'ens portrait-lås) via
+    /// RotationCoordinator. Preview-vinklen holder søgeren horisont-plan; capture-vinklen
+    /// bruges til frame-formen (portrait 4:5 ↔ landscape) og bages ind i foto/video ved optagelse.
+    private func setupRotation(for device: AVCaptureDevice) {
+        previewAngleObs = nil; captureAngleObs = nil
+        let coord = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
+        rotationCoordinator = coord
+        previewAngleObs = coord.observe(\.videoRotationAngleForHorizonLevelPreview, options: [.initial, .new]) { [weak self] _, _ in
+            guard let self else { return }
+            self.queue.async { self.updatePreviewConnection() }
+        }
+        captureAngleObs = coord.observe(\.videoRotationAngleForHorizonLevelCapture, options: [.initial, .new]) { [weak self] c, _ in
+            let landscape = Int(c.videoRotationAngleForHorizonLevelCapture.rounded()) % 180 == 0
+            DispatchQueue.main.async { self?.captureLandscape = landscape }
+        }
+    }
+
+    /// Sæt en capture-forbindelse (foto/video) til horisont-plan-vinklen, så det tagne medie
+    /// kommer ud korrekt vendt uanset hvordan telefonen holdes.
+    private func applyCaptureRotation(_ c: AVCaptureConnection?) {
+        guard let c, let coord = rotationCoordinator else { return }
+        let a = coord.videoRotationAngleForHorizonLevelCapture
+        if c.isVideoRotationAngleSupported(a) { c.videoRotationAngle = a }
     }
 
     private func setAudioInput() {
@@ -937,10 +1064,12 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
         }
     }
 
-    /// Søger-forbindelsen leverer OPRETTE (portræt) og front-spejlede frames.
+    /// Søger-forbindelsen: rotationsvinklen følger telefonens orientering (horisont-plan),
+    /// så et vandret motiv vises korrekt. Front-kameraet spejles.
     private func updatePreviewConnection() {
         guard let c = videoDataOutput.connection(with: .video) else { return }
-        if c.isVideoRotationAngleSupported(90) { c.videoRotationAngle = 90 }
+        let angle = rotationCoordinator?.videoRotationAngleForHorizonLevelPreview ?? 90
+        if c.isVideoRotationAngleSupported(angle) { c.videoRotationAngle = angle }
         c.automaticallyAdjustsVideoMirroring = false
         if c.isVideoMirroringSupported { c.isVideoMirrored = (position == .front) }
     }
@@ -1001,6 +1130,7 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
     func capture() {
         queue.async { [weak self] in
             guard let self, self.session.isRunning, !self.movieOutput.isRecording else { return }
+            self.applyCaptureRotation(self.photoOutput.connection(with: .video))   // vandret → landscape-foto
             let settings = AVCapturePhotoSettings()
             let mode: AVCaptureDevice.FlashMode = self.flashOn ? .on : .off
             if self.photoOutput.supportedFlashModes.contains(mode) { settings.flashMode = mode }
@@ -1012,6 +1142,7 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
     func startRecording() {
         queue.async { [weak self] in
             guard let self, self.session.isRunning, !self.movieOutput.isRecording else { return }
+            self.applyCaptureRotation(self.movieOutput.connection(with: .video))   // vandret → landscape-video
             let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
             try? FileManager.default.removeItem(at: url)
             self.movieOutput.startRecording(to: url, recordingDelegate: self)

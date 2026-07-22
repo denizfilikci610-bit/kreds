@@ -43,16 +43,25 @@ struct VFCropView: View {
                     .allowsHitTesting(false)
                 Group {
                     if circular {
-                        Circle().stroke(Color.white.opacity(0.8), lineWidth: 1.5)
+                        Circle().stroke(Color.white.opacity(0.85), lineWidth: 1.5)
                             .frame(width: frame.width, height: frame.height)
                     } else {
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .stroke(Color.white.opacity(0.8), lineWidth: 1.5)
+                            .stroke(Color.white.opacity(0.9), lineWidth: 1.5)
                             .frame(width: frame.width, height: frame.height)
                     }
                 }
                 .position(x: geo.size.width / 2, y: geo.size.height / 2)
                 .allowsHitTesting(false)
+
+                // Rule-of-thirds-gitter (kun rektangulær beskæring) — hjælper med at komponere.
+                if !circular {
+                    ThirdsGrid()
+                        .stroke(Color.white.opacity(0.35), lineWidth: 0.5)
+                        .frame(width: frame.width, height: frame.height)
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                        .allowsHitTesting(false)
+                }
 
                 VStack {
                     Text(title)
@@ -120,9 +129,10 @@ struct VFCropView: View {
     }
 
     /// Crop frame centered on screen with side margins, honoring the target aspect.
+    /// Større ramme end før (fylder mere af skærmen) for en bedre beskærings-oplevelse.
     private func frameSize(in size: CGSize) -> CGSize {
-        let maxW = size.width - 32
-        let maxH = size.height * 0.6
+        let maxW = size.width - 24
+        let maxH = size.height * 0.72
         var w = maxW
         var h = w / aspect
         if h > maxH { h = maxH; w = h * aspect }
@@ -175,6 +185,20 @@ private struct CropMaskShape: Shape {
                           width: frame.width, height: frame.height)
         if circular { p.addEllipse(in: hole) }
         else { p.addRoundedRect(in: hole, cornerSize: CGSize(width: 4, height: 4)) }
+        return p
+    }
+}
+
+/// To lodrette + to vandrette linjer der deler rammen i tredjedele (kompositions-hjælp).
+struct ThirdsGrid: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        for i in 1...2 {
+            let x = rect.width * CGFloat(i) / 3
+            p.move(to: CGPoint(x: x, y: 0)); p.addLine(to: CGPoint(x: x, y: rect.height))
+            let y = rect.height * CGFloat(i) / 3
+            p.move(to: CGPoint(x: 0, y: y)); p.addLine(to: CGPoint(x: rect.width, y: y))
+        }
         return p
     }
 }
