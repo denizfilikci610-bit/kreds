@@ -957,13 +957,12 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
     @Published var secondsLeft = 0                    // nedtælling under optagelse (6 → 0)
     @Published var zoomFactor: CGFloat = 1.0          // aktuel zoom (1x → maks)
     @Published var position: AVCaptureDevice.Position = .back
-    @Published var captureLandscape = false           // telefonen holdes vandret → landscape-output
     private var countdownTimer: Timer?
-    // Fysisk orientering (uafhængig af app'ens portrait-lås). Roterer capture + preview
-    // så et vandret foto/video kommer ud i landscape (1080×566) korrekt vendt.
+    // Fysisk orientering (uafhængig af app'ens portrait-lås). Preview-forbindelsen holdes
+    // horisont-plan, og capture-vinklen bages ind i foto/video ved optagelse, så et vandret
+    // motiv kommer ud i landscape (1080×566) korrekt vendt. Preview-RAMMEN skifter ikke form.
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     private var previewAngleObs: NSKeyValueObservation?
-    private var captureAngleObs: NSKeyValueObservation?
 
     /// Bed om kamera- (og mikrofon-) adgang og start sessionen. Callbacks kaldes på main-tråden.
     func start(onCapture: @escaping (UIImage) -> Void, onVideo: @escaping (URL) -> Void) {
@@ -1029,18 +1028,15 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
 
     /// Følg telefonens FYSISKE orientering (uafhængigt af app'ens portrait-lås) via
     /// RotationCoordinator. Preview-vinklen holder søgeren horisont-plan; capture-vinklen
-    /// bruges til frame-formen (portrait 4:5 ↔ landscape) og bages ind i foto/video ved optagelse.
+    /// læses direkte ved optagelse (applyCaptureRotation) og bages ind i foto/video, så et
+    /// vandret motiv kommer ud i landscape. Preview-RAMMEN skifter derimod ikke form.
     private func setupRotation(for device: AVCaptureDevice) {
-        previewAngleObs = nil; captureAngleObs = nil
+        previewAngleObs = nil
         let coord = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
         rotationCoordinator = coord
         previewAngleObs = coord.observe(\.videoRotationAngleForHorizonLevelPreview, options: [.initial, .new]) { [weak self] _, _ in
             guard let self else { return }
             self.queue.async { self.updatePreviewConnection() }
-        }
-        captureAngleObs = coord.observe(\.videoRotationAngleForHorizonLevelCapture, options: [.initial, .new]) { [weak self] c, _ in
-            let landscape = Int(c.videoRotationAngleForHorizonLevelCapture.rounded()) % 180 == 0
-            DispatchQueue.main.async { self?.captureLandscape = landscape }
         }
     }
 
@@ -1359,10 +1355,10 @@ struct MemoryCameraScreen: View {
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width
-            // Minde: 4:5-optageområde (1080x1350), eller 1080×566 når telefonen holdes
-            // vandret. Story: HELE skærmen (1080x1920).
-            let fh = model.isStory ? geo.size.height
-                                   : (cam.captureLandscape ? w / VF_LANDSCAPE_ASPECT : w * 5.0 / 4.0)
+            // Minde: fast 4:5-optageområde (1080x1350). Preview-rammen skifter IKKE form når
+            // telefonen drejes. Holdes telefonen vandret, bliver kun OUTPUTTET landscape
+            // (cameraTarget/export detekterer orienteringen af det tagne medie). Story: fuld skærm.
+            let fh = model.isStory ? geo.size.height : w * 5.0 / 4.0
             ZStack {
                 Color.black.ignoresSafeArea()
 
@@ -1391,11 +1387,9 @@ struct MemoryCameraScreen: View {
                 }
                 .overlay(Rectangle().strokeBorder(Color.white.opacity(model.isStory ? 0 : 0.22), lineWidth: 1).frame(width: w, height: fh))
                 // Minde: 4:5-rammen ligger ØVERST (under top-kontrollerne), så den ikke
-                // rammer udløser-knappen og Minde/Story-vælgeren. En lav vandret ramme
-                // (1080×566) centreres i stedet, ligesom en story. Story: fuld skærm.
-                .padding(.top, (model.isStory || cam.captureLandscape) ? 0 : 106)
-                .frame(maxWidth: .infinity, maxHeight: .infinity,
-                       alignment: (model.isStory || cam.captureLandscape) ? .center : .top)
+                // rammer udløser-knappen og Minde/Story-vælgeren. Story: fuld skærm.
+                .padding(.top, model.isStory ? 0 : 106)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: model.isStory ? .center : .top)
                 .gesture(
                     MagnificationGesture()
                         .onChanged { scale in cam.setZoom(baseZoom * scale) }
