@@ -341,9 +341,11 @@ final class PhotoLibModel: NSObject, ObservableObject {
 
     /// Efter en galleri-video er klar (asset loadet, evt. trimmet): minde → video-beskærer,
     /// tanke → upload straks, story → billedtekst (uændret adfærd for de to sidste).
+    /// Kan asset'et ikke indlæses (videoAsset == nil, fx iCloud-fejl), springes beskæringen
+    /// over → billedtekst, så man ikke strander (delingen fejler så pænt via onUploadFailed).
     func afterVideoReady() {
         if forCompose { share() }
-        else if isStory { step = .caption }
+        else if isStory || videoAsset == nil { step = .caption }
         else { cropAspect = 4.0 / 5.0; step = .videocrop }
     }
 
