@@ -904,6 +904,9 @@ function profTimelineClick(e, isPv){
     const tab = tb.dataset.ptab; // grid | list | saved (saved renderes kun på egen profil)
     if(isPv){ pvTab = tab === "grid" ? "grid" : "list"; refreshPv(); }
     else { myTab = tab; renderMyPosts(); }
+    // Genafspil fade-in på det netop re-renderede indhold (kun ved bruger-fane-skift)
+    const c = el(isPv ? "pv-posts" : "myposts");
+    if(c){ c.classList.remove("vf-fadein"); void c.offsetWidth; c.classList.add("vf-fadein"); }
     return;
   }
   const gi = e.target.closest(".pgrid-item");

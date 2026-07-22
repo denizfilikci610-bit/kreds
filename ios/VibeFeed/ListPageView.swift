@@ -86,7 +86,7 @@ final class ListPageModel: ObservableObject {
 struct ListPageView: View {
     @ObservedObject private var model = ListPageModel.shared
     @FocusState private var searchFocused: Bool
-    @State private var dragX: CGFloat = 0
+    @State private var dragX: CGFloat = UIScreen.main.bounds.width
     @State private var dragging = false
 
     private let hairline = Color.primary.opacity(0.1)
@@ -150,7 +150,7 @@ struct ListPageView: View {
                     dragging = false
                 }
         )
-        .onAppear { dragX = 0; dragging = false }
+        .onAppear { dragging = false; withAnimation(.easeOut(duration: 0.28)) { dragX = 0 } }
     }
 
     // MARK: - Header (standard tilbage-chevron + profilens handle centreret)
@@ -284,48 +284,50 @@ struct ListPageView: View {
 
     /// Medlem: rækken hopper til kredsen (chevron). Ikke medlem: Anmod-knap (tap igen = fortryd).
     private func kredsRow(_ f: ListKredsRow) -> some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle().fill(chipFill)
-                // Kreds-ikonet: streg-ring med tre prikker (som webbens kchip)
+        Button { if f.isMember { model.kreds(f.id) } } label: {
+            HStack(spacing: 12) {
                 ZStack {
-                    Circle().strokeBorder(Color.secondary, lineWidth: 1.6)
-                    Circle().fill(Color.secondary).frame(width: 5, height: 5).offset(y: -10)
-                    Circle().fill(Color.secondary).frame(width: 5, height: 5).offset(x: -8.7, y: 5.2)
-                    Circle().fill(Color.secondary).frame(width: 5, height: 5).offset(x: 8.7, y: 5.2)
+                    Circle().fill(chipFill)
+                    // Kreds-ikonet: streg-ring med tre prikker (som webbens kchip)
+                    ZStack {
+                        Circle().strokeBorder(Color.secondary, lineWidth: 1.6)
+                        Circle().fill(Color.secondary).frame(width: 5, height: 5).offset(y: -10)
+                        Circle().fill(Color.secondary).frame(width: 5, height: 5).offset(x: -8.7, y: 5.2)
+                        Circle().fill(Color.secondary).frame(width: 5, height: 5).offset(x: 8.7, y: 5.2)
+                    }
+                    .frame(width: 20, height: 20)
                 }
-                .frame(width: 20, height: 20)
-            }
-            .frame(width: 46, height: 46)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(f.name)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.primary)
-                    .lineLimit(1)
-                Text(f.friends.isEmpty ? f.members : "\(f.members) · \(f.friends)")
-                    .font(.system(size: 13.5))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 8)
-            if f.isMember {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            } else {
-                Button { model.kredsReq(f.id, !f.requested) } label: {
-                    Text(model.L(f.requested ? "requested" : "request"))
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(f.requested ? Color.secondary : .white)
-                        .padding(.vertical, 8).padding(.horizontal, 14)
-                        .background(Capsule().fill(f.requested ? chipFill : vfRed))
+                .frame(width: 46, height: 46)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(f.name)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Color.primary)
+                        .lineLimit(1)
+                    Text(f.friends.isEmpty ? f.members : "\(f.members) · \(f.friends)")
+                        .font(.system(size: 13.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                .buttonStyle(.vfPressPop)
+                Spacer(minLength: 8)
+                if f.isMember {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                } else {
+                    Button { model.kredsReq(f.id, !f.requested) } label: {
+                        Text(model.L(f.requested ? "requested" : "request"))
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(f.requested ? Color.secondary : .white)
+                            .padding(.vertical, 8).padding(.horizontal, 14)
+                            .background(Capsule().fill(f.requested ? chipFill : vfRed))
+                    }
+                    .buttonStyle(.vfPressPop)
+                }
             }
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 16).padding(.vertical, 8)
-        .contentShape(Rectangle())
-        .onTapGesture { if f.isMember { model.kreds(f.id) } }
+        .buttonStyle(.vfPressCard)
     }
 }
 
@@ -337,9 +339,7 @@ struct ListPageHost: ViewModifier {
             content
             if model.open {
                 ListPageView()
-                    .transition(.move(edge: .trailing))
             }
         }
-        .animation(.spring(response: 0.34, dampingFraction: 0.88), value: model.open)
     }
 }

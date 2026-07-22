@@ -286,16 +286,20 @@ function renderStoryMenu(step){
       '<button class="mrow mcancel" data-sv="mcancel">' + esc(t("common.cancel")) + '</button>';
   }
   const wrap = document.createElement("div");
-  wrap.className = "modal sheet sv-menu on";
+  wrap.className = "modal sheet sv-menu";   // .on tilføjes på næste frame, så enter-transitionen spiller
   wrap.setAttribute("role", "dialog");
   wrap.setAttribute("aria-label", t("story.report"));
   wrap.innerHTML = '<div class="modal-card"><div class="mstep">' + inner + '</div></div>';
   el("storyview").appendChild(wrap);
+  requestAnimationFrame(function(){ wrap.classList.add("on"); });
 }
 /* resume=true: storyen kører videre (showItem starter de 6 sek forfra). */
 function closeStoryMenu(resume){
   const w = el("storyview").querySelector(".sv-menu");
-  if(w) w.remove();
+  if(w){
+    w.classList.remove("on");                        // start exit-fade
+    setTimeout(function(){ w.remove(); }, 200);       // fjern DOM'en når fade'en er spillet
+  }
   if(resume && w) showItem();
 }
 async function reportCurrentStory(){
@@ -344,10 +348,17 @@ function gotoGroup(gi, last){
 
 export function closeStoryViewer(){
   clearTimer();
+  const v = el("storyview").querySelector("video");
+  if(v){ try{ v.pause(); }catch(e){} }   // stop lyden straks, mens fade'en spiller
   el("storyview").classList.remove("on");
-  el("storyview").innerHTML = "";
   document.body.classList.remove("lb-lock");
-  renderStories();   // opdater ringene (set-status)
+  // Vent til fade-out'en er spillet færdig, før DOM'en ryddes og ringene tegnes om.
+  // Hvis vieweren er blevet genåbnet i mellemtiden, springes oprydningen over.
+  setTimeout(function(){
+    if(el("storyview").classList.contains("on")) return; // genåbnet
+    el("storyview").innerHTML = "";
+    renderStories();   // opdater ringene (set-status)
+  }, 230);
 }
 
 async function markSeen(it){

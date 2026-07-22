@@ -167,8 +167,8 @@
   .story .ringwrap .bub{width:100%;height:100%;border:3px solid var(--bg);box-sizing:border-box}
 
   /* ================= Story-viewer (fuldskærm) ================= */
-  .storyview{display:none;position:fixed;inset:0;z-index:200;background:#000}
-  .storyview.on{display:block}
+  .storyview{position:fixed;inset:0;z-index:200;background:#000;display:block;opacity:0;visibility:hidden;pointer-events:none;transform:scale(1.05);transition:opacity .22s ease, visibility .22s ease, transform .22s cubic-bezier(.32,.72,.25,1)}
+  .storyview.on{opacity:1;visibility:visible;pointer-events:auto;transform:none}
   .storyview .sv-media{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
   /* Storyen FYLDER hele skærmen (9:16-format; cover beskærer evt. gamle 4:5-stories) */
   .storyview .sv-media img,.storyview .sv-media video{width:100%;height:100%;object-fit:cover}
@@ -318,7 +318,10 @@
   /* ================= Views ================= */
   .view{display:none}
   /* Plads i bunden så sidste opslag kan scrolles fri af den svævende tabbar */
-  .view.active{display:block;flex:1 0 auto;padding-bottom:calc(82px + env(safe-area-inset-bottom))}
+  .view.active{display:block;flex:1 0 auto;padding-bottom:calc(82px + env(safe-area-inset-bottom));animation:vfViewIn .22s ease}
+  @keyframes vfViewIn{from{opacity:0}to{opacity:1}}
+  /* Genbrugelig ind-toning (JS slår den til på profil-fanens indhold) */
+  .vf-fadein{animation:vfViewIn .22s ease}
 
   /* ================= Timeline-post (X-anatomi: to kolonner) ================= */
   .post{
@@ -412,7 +415,9 @@
     border:1px solid var(--line);
     overflow:hidden;
     background:var(--chip);
+    transition:opacity .12s ease;
   }
+  .pmedia:active{opacity:.82}
   .pmedia img,.pmedia video{
     display:block;width:100%;max-height:510px;object-fit:cover;
     -webkit-touch-callout:none;
@@ -528,6 +533,7 @@
     font-size:13.5px;font-weight:700;color:var(--gray);
     background:var(--chip);
   }
+  .mf-btn:active{opacity:.6}
   .mf-btn.on{background:var(--red);color:#fff}
   #attach-img.memcrop{width:100%;object-fit:cover}
   #attach-img.memcrop.a11{aspect-ratio:1/1}
@@ -1063,7 +1069,9 @@
     font-weight:800;font-size:15px;
     flex:0 0 auto;
     padding:4px 0;
+    transition:transform .12s ease;
   }
+  .compose-head .postbtn:active:not(:disabled){transform:scale(.9)}
   .compose-head .postbtn:disabled{opacity:.4;cursor:default}
   .compose-dest{
     display:flex;gap:8px;align-items:center;
@@ -1430,7 +1438,9 @@
     max-width:none;width:100%;height:100%;
     position:relative;display:block;gap:0;
   }
-  .cmenu-pos{position:absolute;display:flex;flex-direction:column;gap:10px;max-width:280px}
+  .cmenu-pos{position:absolute;display:flex;flex-direction:column;gap:10px;max-width:280px;transform-origin:bottom center;transition:transform .18s cubic-bezier(.32,.72,.25,1), opacity .18s ease}
+  #cmenu.anchor:not(.on) .cmenu-pos{transform:scale(.9);opacity:0}
+  #cmenu.anchor.on .cmenu-pos{transform:none;opacity:1}
   .cmenu-pos.mine{align-items:flex-end}
   /* Emoji-pillen (reaktioner) lige over boblen */
   .cm-emojis{
@@ -1691,13 +1701,14 @@
   .authview{
     position:absolute;inset:0;z-index:200;
     background:var(--bg);
-    display:none;
+    display:flex;
     flex-direction:column;
     align-items:center;
     padding:calc(34px + env(safe-area-inset-top)) 30px calc(30px + env(safe-area-inset-bottom));
     overflow-y:auto;
+    opacity:0;visibility:hidden;pointer-events:none;transition:opacity .25s ease, visibility .25s ease;
   }
-  .authview.on{display:flex}
+  .authview.on{opacity:1;visibility:visible;pointer-events:auto}
   .authview .auth-inner{margin:auto;width:100%;max-width:420px}
   .authview .wordmark{font-size:44px;text-align:center}
   .auth-tag{text-align:center;color:var(--gray);font-size:14.5px;margin-top:6px}
@@ -1717,7 +1728,9 @@
     border-radius:8px;
     padding:12px 0;
     font-weight:700;font-size:15px;
+    transition:transform .12s ease, opacity .12s ease;
   }
+  .auth-btn:active:not(:disabled){transform:scale(.98);opacity:.9}
   .auth-btn:disabled{opacity:.5;cursor:default}
   .auth-alt{text-align:center;color:var(--gray);font-size:13px;margin-top:18px}
   .auth-alt button{color:var(--red);font-weight:700}

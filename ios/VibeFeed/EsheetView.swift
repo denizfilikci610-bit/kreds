@@ -190,7 +190,7 @@ struct EditProfilePage: View {
     @State private var cropIsBanner = false
     @State private var slet = ""
     @FocusState private var nameFocused: Bool
-    @State private var dragX: CGFloat = 0
+    @State private var dragX: CGFloat = UIScreen.main.bounds.width
     @State private var dragging = false
 
     private let hairline = Color.primary.opacity(0.1)
@@ -262,7 +262,7 @@ struct EditProfilePage: View {
                     dragging = false
                 }
         )
-        .onAppear { dragX = 0; dragging = false; cropImage = nil }
+        .onAppear { dragging = false; cropImage = nil; withAnimation(.easeOut(duration: 0.28)) { dragX = 0 } }
         .onChange(of: pickerItem) { _, item in loadPicked(item) }
         .onChange(of: bannerItem) { _, item in loadPickedBanner(item) }
     }
@@ -563,9 +563,7 @@ struct EsheetHost: ViewModifier {
             content
             if model.open {
                 EditProfilePage()
-                    .transition(.move(edge: .trailing))
             }
         }
-        .animation(.spring(response: 0.34, dampingFraction: 0.88), value: model.open)
     }
 }
