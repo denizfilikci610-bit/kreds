@@ -172,6 +172,10 @@
   .storyview .sv-media{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
   /* Storyen FYLDER hele skærmen (9:16-format; cover beskærer evt. gamle 4:5-stories) */
   .storyview .sv-media img,.storyview .sv-media video{width:100%;height:100%;object-fit:cover}
+  /* Sikkerhedsnet: indlæsnings-prik indtil mediet er klar (i stedet for helt sort). */
+  .storyview .sv-loading{position:absolute;inset:0;margin:auto;width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.28);border-top-color:#fff;animation:svspin .8s linear infinite;pointer-events:none;transition:opacity .2s ease}
+  .storyview .sv-media.loaded .sv-loading{opacity:0}
+  @keyframes svspin{to{transform:rotate(360deg)}}
   /* Slet egen story: skraldespand i headeren; første tryk armerer ("Slet?"), andet sletter */
   .sv-del{
     flex:0 0 auto;display:flex;align-items:center;justify-content:center;

@@ -60,6 +60,29 @@ export async function loadStories(){
   });
   state.storyGroups = groups;
   renderStories();
+  preloadStoryMedia(groups);   // varm mediet op FØR man trykker, så storyen kommer straks
+}
+
+/* Forudindlæs hver storys FØRSTE medie (det der vises ved tryk) i browserens cache, så
+   vieweren ikke er sort mens billedet/videoen hentes. Referencerne holdes i live, så de
+   ikke bliver renset væk før de er hentet. Kun det første element pr. story (ikke alt). */
+function preloadStoryMedia(groups){
+  const keep = [];
+  (groups || []).forEach(function(g){
+    const it = g.items && g.items[0];
+    if(!it || !it.url) return;
+    if(it.isVideo){
+      const v = document.createElement("video");
+      v.preload = "auto"; v.muted = true; v.playsInline = true; v.src = it.url;
+      try{ v.load(); }catch(_e){}
+      keep.push(v);
+    }else{
+      const im = new Image();
+      im.src = it.url;
+      keep.push(im);
+    }
+  });
+  state._storyPreload = keep;
 }
 
 /* ================= Stories: fuldskærms-viewer ================= */
@@ -88,7 +111,7 @@ function showItem(){
     return '<div class="sv-bar ' + cls + '"><i></i></div>';
   }).join("");
   const media = it.isVideo
-    ? '<video src="' + esc(it.url) + '" playsinline autoplay></video>'
+    ? '<video src="' + esc(it.url) + '" playsinline autoplay preload="auto"></video>'
     : '<img src="' + esc(it.url) + '" alt="">';
   // Kreds-story: samme kchip-pille som på feed-opslag (ikon + navn, tap = åbn kredsen)
   const kf = it.feedId ? feedById(it.feedId) : null;
@@ -96,7 +119,7 @@ function showItem(){
     ? '<button class="kchip" data-sv="kreds" data-feed="' + esc(kf.id) + '">' + KREDS_SVG + '<span>' + esc(kf.name) + '</span></button>'
     : '';
   el("storyview").innerHTML =
-    '<div class="sv-media">' + media + '</div>' +
+    '<div class="sv-media">' + media + '<div class="sv-loading" aria-hidden="true"></div></div>' +
     '<div class="sv-bars">' + bars + '</div>' +
     '<div class="sv-head">' +
       '<span class="sv-ava">' + avaHTML(g.author.handle, 30) + '</span>' +
@@ -119,6 +142,19 @@ function showItem(){
       : '') +
     '<button class="sv-tap sv-left" data-sv="prev" aria-label="Forrige"></button>' +
     '<button class="sv-tap sv-right" data-sv="next" aria-label="Næste"></button>';
+  // Sikkerhedsnet: vis en indlæsnings-prik indtil mediet er klar (i stedet for helt sort).
+  const mediaBox = el("storyview").querySelector(".sv-media");
+  const mediaEl = mediaBox && mediaBox.querySelector("img, video");
+  if(mediaBox && mediaEl){
+    const done = function(){ mediaBox.classList.add("loaded"); };
+    if(it.isVideo){
+      if(mediaEl.readyState >= 2) done();
+      else { mediaEl.addEventListener("loadeddata", done, { once: true }); mediaEl.addEventListener("canplay", done, { once: true }); }
+    }else{
+      if(mediaEl.complete && mediaEl.naturalWidth) done();
+      else { mediaEl.addEventListener("load", done, { once: true }); mediaEl.addEventListener("error", done, { once: true }); }
+    }
+  }
   markSeen(it);
   if(g.isMe) loadViews(it);   // "Set af N" (kun egne stories)
   vw.timer = setTimeout(next, 6000);   // 6 sek pr. story (billede + video)
