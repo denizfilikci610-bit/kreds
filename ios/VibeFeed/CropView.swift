@@ -233,13 +233,13 @@ struct CropButtons: View {
                     .frame(maxWidth: .infinity).padding(.vertical, 15)
                     .background(Capsule().fill(.ultraThinMaterial))
                     .overlay(Capsule().stroke(Color.white.opacity(0.16), lineWidth: 1))
-            }.buttonStyle(.plain)
+            }.buttonStyle(.vfPressFade)
             Button(action: onUse) {
                 Text(useLabel)
                     .font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
                     .frame(maxWidth: .infinity).padding(.vertical, 15)
                     .background(Capsule().fill(vfRed))
-            }.buttonStyle(.plain)
+            }.buttonStyle(.vfPressPop)
         }
         .padding(.horizontal, 20)
     }

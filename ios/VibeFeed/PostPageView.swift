@@ -346,7 +346,7 @@ struct PostPageView: View {
                     .padding(6)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.vfPressScale)
             Text(model.title)
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(Color.primary)
@@ -365,7 +365,7 @@ struct PostPageView: View {
             Button { model.profile(p.handle) } label: {
                 GlassAvatar(url: p.avatarUrl, initials: p.initials, gradient: p.gradient, size: 40)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.vfPressCard)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
                     Text(p.name)
@@ -385,7 +385,7 @@ struct PostPageView: View {
                             .padding(.vertical, 6).padding(.leading, 10)
                             .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.vfPressScale)
                 }
                 if !p.segs.isEmpty {
                     Text(attributed(p.segs))
@@ -443,7 +443,7 @@ struct PostPageView: View {
             .padding(.vertical, 3).padding(.leading, 6).padding(.trailing, 8)
             .background(Capsule().fill(chipFill))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.vfPressChip)
         .padding(.top, 9)
     }
 
@@ -506,7 +506,7 @@ struct PostPageView: View {
                             .padding(.vertical, 9).padding(.horizontal, 12)
                             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(hairline, lineWidth: 1))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.vfPressChip)
                     .padding(.top, 6)
                 }
             }
@@ -569,7 +569,7 @@ struct PostPageView: View {
                 .padding(.vertical, 6)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.vfPressScale)
             Spacer()
             Button { model.postLike() } label: {
                 HStack(spacing: 5) {
@@ -585,7 +585,7 @@ struct PostPageView: View {
                 .padding(.vertical, 6)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.vfPressBounce)
             Spacer()
             if p.canShare {
                 Button { model.share() } label: {
@@ -595,7 +595,7 @@ struct PostPageView: View {
                         .padding(.vertical, 6)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.vfPressPop)
             } else {
                 // Private kreds posts cannot be shared — keep the row's rhythm without the button
                 Color.clear.frame(width: 24, height: 24)
@@ -612,7 +612,7 @@ struct PostPageView: View {
             Button { model.profile(c.handle) } label: {
                 GlassAvatar(url: c.avatarUrl, initials: c.initials, gradient: c.gradient, size: 30)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.vfPressCard)
             VStack(alignment: .leading, spacing: 3) {
                 (Text(c.name).font(.system(size: 14, weight: .semibold)).foregroundColor(.primary)
                     + Text("  ")
@@ -636,7 +636,7 @@ struct PostPageView: View {
                         Text(model.L("reply")).font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
                             .padding(.vertical, 10).padding(.horizontal, 5)
                             .contentShape(Rectangle())
-                    }.buttonStyle(.plain)
+                    }.buttonStyle(.vfPressFade)
                     if c.mine {
                         Button { armDelete(c.id) } label: {
                             Text(deleteArmId == c.id ? model.L("delConfirm") : model.L("del"))
@@ -644,7 +644,7 @@ struct PostPageView: View {
                                 .foregroundStyle(deleteArmId == c.id ? vfRed : .secondary)
                                 .padding(.vertical, 10).padding(.horizontal, 5)
                                 .contentShape(Rectangle())
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(.vfPressFade)
                     }
                 }
                 .padding(.top, 1)
@@ -655,7 +655,7 @@ struct PostPageView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(c.liked ? vfRed : Color.secondary)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.vfPressBounce)
             .padding(.top, 2)
         }
         .padding(.leading, c.indent > 0 ? 34 : 0)
@@ -710,7 +710,7 @@ struct PostPageView: View {
                                 .padding(.horizontal, 10).padding(.vertical, 6)
                                 .background(Capsule().fill(chipFill))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.vfPressChip)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -723,7 +723,7 @@ struct PostPageView: View {
                     Spacer()
                     Button { model.cancelReply() } label: {
                         Text(model.L("cancelReply")).font(.system(size: 12, weight: .semibold)).foregroundStyle(vfRed)
-                    }.buttonStyle(.plain)
+                    }.buttonStyle(.vfPressFade)
                 }
                 .padding(.horizontal, 16)
             }
@@ -733,7 +733,7 @@ struct PostPageView: View {
                     ForEach(model.emoji, id: \.self) { e in
                         Button { model.sendEmoji(e) } label: {
                             Text(e).font(.system(size: 24)).frame(maxWidth: .infinity)
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(.vfPressBounce)
                     }
                 }
                 .padding(.horizontal, 12)
@@ -755,7 +755,7 @@ struct PostPageView: View {
                         Text(model.L("send")).font(.system(size: 15, weight: .bold))
                             .foregroundStyle(model.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : vfRed)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.vfPressPop)
                     .disabled(model.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 .padding(.horizontal, 16)

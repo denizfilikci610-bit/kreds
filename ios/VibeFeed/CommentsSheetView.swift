@@ -228,7 +228,7 @@ struct GlassCommentsSheet: View {
             Button { model.profile(c.handle) } label: {
                 GlassAvatar(url: c.avatarUrl, initials: c.initials, gradient: c.gradient, size: 30)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.vfPressCard)
             VStack(alignment: .leading, spacing: 3) {
                 (Text(c.name).font(.system(size: 14, weight: .semibold)).foregroundColor(.primary)
                     + Text("  ")
@@ -254,7 +254,7 @@ struct GlassCommentsSheet: View {
                         Text(model.L("reply")).font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
                             .padding(.vertical, 10).padding(.horizontal, 5)
                             .contentShape(Rectangle())
-                    }.buttonStyle(.plain)
+                    }.buttonStyle(.vfPressFade)
                     if c.mine {
                         Button { armDelete(c.id) } label: {
                             Text(deleteArmId == c.id ? model.L("delConfirm") : model.L("del"))
@@ -262,7 +262,7 @@ struct GlassCommentsSheet: View {
                                 .foregroundStyle(deleteArmId == c.id ? vfRed : .secondary)
                                 .padding(.vertical, 10).padding(.horizontal, 5)
                                 .contentShape(Rectangle())
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(.vfPressFade)
                     }
                 }
                 .padding(.top, 1)
@@ -273,7 +273,7 @@ struct GlassCommentsSheet: View {
                     Image(systemName: c.liked ? "heart.fill" : "heart")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(c.liked ? vfRed : Color.secondary)
-                }.buttonStyle(.plain)
+                }.buttonStyle(.vfPressBounce)
             }
             .padding(.top, 2)
         }
@@ -330,7 +330,7 @@ struct GlassCommentsSheet: View {
                                 .padding(.horizontal, 10).padding(.vertical, 6)
                                 .glassBG(Capsule())
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.vfPressChip)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -343,7 +343,7 @@ struct GlassCommentsSheet: View {
                     Spacer()
                     Button { model.cancelReply() } label: {
                         Text(model.L("cancelReply")).font(.system(size: 12, weight: .semibold)).foregroundStyle(vfRed)
-                    }.buttonStyle(.plain)
+                    }.buttonStyle(.vfPressFade)
                 }
                 .padding(.horizontal, 16)
             }
@@ -353,7 +353,7 @@ struct GlassCommentsSheet: View {
                     ForEach(model.emoji, id: \.self) { e in
                         Button { model.sendEmoji(e) } label: {
                             Text(e).font(.system(size: 24)).frame(maxWidth: .infinity)
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(.vfPressBounce)
                     }
                 }
                 .padding(.horizontal, 12)
@@ -375,7 +375,7 @@ struct GlassCommentsSheet: View {
                         Text(model.L("send")).font(.system(size: 15, weight: .bold))
                             .foregroundStyle(model.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : vfRed)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.vfPressPop)
                     .disabled(model.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
                 .padding(.horizontal, 16)

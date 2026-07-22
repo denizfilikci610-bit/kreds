@@ -145,7 +145,7 @@ private struct GlassSheetCard: View {
                         )
                         .contentShape(Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.vfPressBounce)
             }
         }
         .padding(.horizontal, 9)
@@ -164,7 +164,7 @@ private struct GlassSheetCard: View {
                 .padding(.vertical, 15)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.vfPressCard)
     }
 
     private var titleHeader: some View {

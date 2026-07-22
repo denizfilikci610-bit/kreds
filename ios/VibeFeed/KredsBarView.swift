@@ -112,7 +112,7 @@ struct NativeKredsBar: View {
                     .frame(width: 36, height: 36)      // stort, robust tryk-område
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.vfPressScale)
         }
         .padding(.horizontal, 16)
         .frame(height: 40)
@@ -136,7 +136,7 @@ struct NativeKredsBar: View {
                                  : (item.kind == "new" ? Color.red : Color.primary))
                 .modifier(ChipBackground(active: item.active))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.vfPressChip)
     }
 
     @ViewBuilder

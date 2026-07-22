@@ -286,7 +286,7 @@ struct EditProfilePage: View {
                         .padding(6)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.vfPressScale)
                 Spacer()
                 if !model.deleteStep {
                     Button { nameFocused = false; model.save() } label: {
@@ -300,7 +300,7 @@ struct EditProfilePage: View {
                         .padding(.vertical, 6)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.vfPressPop)
                     .disabled(!model.canSave || model.saving)
                     .opacity(model.canSave ? 1 : 0.45)
                 }
@@ -385,7 +385,7 @@ struct EditProfilePage: View {
                 Button { model.openPolicy() } label: {
                     Text(model.policyLabel).font(.system(size: 13, weight: .semibold)).underline()
                         .foregroundStyle(.secondary).padding(.horizontal, 16).padding(.top, 14)
-                }.buttonStyle(.plain)
+                }.buttonStyle(.vfPressFade)
 
                 Rectangle().fill(hairline).frame(height: 0.5).padding(.top, 18)
                 Button { model.deleteStep = true; slet = "" } label: {
@@ -394,7 +394,7 @@ struct EditProfilePage: View {
                         .padding(.horizontal, 16).padding(.vertical, 14)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
-                }.buttonStyle(.plain)
+                }.buttonStyle(.vfPressFade)
             }
             .padding(.bottom, 30)
         }
@@ -491,12 +491,12 @@ struct EditProfilePage: View {
                 .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(vfRed))
                 .opacity(slet.trimmingCharacters(in: .whitespaces) == "SLET" && !model.deleting ? 1 : 0.45)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.vfPressPop)
             .disabled(slet.trimmingCharacters(in: .whitespaces) != "SLET" || model.deleting)
             .padding(.horizontal, 16)
             Button { model.deleteStep = false } label: {
                 Text(model.cancelLabel).font(.system(size: 14, weight: .semibold)).foregroundStyle(.secondary).padding(.vertical, 4)
-            }.buttonStyle(.plain)
+            }.buttonStyle(.vfPressFade)
             Spacer()
         }
         .padding(.top, 24)
@@ -522,7 +522,7 @@ struct EditProfilePage: View {
                                 else { RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.18), lineWidth: 1.5) }
                             }
                         )
-                }.buttonStyle(.plain)
+                }.buttonStyle(.vfPressChip)
             }
         }.padding(.horizontal, 16)
     }

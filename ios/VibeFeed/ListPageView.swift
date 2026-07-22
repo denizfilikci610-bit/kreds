@@ -170,7 +170,7 @@ struct ListPageView: View {
                         .padding(6)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.vfPressScale)
                 Spacer()
             }
             .padding(.horizontal, 12)
@@ -204,7 +204,7 @@ struct ListPageView: View {
                 }
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.vfPressFade)
     }
 
     // MARK: - Søgefelt
@@ -258,7 +258,7 @@ struct ListPageView: View {
                     .padding(.horizontal, 16).padding(.vertical, 8)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.vfPressCard)
             }
         }
     }
@@ -315,7 +315,7 @@ struct ListPageView: View {
                         .padding(.vertical, 8).padding(.horizontal, 14)
                         .background(Capsule().fill(f.requested ? chipFill : vfRed))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.vfPressPop)
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 8)

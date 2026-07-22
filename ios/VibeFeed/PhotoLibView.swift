@@ -616,6 +616,7 @@ struct MemoryGalleryScreen: View {
                     else { model.step = model.showTrimStep ? .trim : .gallery }
                 }
             }
+            .buttonStyle(.vfPressFade)
             .foregroundStyle(Color.primary)
             Spacer()
             Text(model.curTitle).font(.system(size: 16, weight: .bold))
@@ -631,9 +632,11 @@ struct MemoryGalleryScreen: View {
                             .foregroundStyle(model.selected == nil ? Color.secondary : vfRed)
                     }
                 }
+                .buttonStyle(.vfPressPop)
                 .disabled(model.selected == nil || model.preparingTrim || model.sharing)
             case .trim:
                 Button(model.nextLabel) { model.afterVideoReady() }
+                    .buttonStyle(.vfPressPop)
                     .font(.system(size: 16, weight: .bold)).foregroundStyle(vfRed)
             case .crop, .videocrop:
                 EmptyView()   // beskærings-trinnene har deres egne knapper
@@ -642,7 +645,7 @@ struct MemoryGalleryScreen: View {
                     if model.sharing { ProgressView() } else {
                         Text(model.curShare).font(.system(size: 16, weight: .bold)).foregroundStyle(vfRed)
                     }
-                }.disabled(model.sharing)
+                }.buttonStyle(.vfPressPop).disabled(model.sharing)
             }
         }
         .padding(.horizontal, 16).frame(height: 48)
@@ -680,6 +683,7 @@ struct MemoryGalleryScreen: View {
             Text(model.limitedNote).font(.system(size: 12.5)).foregroundStyle(.secondary)
             Spacer()
             Button(model.manageLabel) { model.openManage() }
+                .buttonStyle(.vfPressFade)
                 .font(.system(size: 12.5, weight: .bold)).foregroundStyle(vfRed)
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
@@ -692,10 +696,12 @@ struct MemoryGalleryScreen: View {
             Text(model.deniedNote).font(.system(size: 15)).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).padding(.horizontal, 30)
             Button(model.settingsLabel) { model.openSettings() }
+                .buttonStyle(.vfPressPop)
                 .font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
                 .padding(.horizontal, 22).padding(.vertical, 11)
                 .background(RoundedRectangle(cornerRadius: 12).fill(vfRed))
             Button(model.cancelLabel) { model.fallbackToWeb() }
+                .buttonStyle(.vfPressFade)
                 .font(.system(size: 14, weight: .semibold)).foregroundStyle(.secondary)
             Spacer()
         }.frame(maxWidth: .infinity)
@@ -771,7 +777,7 @@ struct MemoryGalleryScreen: View {
                 }
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.vfPressChip)
     }
 
     /// Video-beskærings-trinnet: fuld træk/zoom af den loopende video, samme format-piller.
@@ -884,7 +890,7 @@ struct MemoryGalleryScreen: View {
                             .padding(.horizontal, 10).padding(.vertical, 6)
                             .glassBG(Capsule())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.vfPressChip)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -907,7 +913,7 @@ struct MemoryGalleryScreen: View {
                 .background(Group {
                     if on { Capsule().fill(Color.primary) } else { Capsule().strokeBorder(Color.primary.opacity(0.2), lineWidth: 1.5) }
                 })
-        }.buttonStyle(.plain)
+        }.buttonStyle(.vfPressChip)
     }
 }
 
@@ -1384,7 +1390,7 @@ struct MemoryCameraScreen: View {
                 .padding(.horizontal, 6).padding(.vertical, 5)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.vfPressFade)
     }
     @StateObject private var cam = MemoryCamera()
     @State private var thumb: UIImage?
@@ -1487,6 +1493,7 @@ struct MemoryCameraScreen: View {
                             Color.clear.frame(width: 48, height: 48)   // tanke: ingen galleri-genvej (bruger web-biblioteket)
                         } else {
                             Button { model.step = .gallery } label: { thumbView }
+                                .buttonStyle(.vfPressCard)
                         }
                         Spacer()
                         captureButton
@@ -1573,6 +1580,7 @@ struct MemoryCameraScreen: View {
                 .font(.system(size: 15)).foregroundStyle(.white.opacity(0.85))
                 .multilineTextAlignment(.center).padding(.horizontal, 36)
             Button(model.settingsLabel.isEmpty ? "Åbn Indstillinger" : model.settingsLabel) { model.openSettings() }
+                .buttonStyle(.vfPressPop)
                 .font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
                 .padding(.horizontal, 22).padding(.vertical, 11)
                 .background(RoundedRectangle(cornerRadius: 12).fill(vfRed))
@@ -1588,5 +1596,6 @@ struct MemoryCameraScreen: View {
                 .background(Color.black.opacity(0.28))
                 .clipShape(Circle())
         }
+        .buttonStyle(.vfPressScale)
     }
 }
