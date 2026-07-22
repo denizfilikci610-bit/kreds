@@ -593,7 +593,9 @@ struct MemoryGalleryScreen: View {
             }
         }
         // Kun kamera↔galleri-grænsen animeres (indre trin skifter som før, uden animation).
-        .animation(.spring(response: 0.42, dampingFraction: 0.86), value: model.step == .camera)
+        // .smooth = fjeder UDEN overshoot, så album-preview'et ikke bouncer når det glider
+        // op (frem) og ned (tilbage til kameraet).
+        .animation(.smooth(duration: 0.35), value: model.step == .camera)
     }
 
     private var navBar: some View {
@@ -1354,7 +1356,7 @@ struct MemoryCameraScreen: View {
     /// Skift animerer preview-rammen: story UDVIDER sig til fuld skærm, minde SAMLER sig til 4:5.
     private func modeButton(_ label: String, story: Bool) -> some View {
         Button {
-            withAnimation(.spring(response: 0.44, dampingFraction: 0.82)) { model.isStory = story }
+            withAnimation(.smooth(duration: 0.4)) { model.isStory = story }   // glat, uden bounce
         } label: {
             Text(label.uppercased())
                 .font(.system(size: 13, weight: .bold))
