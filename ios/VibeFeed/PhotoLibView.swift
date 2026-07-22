@@ -584,7 +584,9 @@ struct MemoryGalleryScreen: View {
             if model.step != .camera {
                 VStack(spacing: 0) {
                     navBar
-                    Divider().opacity(0.4)
+                    // Ingen skillelinje på billedtekst-trinnet (minde/story) — renere look
+                    // omkring kreds-vælgeren. Beholdes på galleri/beskærer-trinnene.
+                    if model.step != .caption { Divider().opacity(0.4) }
                     switch model.step {
                     case .camera: EmptyView()   // håndteres fuldskærm ovenfor
                     case .gallery: gallery
@@ -822,8 +824,7 @@ struct MemoryGalleryScreen: View {
                 // så alt kan være på skærmen på én gang (ingen scroll).
                 VStack(alignment: .leading, spacing: 0) {
                     destSelector
-                    Divider().opacity(0.4)
-                    mediaPreview(fill: true).padding(.vertical, 10)
+                    mediaPreview(fill: true).padding(.horizontal, 12).padding(.vertical, 10)
                 }
             } else {
                 // MINDE: kreds-vælger øverst, preview og billedtekst. Siden er LÅST (glider ikke når
@@ -831,8 +832,7 @@ struct MemoryGalleryScreen: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         destSelector
-                        Divider().opacity(0.4).padding(.top, 14)
-                        mediaPreview(fill: false).padding(.top, 12)
+                        mediaPreview(fill: false).padding(.horizontal, 12).padding(.top, 14)
                         captionField
                     }
                 }
@@ -861,20 +861,28 @@ struct MemoryGalleryScreen: View {
     /// fill=false (minde) begrænses til ca. 40% af skærmen, så alt passer uden tastatur.
     @ViewBuilder private func mediaPreview(fill: Bool) -> some View {
         let capH = UIScreen.main.bounds.height * 0.4
+        let round = RoundedRectangle(cornerRadius: 16, style: .continuous)   // runde hjørner på mediet
         if let vurl = model.capturedVideoURL {
             // Rammen følger posterens format (9:16 story, 1080×566 vandret, ellers 4:5).
             let vAspect: CGFloat = (model.capturedImage.map { $0.size.height > 0 ? $0.size.width / $0.size.height : 4.0 / 5.0 }) ?? 4.0 / 5.0
             LoopingVideoView(url: vurl).aspectRatio(vAspect, contentMode: .fit)
                 .frame(maxWidth: .infinity, maxHeight: fill ? .infinity : capH)
-                .clipped()
+                .clipShape(round)
         } else if let shot = model.capturedImage {
-            Image(uiImage: shot).resizable().scaledToFit()
+            // aspectRatio(billedets format) → viewet får præcis mediets størrelse (ingen tomme
+            // sider), så de runde hjørner sidder på selve billedet.
+            let a: CGFloat = shot.size.height > 0 ? shot.size.width / shot.size.height : 4.0 / 5.0
+            Image(uiImage: shot).resizable().aspectRatio(a, contentMode: .fit)
                 .frame(maxWidth: .infinity, maxHeight: fill ? .infinity : capH)
+                .clipShape(round)
         } else if let ci = model.croppedImage {
-            Image(uiImage: ci).resizable().scaledToFit()
+            let a: CGFloat = ci.size.height > 0 ? ci.size.width / ci.size.height : 4.0 / 5.0
+            Image(uiImage: ci).resizable().aspectRatio(a, contentMode: .fit)
                 .frame(maxWidth: .infinity, maxHeight: fill ? .infinity : capH)
+                .clipShape(round)
         } else if let sel = model.selected {
             PreviewPane(asset: sel).frame(maxHeight: fill ? .infinity : UIScreen.main.bounds.height * 0.34)
+                .clipShape(round)
         }
     }
 
