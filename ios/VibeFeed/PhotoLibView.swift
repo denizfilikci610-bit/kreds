@@ -962,7 +962,7 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
     // horisont-plan, og capture-vinklen bages ind i foto/video ved optagelse, så et vandret
     // motiv kommer ud i landscape (1080×566) korrekt vendt. Preview-RAMMEN skifter ikke form.
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
-    private var previewAngleObs: NSKeyValueObservation?
+    private var rotationObs: NSKeyValueObservation?
 
     /// Bed om kamera- (og mikrofon-) adgang og start sessionen. Callbacks kaldes på main-tråden.
     func start(onCapture: @escaping (UIImage) -> Void, onVideo: @escaping (URL) -> Void) {
@@ -1027,14 +1027,15 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
     }
 
     /// Følg telefonens FYSISKE orientering (uafhængigt af app'ens portrait-lås) via
-    /// RotationCoordinator. Preview-vinklen holder søgeren horisont-plan; capture-vinklen
-    /// læses direkte ved optagelse (applyCaptureRotation) og bages ind i foto/video, så et
-    /// vandret motiv kommer ud i landscape. Preview-RAMMEN skifter derimod ikke form.
+    /// RotationCoordinator. Vi renderer selv videoDataOutput-bufferen i et fast Metal-view
+    /// (ikke et AVCaptureVideoPreviewLayer), så vi bruger CAPTURE-vinklen (horisont-plan for
+    /// optaget medie, layer-uafhængig) til BÅDE søgeren og selve optagelsen. Preview-vinklen
+    /// forudsætter et preview-layer og gav forkert rotation (lodret vistes sidelæns).
     private func setupRotation(for device: AVCaptureDevice) {
-        previewAngleObs = nil
+        rotationObs = nil
         let coord = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
         rotationCoordinator = coord
-        previewAngleObs = coord.observe(\.videoRotationAngleForHorizonLevelPreview, options: [.initial, .new]) { [weak self] _, _ in
+        rotationObs = coord.observe(\.videoRotationAngleForHorizonLevelCapture, options: [.initial, .new]) { [weak self] _, _ in
             guard let self else { return }
             self.queue.async { self.updatePreviewConnection() }
         }
@@ -1064,11 +1065,11 @@ final class MemoryCamera: NSObject, ObservableObject, AVCapturePhotoCaptureDeleg
         }
     }
 
-    /// Søger-forbindelsen: rotationsvinklen følger telefonens orientering (horisont-plan),
-    /// så et vandret motiv vises korrekt. Front-kameraet spejles.
+    /// Søger-forbindelsen: rotationsvinklen følger telefonens orientering (capture horisont-plan),
+    /// så motivet altid vises oprejst (lodret = oprejst, vandret = oprejst). Front-kameraet spejles.
     private func updatePreviewConnection() {
         guard let c = videoDataOutput.connection(with: .video) else { return }
-        let angle = rotationCoordinator?.videoRotationAngleForHorizonLevelPreview ?? 90
+        let angle = rotationCoordinator?.videoRotationAngleForHorizonLevelCapture ?? 90
         if c.isVideoRotationAngleSupported(angle) { c.videoRotationAngle = angle }
         c.automaticallyAdjustsVideoMirroring = false
         if c.isVideoMirroringSupported { c.isVideoMirrored = (position == .front) }
