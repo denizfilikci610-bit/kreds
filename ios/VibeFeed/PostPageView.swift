@@ -359,7 +359,7 @@ struct PostPageView: View {
         .padding(.horizontal, 12)
         .frame(height: 52)
         .padding(.top, insets.top)
-        .overlay(alignment: .bottom) { Rectangle().fill(hairline).frame(height: 0.5) }
+        // Ingen skillelinje under "Opslag"-overskriften (ejer-ønske)
     }
 
     // MARK: - Post block (feed thought anatomy: avatar column + content column)
