@@ -334,8 +334,8 @@
   .post{
     display:flex;gap:10px;
     padding:12px 16px;
-    /* Skillelinjen mellem opslag er bevidst mere utydelig end de øvrige streger */
-    border-bottom:1px solid color-mix(in srgb, var(--line) 42%, transparent);
+    /* Ingen skillelinje mellem opslag (ejer-ønske) — renere feed i alle visninger
+       (hovedfeed, kreds-feed og profilens tanke-feed). */
   }
   /* Fastgjort-label (officielt opslag øverst i 'Hele kredsen') */
   .pinlabel{padding:10px 16px 0;font-size:12px;font-weight:700;color:var(--gray)}
