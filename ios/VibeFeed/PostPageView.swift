@@ -282,7 +282,7 @@ struct PostPageView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         if let p = model.post { postBlock(p) }
-                        Rectangle().fill(hairline).frame(height: 0.5)
+                        // Ingen skillelinje mellem opslaget og kommentarerne (ejer-ønske)
                         if model.comments.isEmpty {
                             Text(model.L("empty"))
                                 .font(.system(size: 14)).foregroundStyle(.secondary)
