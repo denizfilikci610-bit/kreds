@@ -565,6 +565,7 @@ final class PhotoLibModel: NSObject, ObservableObject {
 
 struct MemoryGalleryScreen: View {
     @ObservedObject private var model = PhotoLibModel.shared
+    @Namespace private var aspectNS   // glidende markering i format-vælgeren
 
     var body: some View {
         ZStack {
@@ -709,37 +710,56 @@ struct MemoryGalleryScreen: View {
                 )
                 .id(model.cropAspect)   // ny ramme (og frisk pan/zoom) når formatet skiftes
             }
-            VStack(spacing: 7) {
+            VStack(spacing: 12) {
                 if !model.fitLabel.isEmpty {
                     Text(model.fitLabel)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white)   // crop-baggrunden (VFCropView) er sort
+                        .shadow(color: .black.opacity(0.4), radius: 3)
                 }
                 if !model.isStory {   // story er ALTID fuldskærms 9:16 — ingen format-valg
                     aspectPills   // 1:1 / 4:5 / landscape
                 }
             }
-            .padding(.top, 10)
+            .padding(.top, 12)
         }
     }
 
-    /// Format-piller som ikoner (kvadrat / stående / liggende) — ingen tekst at oversætte.
+    /// Format-vælger som en iOS-segmenteret kontrol: store trykflader i en materiale-pille,
+    /// med en glidende rød markering. Ikoner (kvadrat / stående / liggende) — ingen tekst
+    /// at oversætte til de 32 sprog.
     private var aspectPills: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             aspectPill("square", value: 1)
             aspectPill("rectangle.portrait", value: 4.0 / 5.0)
             aspectPill("rectangle", value: VF_LANDSCAPE_ASPECT)   // landscape 1080×566
         }
+        .padding(5)
+        .background(
+            Capsule(style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(Capsule(style: .continuous).strokeBorder(Color.white.opacity(0.14), lineWidth: 1))
+        )
+        .shadow(color: .black.opacity(0.25), radius: 8, y: 3)
     }
 
     private func aspectPill(_ symbol: String, value: CGFloat) -> some View {
         let on = abs(model.cropAspect - value) < 0.02
-        return Button { model.cropAspect = value } label: {
+        return Button {
+            withAnimation(.snappy(duration: 0.28)) { model.cropAspect = value }
+        } label: {
             Image(systemName: symbol)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(on ? .white : .white.opacity(0.85))   // crop-baggrunden er sort
-                .frame(width: 30, height: 26)
-                .background(Capsule().fill(on ? vfRed : Color.white.opacity(0.18)))
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(on ? .white : .white.opacity(0.6))   // crop-baggrunden er sort
+                .frame(width: 60, height: 44)                          // Apple-venlig trykflade (44pt)
+                .background {
+                    if on {
+                        Capsule(style: .continuous).fill(vfRed)
+                            .matchedGeometryEffect(id: "aspectSel", in: aspectNS)
+                            .shadow(color: vfRed.opacity(0.5), radius: 6, y: 2)
+                    }
+                }
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -761,13 +781,14 @@ struct MemoryGalleryScreen: View {
                 )
                 .id(model.cropAspect)   // frisk ramme + afspiller når formatet skiftes
             }
-            VStack(spacing: 7) {
+            VStack(spacing: 12) {
                 if !model.fitLabel.isEmpty {
-                    Text(model.fitLabel).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                    Text(model.fitLabel).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.4), radius: 3)
                 }
                 if !model.isStory { aspectPills }
             }
-            .padding(.top, 10)
+            .padding(.top, 12)
         }
     }
 
