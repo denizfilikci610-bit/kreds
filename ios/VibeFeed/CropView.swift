@@ -173,7 +173,8 @@ struct VFCropView: View {
 }
 
 /// Full-screen dim with an even-odd "hole" where the crop frame sits.
-private struct CropMaskShape: Shape {
+// Ikke private: genbruges også af VFVideoCropView (VideoCropView.swift).
+struct CropMaskShape: Shape {
     let frame: CGSize
     let circular: Bool
     let center: CGPoint
