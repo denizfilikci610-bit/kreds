@@ -547,7 +547,7 @@
   #attach-img.memcrop.a45{aspect-ratio:4/5}
   /* Profil: toggle (Alt/Minder) + 3-kolonne minde-grid */
   /* Instagram-agtige profil-faner: ikoner i fuld bredde med streg under den aktive */
-  .profbar{display:flex;border-top:1px solid var(--line)}
+  .profbar{display:flex}
   .profbar-btn{flex:1;display:flex;align-items:center;justify-content:center;padding:12px 0 11px;color:var(--gray);position:relative}
   .profbar-btn.on{color:var(--ink)}
   .profbar-btn.on::after{content:"";position:absolute;left:26%;right:26%;bottom:-1px;height:2px;background:var(--ink)}
