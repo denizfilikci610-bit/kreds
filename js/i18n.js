@@ -313,6 +313,15 @@ const DA = {
   "gov.not_owner": "Kun ejeren kan fjerne direkte i små kredse",
   "gov.already_member": "Personen er allerede med i kredsen",
   "gov.not_friend": "Du kan kun invitere dine egne venner",
+  /* Automatiske afstemnings-opslag (bygges hos hver seer på deres eget sprog) */
+  "gov.q_add": "Afstemning: Skal {name} med i kredsen?",
+  "gov.q_remove": "Afstemning: Skal {name} ud af kredsen?",
+  "gov.q_request": "Afstemning: Skal {name} lukkes ind i kredsen?",
+  "gov.q_owner": "Afstemning: Hvem skal være ny ejer af {kreds}?",
+  "gov.res_passed": "Vedtaget",
+  "gov.res_rejected": "Afvist",
+  "gov.res_owner": "{name} er ny ejer",
+  "gov.res_ended": "Afsluttet",
 
   /* Skriv (compose) */
   "compose.title": "Nyt opslag",
@@ -810,6 +819,15 @@ const EN = {
   "gov.not_owner": "Only the owner can remove directly in small circles",
   "gov.already_member": "That person is already in the circle",
   "gov.not_friend": "You can only invite your own friends",
+  /* Automated vote posts (rendered per viewer in their own language) */
+  "gov.q_add": "Vote: Should {name} join the circle?",
+  "gov.q_remove": "Vote: Should {name} leave the circle?",
+  "gov.q_request": "Vote: Should {name} be let into the circle?",
+  "gov.q_owner": "Vote: Who should be the new owner of {kreds}?",
+  "gov.res_passed": "Passed",
+  "gov.res_rejected": "Rejected",
+  "gov.res_owner": "{name} is the new owner",
+  "gov.res_ended": "Ended",
 
   /* Compose */
   "compose.title": "New post",

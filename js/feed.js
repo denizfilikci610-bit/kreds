@@ -14,7 +14,7 @@ import { mapPoll, pollHTML, votePoll } from "./polls.js";
 import { openLightbox, lbSync, SOUND_ON_SVG, SOUND_OFF_SVG } from "./lightbox.js";
 import { AD_EVERY, adsEnabled, adSlotHTML, reportAdLayout, initAds } from "./ads.js";
 
-export const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id), poll_options(*, poll_votes(user_id)), membership_proposals(resolved), saved_posts(user_id)";
+export const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id), poll_options(*, poll_votes(user_id)), membership_proposals(resolved, kind, target, created_by, passed, result_user, mp_target:profiles!target(handle, name)), saved_posts(user_id)";
 
 export function mapComment(c){
   if(c.author_profile) registerProfile(c.author_profile);
@@ -37,6 +37,30 @@ export function mapPost(row){
   const cmts = (row.comments || []).slice()
     .sort(function(a,b){ return new Date(a.created_at) - new Date(b.created_at); })
     .map(mapComment);
+  const poll = mapPoll(row) || undefined;
+  // Governance-afstemning: gem STRUKTURERET data (ikke den danske server-tekst), så
+  // opslaget kan vises på hver brugers eget sprog. gd.passed er null for gamle rækker
+  // (ikke backfyldt) → klienten falder tilbage til den gemte tekst for dem.
+  if(poll && poll.gov){
+    const prop = (row.membership_proposals || [])[0];
+    if(prop){
+      const tp = prop.mp_target;
+      if(tp) registerProfile(tp);
+      const tName = tp ? (tp.name || tp.handle)
+                       : (ID2H[prop.target] ? (user(ID2H[prop.target]).name || ID2H[prop.target]) : null);
+      const wName = prop.result_user && ID2H[prop.result_user]
+                       ? (user(ID2H[prop.result_user]).name || ID2H[prop.result_user]) : null;
+      poll.govData = {
+        kind: prop.kind || "add",
+        targetName: tName,
+        isRequest: !!(prop.created_by && ID2H[prop.created_by] === OFFICIAL_HANDLE),
+        resolved: !!prop.resolved,
+        passed: (typeof prop.passed === "boolean") ? prop.passed : null,
+        winnerName: wName,
+        feedId: row.feed_id
+      };
+    }
+  }
   return {
     id: row.id,
     u: h,
@@ -50,7 +74,7 @@ export function mapPost(row){
     likeCount: likes.length,
     saved: !!(me && (row.saved_posts || []).some(function(sp){ return sp.user_id === me.id; })),
     feed: row.feed_id || undefined,
-    poll: mapPoll(row) || undefined,
+    poll: poll,
     cmts: cmts
   };
 }
@@ -90,17 +114,61 @@ const BIGHEART = '<div class="bigheart"><svg viewBox="0 0 24 24"><path d="M20.84
 function cntHTML(n){
   return '<span class="cnt"'+(n > 0 ? '' : ' style="display:none"')+'>'+n+'</span>';
 }
-/* Governance-afstemning: gør navnet fedt i "Afstemning: Skal <navn> med i/ud af/lukkes ind i kredsen?" */
+/* Governance-afstemning (FALLBACK): gør navnet fedt i den gemte danske tekst. Bruges kun
+   for gamle opslag uden struktureret data (se govTextHTML). */
 function govPostText(text){
   const m = /^(Afstemning: Skal )([\s\S]+?)( (?:med i|ud af|lukkes ind i) kredsen\?[\s\S]*)$/.exec(text);
   if(!m) return esc(text);
   return esc(m[1]) + "<b>" + esc(m[2]) + "</b>" + esc(m[3]);
 }
+/* Lokaliseret afstemnings-tekst bygget fra STRUKTUR (kind + navn + udfald) på brugerens
+   EGET sprog. Samme opslag ses af medlemmer med forskellige sprog, så teksten kan aldrig
+   gemmes på ét sprog i DB'en; den bygges her hos hver seer via t(). i18n-teksterne er
+   betroede (kun {name}/{kreds} er brugerdata og escapes+bold'es). Falder tilbage til den
+   gemte danske tekst for GAMLE opslag, hvor det strukturerede udfald ikke er sat. */
+/* Byg den lokaliserede afstemnings-tekst. `wrap` afgør hvordan navne vises: HTML (esc+bold)
+   i feedet, rå tekst til den native opslags-sides segs. Returnerer null → brug fallback
+   (gammelt afgjort opslag uden struktureret udfald, eller struktur der ikke rækker). */
+function govText(gd, wrap){
+  if(!gd || (gd.resolved && gd.passed == null)) return null;
+  let q = null;
+  if(gd.kind === "owner"){
+    const f = feedById(gd.feedId);
+    if(f) q = t("gov.q_owner", { kreds: wrap(f.name) });
+  } else if(gd.targetName){
+    const name = wrap(gd.targetName);
+    q = gd.isRequest ? t("gov.q_request", { name: name })
+      : gd.kind === "remove" ? t("gov.q_remove", { name: name })
+      : t("gov.q_add", { name: name });
+  }
+  if(q == null) return null;
+  if(gd.resolved){ // passed er sat her (null-tilfældet returnerede null ovenfor)
+    let res;
+    if(gd.kind === "owner"){
+      res = gd.passed ? t("gov.res_owner", { name: wrap(gd.winnerName || t("mv.someone")) })
+                      : t("gov.res_ended");
+    } else {
+      res = gd.passed ? t("gov.res_passed") : t("gov.res_rejected");
+    }
+    q += ' · ' + res; // middot, ikke tankestreg
+  }
+  return q;
+}
+/* Feed (HTML): navne escapes + bold'es. Fallback til gemt dansk tekst for gamle opslag. */
+function govTextHTML(gd, fallbackText){
+  const s = govText(gd, function(n){ return "<b>"+esc(n)+"</b>"; });
+  return s == null ? govPostText(fallbackText) : s;
+}
+/* Native opslags-side (segs) + andre rå-tekst-behov: navne står uformateret. */
+export function govPlainText(gd, fallbackText){
+  const s = govText(gd, function(n){ return n; });
+  return s == null ? (fallbackText || "") : s;
+}
 /* Krop for en tanke: tekst → medie → afstemning. (Et minde har sin egen skal, memoryHTML.)
-   richText gør @handles klikbare — governance-tekster (serverskabte) beholder govPostText. */
+   richText gør @handles klikbare — governance-afstemninger renders via govTextHTML. */
 function postBody(p, media){
   const textHTML = p.text
-    ? '<div class="ptext">'+(p.poll && p.poll.gov ? govPostText(p.text) : richText(p.text))+'</div>'
+    ? '<div class="ptext">'+(p.poll && p.poll.gov ? govTextHTML(p.poll.govData, p.text) : richText(p.text))+'</div>'
     : '';
   return textHTML + media + pollHTML(p);
 }

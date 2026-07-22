@@ -2,7 +2,7 @@ import { sb } from "./config.js";
 import { me, expandedCmts, composers, cstate, cfilePid, USERS } from "./store.js";
 import { el, esc, avaHTML, richText, toast, uuid, HEART_SVG, user, ini, grad, imgUrl } from "./helpers.js";
 import { t, likesLabel, stemmerLabel } from "./i18n.js";
-import { findPost, findPostAll, allPostArrays, mapComment, switchTab, setLike, sharePost, feedById, setFeed, openPostMenu, openReportMenu } from "./feed.js";
+import { findPost, findPostAll, allPostArrays, mapComment, switchTab, setLike, sharePost, feedById, setFeed, openPostMenu, openReportMenu, govPlainText } from "./feed.js";
 import { votePoll } from "./polls.js";
 import { openProfile, closeProfile, closeMemView } from "./profile.js";
 import { mentionCards } from "./mentions.js";
@@ -492,7 +492,8 @@ function postPageSnapshot(pid, focusCid){
       gradient: grad(p.u),
       time: p.t,
       kredsName: f ? f.name : "",
-      segs: textSegs(p.text || ""),
+      // Governance-afstemninger vises lokaliseret (samme som feedet); ellers @-segmenter.
+      segs: (p.poll && p.poll.gov) ? [{ t: govPlainText(p.poll.govData, p.text) }] : textSegs(p.text || ""),
       imgUrl: p.img ? p.img.src : "",
       videoUrl: p.video ? p.video.src : "",
       liked: !!p.liked,
