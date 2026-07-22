@@ -51,10 +51,14 @@ struct VFVideoCropView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
 
+                // Videoen KLIPPES til rammen, så man kun ser den inde i det valgte layout
+                // (sort udenfor) og panorerer indenfor — ligesom billed-beskæreren.
                 VideoLayerView(player: loop.player)
                     .frame(width: vidSize.width * t, height: vidSize.height * t)
-                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
                     .offset(off)
+                    .frame(width: frame.width, height: frame.height)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
                     .allowsHitTesting(false)
 
                 // Dæmpning udenfor + ramme + hjørne-markører + gitter (samme pynt som billed-beskæreren).

@@ -32,13 +32,17 @@ struct VFCropView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
 
+                // Billedet KLIPPES til rammen, så man kun ser det inde i det valgte layout
+                // (sort udenfor) og panorerer indenfor — ikke et billede der flyder udover.
                 Image(uiImage: image)
                     .resizable()
                     .frame(width: image.size.width * t, height: image.size.height * t)
-                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
                     .offset(off)
+                    .frame(width: frame.width, height: frame.height)
+                    .clipShape(circular ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 6, style: .continuous)))
+                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
 
-                // Dæmpning udenfor + ramme + hjørne-markører + gitter (fælles pynt).
+                // Ramme + hjørne-markører + gitter (fælles pynt).
                 CropChrome(frame: frame, circular: circular,
                            center: CGPoint(x: geo.size.width / 2, y: geo.size.height / 2),
                            interacting: interacting)
@@ -148,24 +152,6 @@ struct VFCropView: View {
     }
 }
 
-/// Full-screen dim with an even-odd "hole" where the crop frame sits.
-// Ikke private: genbruges også af VFVideoCropView (VideoCropView.swift).
-struct CropMaskShape: Shape {
-    let frame: CGSize
-    let circular: Bool
-    let center: CGPoint
-
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        p.addRect(rect)
-        let hole = CGRect(x: center.x - frame.width / 2, y: center.y - frame.height / 2,
-                          width: frame.width, height: frame.height)
-        if circular { p.addEllipse(in: hole) }
-        else { p.addRoundedRect(in: hole, cornerSize: CGSize(width: 4, height: 4)) }
-        return p
-    }
-}
-
 /// To lodrette + to vandrette linjer der deler rammen i tredjedele (kompositions-hjælp).
 struct ThirdsGrid: Shape {
     func path(in rect: CGRect) -> Path {
@@ -198,42 +184,38 @@ struct CropCorners: Shape {
     }
 }
 
-/// Fælles beskærings-"pynt": blød dæmpning udenfor rammen, tynd ramme + kraftige hjørne-markører,
-/// og et tredjedels-gitter der kun toner frem mens man trækker/knibzoomer. Bruges af både billed-
-/// og video-beskæreren, så de ser ens ud.
+/// Fælles beskærings-"pynt": tynd ramme + kraftige hjørne-markører, og et tredjedels-gitter
+/// der kun toner frem mens man trækker/knibzoomer. Billedet er allerede klippet til rammen, så
+/// der er ingen dæmpning at tegne — udenfor er bare sort. Bruges af både billed- og video-
+/// beskæreren, så de ser ens ud.
 struct CropChrome: View {
     let frame: CGSize
     let circular: Bool
     let center: CGPoint
     let interacting: Bool
     var body: some View {
-        ZStack {
-            CropMaskShape(frame: frame, circular: circular, center: center)
-                .fill(Color.black.opacity(0.55), style: FillStyle(eoFill: true))
-                .allowsHitTesting(false)
-            Group {
-                if circular {
-                    Circle().stroke(Color.white.opacity(0.9), lineWidth: 2)
+        Group {
+            if circular {
+                Circle().stroke(Color.white.opacity(0.9), lineWidth: 2)
+                    .frame(width: frame.width, height: frame.height)
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(Color.white.opacity(0.4), lineWidth: 1)
                         .frame(width: frame.width, height: frame.height)
-                } else {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(Color.white.opacity(0.4), lineWidth: 1)
-                            .frame(width: frame.width, height: frame.height)
-                        ThirdsGrid()
-                            .stroke(Color.white.opacity(0.55), lineWidth: 0.75)
-                            .frame(width: frame.width, height: frame.height)
-                            .opacity(interacting ? 1 : 0)
-                        CropCorners()
-                            .stroke(Color.white, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                            .frame(width: frame.width, height: frame.height)
-                    }
+                    ThirdsGrid()
+                        .stroke(Color.white.opacity(0.55), lineWidth: 0.75)
+                        .frame(width: frame.width, height: frame.height)
+                        .opacity(interacting ? 1 : 0)
+                    CropCorners()
+                        .stroke(Color.white, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                        .frame(width: frame.width, height: frame.height)
                 }
             }
-            .position(center)
-            .allowsHitTesting(false)
-            .shadow(color: .black.opacity(0.3), radius: 3)
         }
+        .position(center)
+        .allowsHitTesting(false)
+        .shadow(color: .black.opacity(0.3), radius: 3)
     }
 }
 
