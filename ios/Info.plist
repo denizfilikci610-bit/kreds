@@ -50,8 +50,6 @@
 	<string>VibeFeed viser dine billeder og videoer i appen, så du selv kan vælge hvad du vil dele som minde, story, kommentar eller besked. Vi henter aldrig noget af os selv.</string>
 	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
 	<true/>
-	<key>NSUserTrackingUsageDescription</key>
-	<string>Tilladelsen bruges kun til at vise reklamer, der er mere relevante for dig.</string>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-2451374090541637~8613366036</string>
 	<key>NSAppTransportSecurity</key>
