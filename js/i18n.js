@@ -72,7 +72,7 @@ const DA = {
   "feedbar.cancel_aria": "Annuller søgning",
   "feedbar.no_match": "Ingen kredse matcher",
   "kredshead.aria": "Kredsens medlemmer",
-  "kredshead.line": "<b>{n} medlemmer</b><br>Privat kreds — kun jer kan se og skrive her.",
+  "kredshead.line": "<b>{n} medlemmer</b><br>Privat kreds. Kun jer kan se og skrive her.",
   "aria.profile": "Profil",
   "aria.more": "Mere",
   "aria.comments": "Kommentarer",
