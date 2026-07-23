@@ -1051,7 +1051,7 @@
   .ms-btn.cancel{background:none;color:var(--red);padding:6px 2px}
   .ms-btn:active{opacity:.7}
   .ms-btn:disabled{opacity:.5;cursor:default}
-  .ms-leavezone{border-top:1px solid var(--line);margin-top:14px;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+  .ms-leavezone{margin-top:14px;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
   .ms-leave{color:var(--red);font-size:14px;font-weight:700;text-align:left;padding:0}
   .ms-confirmtxt{font-size:13.5px;color:var(--gray);line-height:1.45;padding-bottom:12px}
 
