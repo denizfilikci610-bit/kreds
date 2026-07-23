@@ -612,8 +612,8 @@
   .gov-head{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:12px;font-weight:800;color:var(--ink);letter-spacing:.02em}
   /* Live optagelses-afstemning (målpersonens boks i Notifikationer) */
   #admvotes:empty{display:none}
-  .admvote{margin:12px 16px 0;padding:12px 14px;border:1px solid var(--red);border-radius:14px}
-  .admvote.done{border-color:var(--line)}
+  .admvote{margin:12px 16px 18px;padding:12px 14px;background:var(--chip);border-radius:14px}
+  .admvote.done{opacity:.65}
   .adm-top{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14.5px}
   .adm-countdown{flex:0 0 auto;font-size:12.5px;font-weight:800;color:var(--red)}
   .adm-done{flex:0 0 auto;font-size:12.5px;font-weight:800}
