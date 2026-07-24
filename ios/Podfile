@@ -1,22 +1,12 @@
-# VibeFeed iOS — Appodeal SDK 4.2.0 with Google AdMob + BidMachine mediation.
+# VibeFeed iOS — no third-party pods.
 #
-# The owner's Appodeal app (782028) uses AdMob-managed mediation; Appodeal's
-# dashboard selects the actual ad units at runtime (no ad-unit ids hardcoded here).
-# BidMachine (Appodeal's own programmatic demand, no extra account) is added as a
-# SECOND demand source so an MREC no-fill/refresh from AdMob can be back-filled —
-# a single-network fleet was leaving the sponsored slot empty ("ads disappear").
-#
-# Build after `pod install` with:
-#   cd ios && xcodebuild -workspace VibeFeed.xcworkspace -scheme VibeFeed \
-#     -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
+# The Appodeal/AdMob ad SDK was removed 2026-07-24 to resolve an App Review
+# AppTrackingTransparency finding: VibeFeed ships with no ads and no tracking, so
+# the binary must not link any framework that references AppTrackingTransparency.
+# If ads are reintroduced later, re-add the Appodeal pods + their spec sources here.
 
 platform :ios, '17.0'
 
-# Appodeal SDK + adapters live in Appodeal's own spec repo; the AdMob adapter
-# pulls Bidon (Appodeal's bidding layer) from the Bidon spec repo; everything
-# else (Google-Mobile-Ads-SDK, Protobuf) comes from the CocoaPods CDN.
-source 'https://github.com/appodeal/CocoaPods.git'
-source 'https://github.com/bidon-io/CocoaPods-Specs.git'
 source 'https://cdn.cocoapods.org/'
 
 install! 'cocoapods', :deterministic_uuids => false
@@ -24,23 +14,15 @@ install! 'cocoapods', :deterministic_uuids => false
 use_frameworks!
 
 target 'VibeFeed' do
-  pod 'Appodeal', '4.2.0'
-  pod 'AppodealGoogleAdMobAdapter', '12.13.0.0'
-  pod 'AppodealBidMachineAdapter', '3.7.1.0'
+  # No pods. Intentionally empty.
 end
 
-# Keep the pods on iOS 17 and strip bitcode/signing noise for simulator builds.
+# Keep the (empty) pods project on iOS 17 and quiet simulator signing.
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
       config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-      # Protobuf & Google-Mobile-Ads use double-quoted includes in their framework
-      # headers; newer Xcode's framework-module verifier treats that as an error.
-      # Silence the pedantic warning AND skip the VerifyModule build phase for pods
-      # (third-party frameworks we don't control) so it can't fail the build.
-      config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
-      config.build_settings['ENABLE_MODULE_VERIFIER'] = 'NO'
     end
   end
 end
