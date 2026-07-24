@@ -473,10 +473,82 @@ export function restoreVideos(container, snap){
   });
 }
 
+/* ================= Kirurgisk gen-tegning =================
+   Feedet blev før bygget som ÉN stor HTML-streng og sat ind med innerHTML ved hver
+   eneste render. Alt blev altså revet ned og bygget op igen, hver gang bare ét like, én
+   kommentar eller ét nyt opslag fra hvem som helst ankom — og dermed blev hvert eneste
+   <img> og <video> et NYT element, der begyndte sin download forfra fra byte 0. På et
+   smalt net nåede et billede derfor bogstaveligt talt aldrig at blive færdigt.
+
+   Nu bygges den samme HTML kort for kort, og hvert korts HTML ER dets signatur: er
+   strengen den samme som sidst, røres noden slet ikke. Kun kort der faktisk har ændret
+   sig bygges om — og selv der flyttes det allerede hentede medie med over i det nye kort.
+   Resultatet på skærmen er tegn for tegn det samme som før; det er kun DOM-arbejdet, der
+   er skåret væk. Fordi signaturen er selve outputtet, kan der ikke opstå et kort, der
+   "glemmer" at opdatere sig: ændrer noget som helst udseendet, ændrer strengen sig med.
+
+   Realtime (js/realtime.js) er urørt: live-opdateringer kommer lige så hurtigt som før,
+   de river bare ikke længere mediet ned undervejs. */
+const cardHtml = new WeakMap(); // kort-node -> den HTML den blev bygget af
+
+function buildCard(c){
+  const tpl = document.createElement("template");
+  tpl.innerHTML = c.html;
+  const node = tpl.content.firstElementChild; // ét kort = ét rod-element
+  if(!node) return null;
+  node.dataset.vfk = c.key;
+  cardHtml.set(node, c.html);
+  return node;
+}
+/* Flyt medie, der allerede ER hentet (samme src), med over i det ombyggede kort, så et
+   like på et opslag ikke sender dets billede tilbage til byte 0. */
+function keepMedia(oldNode, newNode){
+  const olds = new Map();
+  oldNode.querySelectorAll(".pmedia img, .pmedia video").forEach(function(m){
+    olds.set(m.tagName + "|" + m.getAttribute("src"), m);
+  });
+  if(!olds.size) return;
+  newNode.querySelectorAll(".pmedia img, .pmedia video").forEach(function(m){
+    const keep = olds.get(m.tagName + "|" + m.getAttribute("src"));
+    if(keep) m.replaceWith(keep);
+  });
+}
+/* Bring container'ens børn i overensstemmelse med kort-listen: genbrug uændrede, byg kun
+   ændrede om, indsæt nye, fjern dem der er væk. Noder uden data-vfk (fx "Henter…" fra
+   setFeed) hører ikke til listen og ryddes, præcis som innerHTML gjorde før. */
+function reconcileCards(container, cards){
+  const byKey = new Map();
+  Array.prototype.slice.call(container.children).forEach(function(n){
+    const k = n.dataset ? n.dataset.vfk : null;
+    if(k && !byKey.has(k)) byKey.set(k, n);
+    else n.remove();
+  });
+  let prev = null;
+  cards.forEach(function(c){
+    let node = byKey.get(c.key);
+    byKey.delete(c.key);
+    if(node && cardHtml.get(node) !== c.html){
+      const fresh = buildCard(c);
+      if(fresh){ keepMedia(node, fresh); node.remove(); node = fresh; }
+    } else if(!node){
+      node = buildCard(c);
+    }
+    if(!node) return;
+    // nextElementSibling (ikke nextSibling): en tilfældig tekstnode må ikke få os til at
+    // flytte et kort, der i virkeligheden allerede står rigtigt — et flyt pauser en video.
+    const want = prev ? prev.nextElementSibling : container.firstElementChild;
+    if(node !== want) container.insertBefore(node, want);
+    prev = node;
+  });
+  byKey.forEach(function(n){ n.remove(); }); // opslag der ikke længere er i feedet
+}
+
 export function renderFeed(){
-  let html = "";
-  if(state.currentFeed === "all" && me && !state.humanFriends.length){
-    html += '<div class="emptynote" style="padding:24px 20px;text-align:center">'+t("feed.empty_friends")+'</div>';
+  const cards = [];
+  const noFriends = !!(state.currentFeed === "all" && me && !state.humanFriends.length);
+  if(noFriends){
+    cards.push({ key: "empty-friends",
+      html: '<div class="emptynote" style="padding:24px 20px;text-align:center">'+t("feed.empty_friends")+'</div>' });
   }
   /* Ingen fastgøring: alle opslag (inkl. den officielle profil) flyder kronologisk */
   const items = state.posts;
@@ -485,22 +557,24 @@ export function renderFeed(){
        Ikke efter det allersidste opslag, så feedet ikke slutter på en reklame. */
     const withAds = adsEnabled();
     let adIdx = 0;
-    html += items.map(function(p, idx){
-      let card = postHTML(p);
+    items.forEach(function(p, idx){
+      cards.push({ key: "p:"+p.id, html: postHTML(p) });
       if(withAds && (idx + 1) % AD_EVERY === 0 && (idx + 1) < items.length){
-        card += adSlotHTML(adIdx++);
+        const i = adIdx++;
+        cards.push({ key: "ad:"+i, html: adSlotHTML(i) });
       }
-      return card;
-    }).join("");
-  } else if(!(state.currentFeed === "all" && me && !state.humanFriends.length)){
-    html += '<div class="emptynote" style="padding:36px 20px;text-align:center">'+t("feed.empty_kreds")+'</div>';
+    });
+  } else if(!noFriends){
+    cards.push({ key: "empty-kreds",
+      html: '<div class="emptynote" style="padding:36px 20px;text-align:center">'+t("feed.empty_kreds")+'</div>' });
   }
   const f = document.activeElement && document.activeElement.closest ? document.activeElement.closest("#feed .cfield") : null;
   const fpid = f ? f.dataset.id : null, selS = f ? f.selectionStart : 0, selE = f ? f.selectionEnd : 0;
-  const vsnap = snapVideos(el("feed"));
-  el("feed").innerHTML = html;
-  restoreVideos(el("feed"), vsnap);
-  applyFeedSound(); // gen-render nulstiller muted-attributten — genanvend lyd-valget
+  reconcileCards(el("feed"), cards);
+  /* snapVideos/restoreVideos er ikke længere nødvendige her: videoen ER det samme element
+     bagefter, så den beholder sin position af sig selv (at sætte currentTime igen ville
+     tværtimod kunne udløse en ny søgning i filen). */
+  applyFeedSound(); // et ombygget kort nulstiller muted-attributten — genanvend lyd-valget
   clampMemCaps(el("feed")); // vis "Se mere" kun hvor minde-billedteksten løber over
   pushNativeComments();     // hold et evt. åbent native kommentar-sheet i sync (realtime)
   pushNativePostPage();     // …og den native opslags-side
