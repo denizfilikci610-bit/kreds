@@ -49,9 +49,12 @@ function mapMsg(r){
     authorId: r.author,
     text: r.text || "",
     postId: r.post_id || null,
-    thumb: post && post.image_path ? imgUrl(post.image_path) : "",
+    /* ⚠️ Kun BILLED-grenene skaleres: render/image-endpointet svarer HTTP 400 på en
+       video-sti, og de to slags medier deler samme imgUrl. Bredderne følger CSS'en
+       (.cv-thumb 150 px, .cv-mimg maks. 210 px) gange 3 for retina. */
+    thumb: post && post.image_path ? imgUrl(post.image_path, 480) : "",
     thumbVideo: post && !post.image_path && post.video_path ? imgUrl(post.video_path) : "",
-    mimg: r.image_path ? imgUrl(r.image_path) : "",       // beskedens EGET billede
+    mimg: r.image_path ? imgUrl(r.image_path, 640) : "",   // beskedens EGET billede
     mimgPath: r.image_path || null,                        // rå sti (storage-oprydning)
     mvideo: r.video_path ? imgUrl(r.video_path) : "",
     edited: !!r.edited_at,

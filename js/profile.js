@@ -2,7 +2,7 @@ import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab, expandedCmts } from "./store.js";
 import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConsent, setConsent, imgUrl, ini } from "./helpers.js";
 import { t, setLang, getLang, policyURL, LANGS } from "./i18n.js";
-import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps, applyFeedSound, switchTab, setFeed, feedById, POST_SELECT } from "./feed.js";
+import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps, applyFeedSound, switchTab, setFeed, feedById, POST_SELECT, GRID_IMG_W } from "./feed.js";
 import { openNativePostPage, rerenderPostCmts } from "./comments.js";
 import { openCompose, openStoryCamera } from "./compose.js";
 import { openStoryViewer } from "./stories.js";
@@ -46,9 +46,12 @@ function gridHTML(posts, emptyText){
   const mems = posts.filter(function(p){ return p.kind === "memory" && (p.img || p.video); });
   return mems.length
     ? '<div class="pgrid">'+mems.map(function(p){
+        // Gitteret viser mediet i en tredjedels bredde — hent billedet i netop den
+        // størrelse (målt: 589 kB → 7 kB) i stedet for feedets fulde udgave.
+        const gimg = p.imgPath ? imgUrl(p.imgPath, GRID_IMG_W) : (p.img ? p.img.src : "");
         const m = p.video
           ? '<video src="'+esc(p.video.src)+'#t=0.1" muted playsinline preload="metadata"></video>'
-          : '<img src="'+esc(p.img.src)+'" alt="" loading="lazy" draggable="false">';
+          : '<img src="'+esc(gimg)+'" alt="" loading="lazy" decoding="async" draggable="false">';
         return '<button class="pgrid-item" data-mem="'+esc(p.id)+'">'+m+
           (p.feed ? '<span class="pgrid-lock">'+P_LOCK_ICON+'</span>' : '')+ /* kreds-minde = lille lås */
           (p.video ? '<span class="pgrid-play"></span>' : '')+

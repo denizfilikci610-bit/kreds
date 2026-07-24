@@ -14,6 +14,16 @@ import { mapPoll, pollHTML, votePoll } from "./polls.js";
 import { openLightbox, lbSync, SOUND_ON_SVG, SOUND_OFF_SVG } from "./lightbox.js";
 import { AD_EVERY, adsEnabled, adSlotHTML, reportAdLayout, initAds } from "./ads.js";
 
+/* Bredde på feedets billeder (px). Kameraet gemmer minder i 1080 px bredde, så 1080 er
+   den fulde opløsning: intet tabes på skærmen, men filen komprimeres om (quality 70), og
+   store galleri-billeder på 3000-4000 px skaleres ned. Sæt lavere (fx 828) for endnu
+   færre bytes på bekostning af skarphed på de største telefoner. */
+const FEED_IMG_W = 1080;
+/* Miniature i profilens 3-kolonne-gitter: ca. 143 pt bredt × 3 = 429 px */
+export const GRID_IMG_W = 400;
+/* Billede i en kommentar (.cimg: maks. 70 % bredde, 180 pt højt) */
+const CMT_IMG_W = 720;
+
 export const POST_SELECT = "*, author_profile:profiles!author(*), comments(*, author_profile:profiles!author(*), comment_likes(user_id)), likes(user_id), poll_options(*, poll_votes(user_id)), membership_proposals(resolved, kind, target, created_by, passed, result_user, mp_target:profiles!target(handle, name)), saved_posts(user_id)";
 
 export function mapComment(c){
@@ -23,7 +33,7 @@ export function mapComment(c){
     id: c.id,
     u: c.author_profile ? c.author_profile.handle : (ID2H[c.author] || "?"),
     text: c.text || "",
-    img: c.image_path ? imgUrl(c.image_path) : null,
+    img: c.image_path ? imgUrl(c.image_path, CMT_IMG_W) : null,
     parent: c.parent_id != null ? c.parent_id : null,
     t: fmtTime(c.created_at),
     liked: !!(me && ls.some(function(l){ return l.user_id === me.id; })),
@@ -68,8 +78,9 @@ export function mapPost(row){
     created: row.created_at,
     t: fmtTime(row.created_at),
     text: row.text || undefined,
-    img: row.image_path ? { src: imgUrl(row.image_path), alt: t("media.image") } : undefined,
-    video: row.video_path ? { src: imgUrl(row.video_path) } : undefined,
+    imgPath: row.image_path || null, /* rå sti: gitteret henter samme billede i sin egen (lille) bredde */
+    img: row.image_path ? { src: imgUrl(row.image_path, FEED_IMG_W), alt: t("media.image") } : undefined,
+    video: row.video_path ? { src: imgUrl(row.video_path) } : undefined, /* video: ALDRIG transform */
     liked: !!(me && likes.some(function(l){ return l.user_id === me.id; })),
     likeCount: likes.length,
     saved: !!(me && (row.saved_posts || []).some(function(sp){ return sp.user_id === me.id; })),
@@ -311,11 +322,20 @@ function memoryHTML(p, inner){
     '</article>'
   );
 }
+/* Medie-elementet i et opslag. Begge dele henter FØRST rigtige data når de er på vej ind
+   på skærmen: billeder via loading="lazy", videoer ved at autoplay er væk — en
+   IntersectionObserver starter dem først når de faktisk er synlige (se observeFeedVideos).
+   Før stod der autoplay på alle videoer og intet lazy på billederne, så hele feedets
+   medier (målt: 91 MB) blev sat i kø på én gang, længe før man scrollede ned til dem.
+   preload="metadata" er BEVIDST beholdt (ikke "none"): uden metadata kender browseren
+   ikke videoens højde, så kortet ville stå 150 px højt og SPRINGE i layout — og rive
+   scroll-positionen med sig — i det øjeblik videoen begyndte at spille. Metadata er
+   nogle få hundrede kB; det var autoplay, der hentede hele filen. */
 export function postHTML(p){
   const inner = p.video
-    ? '<video src="'+esc(p.video.src)+'" playsinline muted loop autoplay preload="metadata"></video>'+vsoundHTML(p)
+    ? '<video src="'+esc(p.video.src)+'" playsinline muted loop preload="metadata"></video>'+vsoundHTML(p)
     : p.img
-    ? '<img src="'+esc(p.img.src)+'" alt="'+esc(p.img.alt||"")+'" draggable="false">'
+    ? '<img src="'+esc(p.img.src)+'" alt="'+esc(p.img.alt||"")+'" loading="lazy" decoding="async" draggable="false">'
     : '';
   if(p.kind === "memory") return memoryHTML(p, inner);
   const media = inner ? '<div class="pmedia" data-id="'+p.id+'">'+inner+BIGHEART+'</div>' : '';
@@ -361,23 +381,61 @@ function soundTarget(){
   const av = document.querySelector(".view.active");
   return av ? av.querySelector(sel) : null;
 }
+/* ================= Kun den synlige video henter og spiller =================
+   Feedets videoer starter først, når de er på skærmen (og skifter da til preload="auto"),
+   og pauses igen når de forlader den. Uden det hentede alle feedets videoer sig selv helt
+   ned samtidig (målt: 8 stk., gennemsnit 9,3 MB, største 20,4 MB), også dem man aldrig
+   scrollede ned til. Grid-miniaturer (.pgrid-item) er bevidst pausede og røres ikke. */
+let vidObs = null;
+const visVideos = new Set(); // videoer der er på skærmen lige nu
+function videoObserver(){
+  if(vidObs || !window.IntersectionObserver) return vidObs;
+  vidObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(en){
+      const v = en.target;
+      if(en.isIntersecting){
+        visVideos.add(v);
+        if(v.preload !== "auto") v.preload = "auto";
+        if(v.paused) v.play().catch(function(){});
+      } else {
+        visVideos.delete(v);
+        if(!v.paused) v.pause();
+      }
+    });
+  }, { threshold: 0.2 });
+  return vidObs;
+}
+function observeFeedVideos(){
+  const obs = videoObserver();
+  const vids = document.querySelectorAll(".pmedia video");
+  if(!obs){ // ingen IntersectionObserver (meget gammel browser): spil som før
+    vids.forEach(function(v){ v.preload = "auto"; if(v.paused) v.play().catch(function(){}); });
+    return;
+  }
+  obs.disconnect(); // fjernede videoer skal ikke holdes i live af observeren
+  visVideos.clear();
+  vids.forEach(function(v){ obs.observe(v); });
+}
 /* Anvend lyd-tilstanden på alle renderede videoer (kaldes efter hver re-render
-   og ved kontekst-skift: faneskift, detalje-side åbnes/lukkes). Genstarter samtidig
-   pausede videoer, så feedet ALTID looper — autoplay kan være blevet afbrudt. */
+   og ved kontekst-skift: faneskift, detalje-side åbnes/lukkes) og genopfrisk hvilke
+   videoer der er synlige. */
 export function applyFeedSound(){
   const target = soundTarget();
   document.querySelectorAll(".pmedia video").forEach(function(v){
     v.muted = v !== target;
-    if(v.paused) v.play().catch(function(){});
   });
+  observeFeedVideos();
 }
-/* Feed-videoer skal ALTID spille i loop. Autoplay kan blive afbrudt af iOS (app i
+/* Den synlige video skal ALTID spille i loop. iOS kan afbryde afspilningen (app i
    baggrund, afbrudt AVAudioSession, strømsparetilstand) uden at komme i gang igen af
-   sig selv — genstart derfor pausede videoer når appen bliver synlig igen og ved
-   berøring (berørings-kaldet kører i gesture-kontekst, hvor play() også får lov i
-   strømsparetilstand). Grid-miniaturer (.pgrid-item) er bevidst pausede og røres ikke. */
+   sig selv — genstart derfor ved retur og ved berøring (berørings-kaldet kører i
+   gesture-kontekst, hvor play() også får lov i strømsparetilstand). KUN videoer på
+   skærmen: før blev hele feedets videoer sat i gang ved hver eneste berøring. */
 function ensureFeedVideos(){
-  applyFeedSound();
+  visVideos.forEach(function(v){
+    if(!v.isConnected) visVideos.delete(v);
+    else if(v.paused) v.play().catch(function(){});
+  });
 }
 /* Vieweren (lightboxen) ejer lyden mens den er åben — sluk feed-lyden helt */
 export function muteFeedSound(){

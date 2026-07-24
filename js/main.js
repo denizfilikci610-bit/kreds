@@ -1,6 +1,6 @@
 import { sb, recoveryMode, recoveryLinkError } from "./config.js";
 import { me, curTab } from "./store.js";
-import { el, toast } from "./helpers.js";
+import { el, toast, initImgFallback } from "./helpers.js";
 import { t, initI18n, setLang, hasStoredLang } from "./i18n.js";
 import { initFeed, setTabIcons, switchTab, closePostEdit, renderFeedbar, renderKredshead, renderFeed, setFeed, nativeKredsState } from "./feed.js";
 import { initComments, nativeCommentsAction, nativePostPageAction } from "./comments.js";
@@ -39,6 +39,7 @@ initI18n(function(){
 });
 
 /* ================= Wiring (samme lyttere som før, samlet her) ================= */
+initImgFallback(); // et skaleret billede der fejler, falder tilbage til originalen
 initFeed();
 initComments();
 initKredse();
