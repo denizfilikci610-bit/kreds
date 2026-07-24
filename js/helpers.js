@@ -130,7 +130,14 @@ export function mediaBucket(p){ return isPrivatePath(p) ? "vf-private" : "post-i
    imgUrl bruges til begge (fx chat, hvor beskeden kan bære et billede eller en video).
    Derfor to uafhængige lag: kaldstedet sender kun en bredde på sine billed-grene, OG
    funktionen her afviser selv video-endelser. Private stier (priv/) hentes med signerede
-   URL'er og transformeres heller ikke. */
+   URL'er og transformeres heller ikke.
+
+   ⚠️⚠️ resize:"contain" ER OBLIGATORISK. Med KUN width sætter Supabase bredden og lader
+   HØJDEN stå på originalens: en avatar på 512x512 kom tilbage som 102x512, altså klemt til
+   en høj, smal strimmel, og profil-gitteret som 400x1350. (Feed-billeder så tilfældigvis
+   rigtige ud, fordi 1080 er originalens egen bredde.) Målt mod ejerens egne filer med
+   contain: 512x512 → 54x54 / 120x120, 1080x1350 → 400x500 / 720x900, banner 1278x432 →
+   1080x365. Ingen udfyldning, og beder man om mere end originalen, kommer originalen igen. */
 const VIDEO_RE = /\.(mp4|m4v|mov|qt|webm|avi|mkv|3gp)$/i;
 export function isVideoPath(p){ return VIDEO_RE.test(String(p || "")); }
 const IMG_QUALITY = 70;
@@ -139,7 +146,9 @@ export function imgUrl(path, width){
   const w = Math.round(Number(width) || 0);
   const store = sb.storage.from("post-images");
   if(w > 0 && !isVideoPath(path) && !isPrivatePath(path)){
-    return store.getPublicUrl(path, { transform: { width: w, quality: IMG_QUALITY } }).data.publicUrl;
+    return store.getPublicUrl(path, {
+      transform: { width: w, resize: "contain", quality: IMG_QUALITY }
+    }).data.publicUrl;
   }
   return store.getPublicUrl(path).data.publicUrl;
 }
