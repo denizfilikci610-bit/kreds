@@ -1824,6 +1824,9 @@
     margin-bottom:12px;
   }
   .consent-btn.primary{background:var(--red);color:#fff;border-color:var(--red)}
+  /* Reklame-arket har et politik-link mellem tekst og knapper, der giver luften. Invitations-
+     arket har ikke det link, så den første knap sad klods op ad teksten. */
+  #inviteview .consent-btn.primary{margin-top:22px}
   .consent-btn:active{opacity:.7}
 
   /* ---- Privatliv (Rediger profil): politik-link under samtykke-chips ---- */

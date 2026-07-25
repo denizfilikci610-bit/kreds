@@ -164,7 +164,7 @@ if(window.__vfNative){
     const compact = document.body.classList.contains("hidebar");
     // Skjul barerne når noget ligger ovenpå ELLER vi ikke er på hoved-appen (boot-splash, login, gates)
     const blocked = nativeSheetOpen || !!document.querySelector(
-        "#scrim.on, .compose.on, .profileview.on, .postview.on, #chatview.on, #lightbox.on, #authview.on, #langview.on, #consentview.on"
+        "#scrim.on, .compose.on, .profileview.on, .postview.on, #chatview.on, #lightbox.on, #authview.on, #langview.on, #consentview.on, #inviteview.on"
       ) || document.body.classList.contains("lb-lock")
       || !!(el("splash") && !el("splash").classList.contains("gone"));
     const visible = !blocked;
