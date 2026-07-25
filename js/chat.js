@@ -1120,10 +1120,9 @@ function msgHTML(m, first, last){
     : m.mvideo
     ? '<video class="cv-mimg" src="'+esc(m.mvideo)+'" controls playsinline preload="metadata"></video>'
     : '';
-  const bare = media && !m.text && !share;
-  // Citat-svar (Messenger-agtigt): etiket "Svar til Navn" + den citerede besked som
-  // tydelig chip m. evt. miniature — tap hopper til beskeden. Kilden slås op LOKALT i
-  // tråden (rm), så citatet altid er friskt, og en slettet kilde forsvinder af sig selv.
+  // Citat-svar: den citerede besked som en chip ØVERST INDE i svarboblen, med afsenderens
+  // navn og evt. miniature — tap hopper til beskeden. Kilden slås op LOKALT i tråden (rm),
+  // så citatet altid er friskt, og en slettet kilde forsvinder af sig selv.
   let quote = "";
   if(m.replyToId != null){
     const rm = msgs.find(function(x){ return x.id === m.replyToId; });
@@ -1136,22 +1135,28 @@ function msgHTML(m, first, last){
         : rvid
         ? '<video class="cv-qthumb" src="'+esc(rvid)+'#t=0.1" muted playsinline preload="metadata"></video>'
         : '';
-      // Med miniature vises KUN billedet — aldrig tekst/billedtekst ved siden af
-      const rtxt = rthumb ? "" : esc(snip(rm.text, 64) ||
+      // Miniaturen står nu VED SIDEN AF teksten, så man både kan se hvad der svares på og
+      // hvad der blev sagt. Er der intet at citere (rent medie), træder "📷 Medie" i stedet.
+      const rtxt = esc(snip(rm.text, 64) ||
         ((rm.postId || rm.mimg || rm.mvideo) ? t("chat.q_media") : ""));
       if(rname || rtxt || rthumb){
-        quote = '<div class="cv-qwrap">'+
-          '<span class="cv-qlabel">'+
-            '<svg viewBox="0 0 24 24"><path class="stroke" d="M9.5 7 4.5 12l5 5M4.5 12H14a5.5 5.5 0 0 1 5.5 5.5v1"/></svg>'+
-            t("chat.replying_to", { n: rname })+
-          '</span>'+
-          '<button class="cv-quote" data-q="'+esc(m.replyToId)+'">'+
-            rthumb+(rtxt ? '<span class="cv-qtxt">'+rtxt+'</span>' : '')+
-          '</button>'+
-        '</div>';
+        /* Citatet ligger INDE i svarboblen (se .cv-quote i css/app.css). Før lå det som tre
+           løse lag ovenover: en "Svar til X"-etiket, en grå boble i samme form og størrelse
+           som en rigtig besked, og så selve svaret. Det læste som to beskeder frem for ét
+           svar. Nu er navnet flyttet ind i citatet, og etiketten er dermed overflødig. */
+        quote = '<button class="cv-quote" data-q="'+esc(m.replyToId)+'">'+
+            rthumb+
+            '<span class="cv-qcol">'+
+              '<span class="cv-qnm">'+rname+'</span>'+
+              (rtxt ? '<span class="cv-qtxt">'+rtxt+'</span>' : '')+
+            '</span>'+
+          '</button>';
       }
     }
   }
+  /* Boble uden baggrund (som Messenger, når beskeden KUN er et billede). Et citat skal
+     have noget at ligge på, så det tæller med her: beregnes derfor efter quote. */
+  const bare = media && !m.text && !share && !quote;
   // Reaktioner: pille under boblens hjørne — højst 3 emojis (hyppigste først) + samlet
   // tal; tap åbner listen over hvem der har reageret med hvad
   const counts = {};
@@ -1172,8 +1177,7 @@ function msgHTML(m, first, last){
     avaCell+
     '<div class="cv-col">'+
       (!mine && first ? '<span class="cv-nm">'+esc(user(m.u).name)+'</span>' : '')+
-      quote+
-      '<div class="cv-bubble'+(bare ? " cv-bare" : "")+'">'+share+media+(m.text ? '<span class="cv-text">'+esc(m.text)+'</span>' : '')+'</div>'+
+      '<div class="cv-bubble'+(bare ? " cv-bare" : "")+'">'+quote+share+media+(m.text ? '<span class="cv-text">'+esc(m.text)+'</span>' : '')+'</div>'+
       reacts+
       (last ? '<span class="cv-time">'+esc(m.t)+(m.edited ? ' · '+t("chat.edited") : '')+'</span>' : '')+
     '</div>'+
@@ -1477,8 +1481,7 @@ export function initChat(){
   });
   el("cv-body").addEventListener("click", function(e){
     if(lpFired){ lpFired = false; return; } // long-press må ikke også udløse et tap
-    const qw = e.target.closest(".cv-qwrap");
-    const q = qw ? qw.querySelector(".cv-quote") : e.target.closest(".cv-quote");
+    const q = e.target.closest(".cv-quote"); // citatet er nu ét element inde i boblen
     if(q){
       // Tap på citatet hopper til den citerede besked og fremhæver den
       const tEl = el("cv-body").querySelector('.cv-msg[data-mid="'+q.dataset.q+'"]');
