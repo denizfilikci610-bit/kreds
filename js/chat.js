@@ -32,6 +32,19 @@ let msgs = [];         // den åbne tråds beskeder (ældste først)
 let oldestAnchor = null;   // { created, id } eller null = intet at hente ældre end
 let loadingOlder = false;
 let noMoreOlder = false;
+/* En tråd skal åbne på den NYESTE besked. renderThread scroller til bunden med det samme,
+   men på det tidspunkt har billederne ikke fyldt deres plads endnu: delte minder har fri
+   højde, og alle chat-billeder er lazy. Hvert billede der lander bagefter, skubber
+   indholdet ned, og så står man pludselig et stykke oppe i tråden.
+   Derfor holder vi fast i bunden fra åbningen, indtil brugeren selv rører tråden (eller
+   der er gået et par sekunder). */
+let stickBottom = false, stickTimer = 0;
+function releaseBottom(){ stickBottom = false; clearTimeout(stickTimer); }
+function holdBottom(){
+  stickBottom = true;
+  clearTimeout(stickTimer);
+  stickTimer = setTimeout(releaseBottom, 2500); // sikkerhedsnet: aldrig hænge fast
+}
 let lastByFeed = {};   // feed_id -> seneste besked (listens previews)
 let chatSeq = 0;       // supersession: kun nyeste åbning må skrive tråden
 let reads = {};        // åben tråd: user_id -> last_read_at (set-kvitteringer)
@@ -313,6 +326,7 @@ export async function openKredsChat(feedId){
     });
     unreadAtId = firstUnread ? firstUnread.id : null;
   }
+  holdBottom(); // tråden åbner på den nyeste besked, også når billederne lander bagefter
   renderThread(true);
   markThreadRead();
 }
@@ -499,6 +513,7 @@ function markThreadRead(){
 }
 export function closeKredsChat(){
   chatFeed = null;
+  releaseBottom();
   oldestAnchor = null; loadingOlder = false; noMoreOlder = false;
   pendingShare = null; pendingReply = null; editingMsg = null;
   renderCtxBar();
@@ -1545,8 +1560,15 @@ export function initChat(){
      derfor capture-fasen. */
   body.addEventListener("load", function(e){
     if(!e.target || e.target.tagName !== "IMG") return;
+    // Mens tråden åbner holder vi fast i bunden uanset hvor meget et billede skubber
+    if(stickBottom){ body.scrollTop = body.scrollHeight; return; }
     if(body.scrollHeight - body.scrollTop - body.clientHeight < 120) body.scrollTop = body.scrollHeight;
   }, true);
+  /* Så snart brugeren selv rører tråden, slipper vi bunden igen — ellers ville vi rive
+     dem tilbage, hvis de scroller op mens billederne stadig lander. */
+  ["touchstart", "wheel", "pointerdown"].forEach(function(ev){
+    body.addEventListener(ev, releaseBottom, { passive: true });
+  });
   let lpTimer = 0, sx = 0, sy = 0, swipeEl = null, swipeMid = 0, swiping = false, lpFired = false;
   body.addEventListener("touchstart", function(e){
     lpFired = false; swiping = false; swipeEl = null;
