@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} tě zve na VibeFeed. Až budeš uvnitř, vyhledej @{handle}.",
   "invite.share_plain": "Přidej se ke mně na VibeFeedu.",
   "invite.copied": "Odkaz zkopírován",
+  "invite.row_title": "Pozvi kamaráda",
+  "invite.row_sub": "Pošli odkaz těm, kdo tu ještě nejsou",
   "profile.myposts": "Tvoje příspěvky",
   "profile.you": "Ty",
   "myposts.empty": "Zatím jsi nic nesdílel. Klepni na + a sdílej obrázek nebo myšlenku.",

@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} הזמין אותך ל-VibeFeed. חפש את @{handle} אחרי שתיכנס.",
   "invite.share_plain": "בוא אליי ל-VibeFeed.",
   "invite.copied": "הקישור הועתק",
+  "invite.row_title": "הזמן חבר",
+  "invite.row_sub": "שלח קישור למי שעדיין לא כאן",
   "profile.myposts": "הפוסטים שלך",
   "profile.you": "אתה",
   "myposts.empty": "עוד לא שיתפת כלום. הקש על + ושתף תמונה או מחשבה.",

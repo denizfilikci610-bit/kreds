@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} har bjudit in dig till VibeFeed. Sök efter @{handle} när du har kommit in.",
   "invite.share_plain": "Följ med på VibeFeed.",
   "invite.copied": "Länken är kopierad",
+  "invite.row_title": "Bjud in en vän",
+  "invite.row_sub": "Skicka en länk till dem som inte är här än",
   "profile.myposts": "Dina inlägg",
   "profile.you": "Du",
   "myposts.empty": "Du har inte delat något än. Tryck på + och dela en bild eller en tanke.",

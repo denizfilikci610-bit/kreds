@@ -6,6 +6,7 @@ import { loadFeeds, loadPosts, setFeed, feedById, renderFeedbar, renderKredshead
 import { renderComposeDest } from "./compose.js";
 import { openProfile } from "./profile.js";
 import { closeKredsChat } from "./chat.js";
+import { inviteRowHTML } from "./invite.js";
 
 /* Tap på en person i medlems-arket: luk arket (og en evt. åben tråd, som profilen
    ellers ville ligge UNDER) og åbn profil-SIDEN med den normale tilbage-pil */
@@ -101,11 +102,13 @@ async function createFeedNative(obj){
   toast(t("fs.created", { name: name }));
 }
 function renderFsList(){
+  // Øverst altid: inviter en ven. Har man ingen at vælge, er det eneste vej videre.
+  const invite = inviteRowHTML();
   if(!state.humanFriends.length){
-    el("fs-list").innerHTML = '<div class="emptynote">'+t("fs.empty")+'</div>';
+    el("fs-list").innerHTML = invite + '<div class="emptynote">'+t("fs.empty")+'</div>';
     return;
   }
-  el("fs-list").innerHTML = state.humanFriends.map(function(h){
+  el("fs-list").innerHTML = invite + state.humanFriends.map(function(h){
     return '<div class="listrow'+(fsSelected[h] ? " sel" : "")+'" data-h="'+esc(h)+'">'+
       avaHTML(h, 44)+
       '<div class="grow"><div class="l1">'+esc(user(h).name)+'</div><div class="l2">@'+esc(h)+'</div></div>'+
@@ -236,7 +239,10 @@ function renderMemberSheet(){
     const u = user(h);
     return u.id && f.memberIds.indexOf(u.id) < 0;
   });
-  el("ms-friends").innerHTML = cand.length
+  // Øverst altid: inviter en ven. Er alle ens venner allerede med i kredsen, er det
+  // netop her man mangler flere folk.
+  const inviteRow = inviteRowHTML();
+  el("ms-friends").innerHTML = inviteRow + (cand.length
     ? cand.map(function(h){
         const uid = user(h).id;
         let action;
@@ -254,7 +260,7 @@ function renderMemberSheet(){
           action+
         '</div>';
       }).join("")
-    : '<div class="emptynote">'+t("ms.all_in")+'</div>';
+    : '<div class="emptynote">'+t("ms.all_in")+'</div>');
 }
 /* Gen-render det åbne medlemmer-sheet (no-op hvis det er lukket) — kaldes også fra realtime */
 export function refreshMemberSheet(){

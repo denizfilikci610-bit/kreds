@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} te-a invitat pe VibeFeed. Caută @{handle} după ce intri.",
   "invite.share_plain": "Vino și tu pe VibeFeed.",
   "invite.copied": "Linkul a fost copiat",
+  "invite.row_title": "Invită un prieten",
+  "invite.row_sub": "Trimite un link celor care nu sunt încă aici",
   "profile.myposts": "Postările tale",
   "profile.you": "Tu",
   "myposts.empty": "N-ai distribuit nimic încă. Atinge + și împarte o imagine sau un gând.",

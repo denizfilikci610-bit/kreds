@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "Ο/Η {name} σε καλεί στο VibeFeed. Μόλις μπεις, ψάξε το @{handle}.",
   "invite.share_plain": "Έλα κι εσύ στο VibeFeed.",
   "invite.copied": "Ο σύνδεσμος αντιγράφηκε",
+  "invite.row_title": "Κάλεσε έναν φίλο",
+  "invite.row_sub": "Στείλε λινκ σε όσους λείπουν ακόμα",
   "profile.myposts": "Οι αναρτήσεις σου",
   "profile.you": "Εσύ",
   "myposts.empty": "Δεν έχεις μοιραστεί τίποτα ακόμα. Πάτησε + και μοιράσου μια εικόνα ή μια σκέψη.",

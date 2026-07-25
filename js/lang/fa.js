@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} تو را به VibeFeed دعوت کرد. وقتی وارد شدی @{handle} را جستجو کن.",
   "invite.share_plain": "در VibeFeed به من بپیوند.",
   "invite.copied": "لینک کپی شد",
+  "invite.row_title": "دعوت از یک دوست",
+  "invite.row_sub": "برای کسانی که هنوز اینجا نیستند لینک بفرست",
   "profile.myposts": "پست‌های تو",
   "profile.you": "تو",
   "myposts.empty": "هنوز چیزی به اشتراک نگذاشته‌ای. روی + بزن و یک عکس یا فکر به اشتراک بگذار.",

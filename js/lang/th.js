@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} ชวนคุณมาที่ VibeFeed พอเข้ามาแล้วลองค้นหา @{handle} นะ",
   "invite.share_plain": "มาเล่น VibeFeed ด้วยกันสิ",
   "invite.copied": "คัดลอกลิงก์แล้ว",
+  "invite.row_title": "ชวนเพื่อน",
+  "invite.row_sub": "ส่งลิงก์ให้คนที่ยังไม่ได้อยู่ที่นี่",
   "profile.myposts": "โพสต์ของคุณ",
   "profile.you": "คุณ",
   "myposts.empty": "คุณยังไม่ได้แชร์อะไรเลย แตะ + แล้วแชร์รูปหรือความคิดสักอย่าง",

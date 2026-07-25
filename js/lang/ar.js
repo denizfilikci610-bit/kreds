@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "دعاك {name} إلى VibeFeed. ابحث عن @{handle} بعد أن تدخل.",
   "invite.share_plain": "انضم إليّ على VibeFeed.",
   "invite.copied": "تم نسخ الرابط",
+  "invite.row_title": "ادعُ صديقًا",
+  "invite.row_sub": "أرسل رابطًا لمن لم يأتِ بعد",
   "profile.myposts": "منشوراتك",
   "profile.you": "أنت",
   "myposts.empty": "لم تشارك شيئًا بعد. اضغط + وشارك صورة أو خاطرة.",

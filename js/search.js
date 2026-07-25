@@ -4,6 +4,7 @@ import { el, esc, avaHTML, user, toast, registerProfile, BADGE } from "./helpers
 import { t } from "./i18n.js";
 import { loadFriends, loadPosts } from "./feed.js";
 import { renderStories, openProfile } from "./profile.js";
+import { inviteRowHTML } from "./invite.js";
 
 /* ================= Søg ================= */
 let globalResults = [], globalQ = "", searchTimer = null;
@@ -15,6 +16,8 @@ function matchFriends(q){
 export function renderSearch(){
   const q = (el("search-input").value || "").trim().toLowerCase();
   const list = matchFriends(q);
+  /* Øverst altid: inviter en ven. Leder man forgæves efter nogen, er det her svaret. */
+  const invite = me ? inviteRowHTML() : "";
   /* Hele rækken kan tappes (åbner profilen) — som notifikations-rækkerne */
   let html = list.map(function(h){
     return '<div class="listrow tap" data-open="'+esc(h)+'">'+
@@ -42,7 +45,7 @@ export function renderSearch(){
   if(!html){
     html = '<div class="emptynote">'+(q ? t("search.no_match") : t("search.empty"))+'</div>';
   }
-  el("search-list").innerHTML = html;
+  el("search-list").innerHTML = invite + html;
 }
 async function runGlobalSearch(q){
   if(!me) return;

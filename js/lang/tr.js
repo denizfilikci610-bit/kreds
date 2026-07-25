@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} seni VibeFeed'e davet etti. İçeri girdiğinde @{handle} hesabını ara.",
   "invite.share_plain": "VibeFeed'de bana katıl.",
   "invite.copied": "Bağlantı kopyalandı",
+  "invite.row_title": "Bir arkadaşını davet et",
+  "invite.row_sub": "Henüz burada olmayanlara bir bağlantı gönder",
   "profile.myposts": "Gönderilerin",
   "profile.you": "Sen",
   "myposts.empty": "Henüz bir şey paylaşmadın. + simgesine dokun ve bir fotoğraf ya da düşünce paylaş.",

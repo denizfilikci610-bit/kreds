@@ -734,6 +734,12 @@
   .listrow .l1{font-weight:700;font-size:14.5px;color:var(--ink);display:flex;align-items:center;gap:4px}
   .listrow .l1 svg{width:14px;height:14px}
   .listrow .l2{font-size:13.5px;color:var(--gray)}
+  /* "Inviter en ven": øverste række på de lister hvor man leder efter folk. Plus i stedet
+     for avatar, så den ikke kan forveksles med en ven, men samme højde som de andre. */
+  .inviteav{background:var(--chip);color:var(--red);flex:0 0 auto}
+  .inviteav svg{width:22px;height:22px}
+  .inviteav svg .stroke{fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
+  .inviterow .l1{color:var(--red)}
   .sectionlabel{font-size:16px;font-weight:700;padding:14px 16px 6px;color:var(--ink)}
   .addaction{color:var(--red);font-weight:700;font-size:14px;text-align:left}
   .addaction.pending{color:var(--gray)}

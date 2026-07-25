@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} het jou na VibeFeed genooi. Soek na @{handle} sodra jy binne is.",
   "invite.share_plain": "Sluit by my aan op VibeFeed.",
   "invite.copied": "Skakel gekopieer",
+  "invite.row_title": "Nooi 'n vriend",
+  "invite.row_sub": "Stuur 'n skakel aan dié wat nog nie hier is nie",
   "profile.myposts": "Jou plasings",
   "profile.you": "Jy",
   "myposts.empty": "Jy het nog niks gedeel nie. Tik op + en deel 'n prent of 'n gedagte.",

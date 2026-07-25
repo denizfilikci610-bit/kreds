@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} hat dich zu VibeFeed eingeladen. Such nach @{handle}, wenn du drin bist.",
   "invite.share_plain": "Komm zu mir auf VibeFeed.",
   "invite.copied": "Link kopiert",
+  "invite.row_title": "Freund einladen",
+  "invite.row_sub": "Schick einen Link an alle, die noch nicht hier sind",
   "profile.myposts": "Deine Beiträge",
   "profile.you": "Du",
   "myposts.empty": "Du hast noch nichts geteilt. Tippe auf + und teile ein Bild oder einen Gedanken.",

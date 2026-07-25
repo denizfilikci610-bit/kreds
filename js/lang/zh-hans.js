@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} 邀请你加入 VibeFeed。进来后搜索 @{handle} 就能找到我。",
   "invite.share_plain": "来 VibeFeed 找我吧。",
   "invite.copied": "链接已复制",
+  "invite.row_title": "邀请朋友",
+  "invite.row_sub": "给还没加入的人发个链接",
   "profile.myposts": "你的帖子",
   "profile.you": "你",
   "myposts.empty": "你还没有分享任何内容。点 + 分享一张图片或一个想法。",

@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name}님이 너를 VibeFeed에 초대했어. 들어오면 @{handle} 검색해 봐.",
   "invite.share_plain": "VibeFeed에서 같이 하자.",
   "invite.copied": "링크를 복사했어요",
+  "invite.row_title": "친구 초대하기",
+  "invite.row_sub": "아직 없는 사람에게 링크를 보내 보세요",
   "profile.myposts": "내 게시물",
   "profile.you": "나",
   "myposts.empty": "아직 아무것도 공유하지 않았어요. +를 눌러 사진이나 생각을 공유해 보세요.",

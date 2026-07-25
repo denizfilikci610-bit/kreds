@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} ने तुम्हें VibeFeed पर बुलाया है। अंदर आकर @{handle} को खोज लेना।",
   "invite.share_plain": "मेरे साथ VibeFeed पर आओ।",
   "invite.copied": "लिंक कॉपी हो गया",
+  "invite.row_title": "एक दोस्त बुलाओ",
+  "invite.row_sub": "जो अभी यहाँ नहीं हैं, उन्हें लिंक भेजो",
   "profile.myposts": "आपकी पोस्ट",
   "profile.you": "आप",
   "myposts.empty": "आपने अभी कुछ शेयर नहीं किया है। + दबाएँ और कोई तस्वीर या विचार शेयर करें।",

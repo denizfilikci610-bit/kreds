@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} đã mời bạn vào VibeFeed. Vào rồi thì tìm @{handle} nhé.",
   "invite.share_plain": "Vào VibeFeed với mình nhé.",
   "invite.copied": "Đã sao chép liên kết",
+  "invite.row_title": "Mời một người bạn",
+  "invite.row_sub": "Gửi liên kết cho những người chưa có ở đây",
   "profile.myposts": "Bài đăng của bạn",
   "profile.you": "Bạn",
   "myposts.empty": "Bạn chưa chia sẻ gì cả. Nhấn + và chia sẻ một tấm ảnh hoặc một suy nghĩ.",

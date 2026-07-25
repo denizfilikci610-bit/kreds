@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} har invitert deg til VibeFeed. Søk etter @{handle} når du har kommet inn.",
   "invite.share_plain": "Bli med på VibeFeed.",
   "invite.copied": "Lenken er kopiert",
+  "invite.row_title": "Inviter en venn",
+  "invite.row_sub": "Send en lenke til dem som ikke er her ennå",
   "profile.myposts": "Innleggene dine",
   "profile.you": "Deg",
   "myposts.empty": "Du har ikke delt noe ennå. Trykk på + og del et bilde eller en tanke.",

@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} kutsui sinut VibeFeediin. Hae @{handle}, kun olet päässyt sisään.",
   "invite.share_plain": "Tule mukaan VibeFeediin.",
   "invite.copied": "Linkki kopioitu",
+  "invite.row_title": "Kutsu kaveri",
+  "invite.row_sub": "Lähetä linkki niille, jotka eivät vielä ole täällä",
   "profile.myposts": "Sinun julkaisusi",
   "profile.you": "Sinä",
   "myposts.empty": "Et ole vielä jakanut mitään. Napauta + ja jaa kuva tai ajatus.",

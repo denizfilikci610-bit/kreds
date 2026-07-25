@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} запрошує тебе у VibeFeed. Коли зайдеш, знайди @{handle}.",
   "invite.share_plain": "Приєднуйся до мене у VibeFeed.",
   "invite.copied": "Посилання скопійовано",
+  "invite.row_title": "Запроси друга",
+  "invite.row_sub": "Надішли посилання тим, кого тут ще немає",
   "profile.myposts": "Твої дописи",
   "profile.you": "Ти",
   "myposts.empty": "Ти ще нічим не поділився. Натисни + і поділися фото чи думкою.",

@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "Inimbitahan ka ni {name} sa VibeFeed. Hanapin mo ang @{handle} pagpasok mo.",
   "invite.share_plain": "Samahan mo ako sa VibeFeed.",
   "invite.copied": "Nakopya ang link",
+  "invite.row_title": "Mag-imbita ng kaibigan",
+  "invite.row_sub": "Magpadala ng link sa mga wala pa rito",
   "profile.myposts": "Mga post mo",
   "profile.you": "Ikaw",
   "myposts.empty": "Wala ka pang naibahagi. Pindutin ang + at magbahagi ng larawan o iniisip.",

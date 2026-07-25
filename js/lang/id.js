@@ -77,6 +77,8 @@ export default {
   "invite.share_text": "{name} mengundangmu ke VibeFeed. Cari @{handle} kalau kamu sudah masuk, ya.",
   "invite.share_plain": "Yuk, gabung di VibeFeed.",
   "invite.copied": "Tautan disalin",
+  "invite.row_title": "Undang teman",
+  "invite.row_sub": "Kirim tautan ke mereka yang belum ada di sini",
   "profile.myposts": "Postinganmu",
   "profile.you": "Kamu",
   "myposts.empty": "Kamu belum membagikan apa pun. Ketuk + dan bagikan gambar atau pemikiran.",

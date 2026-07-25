@@ -42,6 +42,24 @@ export function shareInvite(){
   toast(t("err.generic"));
 }
 
+/* ================= "Inviter en ven" som øverste række =================
+   Rækken står ØVERST på hver liste hvor man leder efter folk: søge-fanen, vælg-venner
+   når man opretter en kreds, og invitér-listen inde i en kreds. Det er præcis der man
+   opdager at den man leder efter ikke er på VibeFeed endnu.
+   Den ligner en almindelig person-række, men har et plus i stedet for en avatar, så den
+   ikke kan forveksles med en ven. Tryk åbner arket (ikke delingen direkte), så man får
+   at vide hvad der sker, før systemarket popper op. */
+const PLUS_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="stroke" d="M12 5v14M5 12h14"/></svg>';
+export function inviteRowHTML(){
+  return '<div class="listrow tap inviterow" data-invite="1">'+
+    '<span class="av inviteav" style="width:44px;height:44px">'+PLUS_SVG+'</span>'+
+    '<div class="grow">'+
+      '<div class="l1">'+t("invite.row_title")+'</div>'+
+      '<div class="l2">'+t("invite.row_sub")+'</div>'+
+    '</div>'+
+  '</div>';
+}
+
 export function openInviteSheet(){ el("inviteview").classList.add("on"); }
 export function closeInviteSheet(){ el("inviteview").classList.remove("on"); }
 
@@ -69,5 +87,10 @@ export function initInvite(){
   el("invite-later").addEventListener("click", closeInviteSheet);
   el("inviteview").addEventListener("click", function(e){
     if(e.target === el("inviteview")) closeInviteSheet(); // tryk uden for arket lukker
+  });
+  /* Én delegeret lytter dækker alle de lister rækken optræder på. Rækken bærer hverken
+     data-open eller data-h, så listernes egne klik-handlere finder intet og gør intet. */
+  document.addEventListener("click", function(e){
+    if(e.target && e.target.closest && e.target.closest("[data-invite]")) openInviteSheet();
   });
 }
