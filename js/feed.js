@@ -1580,6 +1580,8 @@ el("rm-block2").addEventListener("click", function(){
 });
 el("undobar-btn").addEventListener("click", undoReport);
 /* ---- Kreds-medlemmer: sheet åbnes fra kredshead ---- */
+/* Topbarens genvej fører til præcis den samme Ny kreds-side som pillen i kreds-baren. */
+el("topnew").addEventListener("click", function(){ if(me) openFeedSheet(); });
 el("kredshead").addEventListener("click", function(){ openMemberSheet(); });
 el("kredshead").addEventListener("keydown", function(e){
   if(e.key === "Enter" || e.key === " "){ e.preventDefault(); openMemberSheet(); }

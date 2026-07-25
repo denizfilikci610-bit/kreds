@@ -19,9 +19,23 @@
 <div class="phone">
   <div class="app" id="app">
 
-    <!-- Topbar -->
+    <!-- Topbar. Logoet bliver hvor det altid har været (venstre); genvejen til Ny kreds ligger
+         til HØJRE og vises kun på Hjem og Beskeder, hvor kredse er det man arbejder med. Den
+         eksisterende "+ Ny kreds"-pille i kreds-baren er urørt; denne er en ekstra vej derhen,
+         fordi pillen ligger efter alle kredsene og forsvinder ud til højre, når man har mange. -->
     <header class="topbar">
       <div class="wordmark">VibeFeed<span class="prik">.</span></div>
+      <button class="topnew" id="topnew" type="button" aria-label="Ny kreds" data-i18n-aria="fs.title">
+        <!-- Samme opbygning som privat-kommentar-ikonet (.cmtp-btn med .cmtp-lock): appens eget
+             kreds-symbol med et lille badge i hjørnet, her et plus i stedet for en lås. Badgen
+             er et selvstændigt element med baggrundsfarve bag sig, så den står frit; lægges
+             plusset inde i selve kredsen, smelter de tre former sammen ved 25 px. -->
+        <svg viewBox="0 0 24 24">
+          <circle class="stroke" cx="12" cy="12" r="7.3"/>
+          <g class="fillic"><circle cx="12" cy="4.7" r="2.1"/><circle cx="5.7" cy="15.7" r="2.1"/><circle cx="18.3" cy="15.7" r="2.1"/></g>
+        </svg>
+        <span class="topnew-plus"><svg viewBox="0 0 24 24"><path class="stroke" d="M12 5.5v13M5.5 12h13"/></svg></span>
+      </button>
     </header>
 
     <!-- HJEM -->

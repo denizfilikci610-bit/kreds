@@ -119,6 +119,33 @@
   }
   /* Ordmærke som billede (theme-bevidst): sort i lys mode, hvidt i mørk mode. Teksten
      beholdes i DOM'en for skærmlæsere, men skjules visuelt. */
+  /* Genvej til Ny kreds i topbarens HØJRE side. Topbarens space-between gør resten: logoet
+     bliver liggende helt til venstre, præcis hvor det altid har været, og knappen lander
+     modsat. Vises KUN på Hjem og Beskeder, hvor kredse er det man arbejder med (switchTab
+     sætter body[data-tab], så synligheden er ren CSS). */
+  .topnew{
+    display:none;
+    position:relative; /* bærer plus-badgen, som .cmtp-btn bærer lås-badgen */
+    flex:0 0 auto;
+    align-items:center;justify-content:center;
+    width:26px;height:26px;
+    color:var(--ink);
+  }
+  body[data-tab="feed"] .topnew,
+  body[data-tab="chat"] .topnew{display:flex}
+  .topnew > svg{width:24px;height:24px}
+  .topnew svg .stroke{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}
+  .topnew svg .fillic{fill:currentColor}
+  /* Plus-badge i hjørnet, samme greb som .cmtp-lock: egen baggrund, så den står frit af kredsen */
+  .topnew-plus{
+    position:absolute;right:-4px;bottom:-3px;
+    width:14px;height:14px;border-radius:50%;
+    background:var(--bg);color:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .topnew-plus svg{width:11px;height:11px}
+  .topnew-plus svg .stroke{stroke-width:3.2}
+  .topnew:active{opacity:.55}
   .wordmark{
     background-image:url(../img/logo-light.png);
     background-repeat:no-repeat;background-position:left center;background-size:contain;
