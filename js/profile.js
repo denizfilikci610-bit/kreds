@@ -9,6 +9,7 @@ import { openStoryViewer } from "./stories.js";
 import { renderSearch, refreshSearchAfterFriendAdd } from "./search.js";
 import { resetApp, showAuth, nativeLogout } from "./auth.js";
 import { ADS_LIVE } from "./ads.js";
+import { shareInvite } from "./invite.js";
 
 /* ================= Bobler-række ================= */
 export function renderStories(){
@@ -959,6 +960,9 @@ el("ls-list").addEventListener("click", function(e){
 });
 el("myposts").addEventListener("click", function(e){ profTimelineClick(e, false); });
 el("pv-posts").addEventListener("click", function(e){ profTimelineClick(e, true); });
+/* Inviter venner: samme deling som arket efter oprettelse, bare altid tilgængelig.
+   Kaldes direkte i klikket, ellers får iOS' delingsark ikke lov at åbne. */
+el("inviteprof").addEventListener("click", function(){ if(me) shareInvite(); });
 el("editprof").addEventListener("click", function(){
   if(!me) return;
   // App'en: ægte native Liquid Glass-sheet i stedet for web-sheet'et.

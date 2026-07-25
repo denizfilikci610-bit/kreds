@@ -89,6 +89,9 @@
       </div>
       <div class="pbtns">
         <button class="chipbtn" id="editprof" data-i18n="profile.edit">Rediger profil</button>
+        <!-- Blivende indgang: pop op'en efter oprettelse ses kun én gang, men man kommer
+             oftest i tanke om nogen at invitere senere. -->
+        <button class="chipbtn" id="inviteprof" data-i18n="invite.profile_btn">Inviter venner</button>
         <button class="chipbtn" id="logoutbtn" data-i18n="profile.logout">Log ud</button>
       </div>
       <div id="myposts"></div>
@@ -581,6 +584,18 @@
       <a class="consent-policy" data-policy-link href="/privatliv.html" target="_blank" rel="noopener" data-i18n="consent.policy">Privatlivspolitik</a>
       <button class="consent-btn primary" id="consent-personal" type="button" data-i18n="consent.personal">OK — også personlige reklamer</button>
       <button class="consent-btn" id="consent-limited" type="button" data-i18n="consent.limited">Kun ikke-personlige reklamer</button>
+    </div>
+  </div>
+
+  <!-- Invitations-ark: vises én gang for en ny bruger lige efter oprettelse, og kan altid
+       åbnes igen fra profilen. Deler bevidst stil med reklame-arket ovenfor, så de to ark
+       ser ens ud (derfor .consentview .as-sheet og consent-klasserne her). -->
+  <div class="consentview as-sheet" id="inviteview" role="dialog" aria-modal="true" aria-label="Inviter dine venner" data-i18n-aria="invite.title">
+    <div class="consent-inner">
+      <div class="consent-title" data-i18n="invite.title">Inviter dine venner</div>
+      <p class="consent-text" data-i18n="invite.text">VibeFeed er tomt uden dine folk. Send et link til dem du gerne vil dele dine øjeblikke med.</p>
+      <button class="consent-btn primary" id="invite-send" type="button" data-i18n="invite.send">Send et link</button>
+      <button class="consent-btn" id="invite-later" type="button" data-i18n="invite.later">Ikke nu</button>
     </div>
   </div>
 

@@ -13,6 +13,7 @@ import { ADS_LIVE } from "./ads.js";
 import { subscribeRealtime, unsubscribeRealtime } from "./realtime.js";
 import { refreshNotifDot } from "./notifications.js";
 import { resetSearch } from "./search.js";
+import { maybeShowInviteSheet } from "./invite.js";
 
 /* ================= Auth ================= */
 /* Fejlkode -> i18n-nøgle (tekster i i18n.js) */
@@ -166,6 +167,9 @@ export async function boot(session){
   // ads.js) — ellers ville vi bede om samtykke til noget der ikke findes.
   // Ingen await — arket er modalt (inert) og styrer sig selv.
   if(ADS_LIVE && !getConsent()) showConsentGate();
+  // Ny bruger: spørg ÉN gang om at invitere sine folk. Uden venner er feedet tomt, og
+  // så er der ingen grund til at komme igen. Samme knap ligger blivende på profilen.
+  maybeShowInviteSheet();
 }
 export function resetApp(){
   nativeLogout(); // no-op hvis allerede kaldt før signOut (nøglen er fjernet)

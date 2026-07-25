@@ -17,6 +17,7 @@ import { initPullRefresh } from "./pullrefresh.js";
 import { initPinchZoom } from "./pinchzoom.js";
 import { initChat, renderChatList } from "./chat.js";
 import { initMentions } from "./mentions.js";
+import { initInvite } from "./invite.js";
 
 /* ================= i18n =================
    Callback ved sprogskifte: statisk markup er allerede opdateret af setLang
@@ -55,6 +56,7 @@ initAuth();
 initPullRefresh(); // ren pull-to-refresh for hele appen (erstatter native webview-bounce)
 initPinchZoom();   // live pinch-zoom på minde-billeder direkte i feedet (Instagram-agtigt)
 initChat();        // kreds-chat (Messenger-agtig beskeder-fane)
+initInvite();      // invitations-arket + delings-knappen
 
 el("scrim").addEventListener("click", function(){ closeFeedSheet(); closeMemberSheet(); closeEditSheet(); closeActivitySheet(); closeListSheet(); closePostEdit(); });
 
