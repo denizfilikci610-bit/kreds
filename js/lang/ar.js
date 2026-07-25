@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "حذف",
   "chat.search_ph": "بحث",
   "chat.search_msgs": "الرسائل",
+  "chat.search_kredse": "الدوائر المشتركة مع {name}",
   "chat.search_none": "لا نتائج",
   "aria.private_comment": "علّق بشكل خاص",
 

@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "刪除",
   "chat.search_ph": "搜尋",
   "chat.search_msgs": "訊息",
+  "chat.search_kredse": "與 {name} 共同的圈子",
   "chat.search_none": "沒有找到",
   "aria.private_comment": "私下留言",
 

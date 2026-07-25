@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Smazat",
   "chat.search_ph": "Hledat",
   "chat.search_msgs": "Zprávy",
+  "chat.search_kredse": "Kruhy s {name}",
   "chat.search_none": "Nic nenalezeno",
   "aria.private_comment": "Komentovat soukromě",
 

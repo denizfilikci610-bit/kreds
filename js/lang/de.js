@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Löschen",
   "chat.search_ph": "Suchen",
   "chat.search_msgs": "Nachrichten",
+  "chat.search_kredse": "Kreise mit {name}",
   "chat.search_none": "Nichts gefunden",
   "aria.private_comment": "Privat kommentieren",
 

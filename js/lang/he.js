@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "מחק",
   "chat.search_ph": "חיפוש",
   "chat.search_msgs": "הודעות",
+  "chat.search_kredse": "מעגלים משותפים עם {name}",
   "chat.search_none": "לא נמצא כלום",
   "aria.private_comment": "הגב באופן פרטי",
 

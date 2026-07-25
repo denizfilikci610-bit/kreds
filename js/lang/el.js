@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Διαγραφή",
   "chat.search_ph": "Αναζήτηση",
   "chat.search_msgs": "Μηνύματα",
+  "chat.search_kredse": "Κύκλοι με {name}",
   "chat.search_none": "Δεν βρέθηκε τίποτα",
   "aria.private_comment": "Σχολίασε ιδιωτικά",
 

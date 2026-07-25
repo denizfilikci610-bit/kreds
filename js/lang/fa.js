@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "حذف",
   "chat.search_ph": "جستجو",
   "chat.search_msgs": "پیام‌ها",
+  "chat.search_kredse": "حلقه‌های مشترک با {name}",
   "chat.search_none": "چیزی پیدا نشد",
   "aria.private_comment": "نظر خصوصی",
 

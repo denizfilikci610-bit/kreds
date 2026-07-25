@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Hapus",
   "chat.search_ph": "Cari",
   "chat.search_msgs": "Pesan",
+  "chat.search_kredse": "Lingkaran bersama {name}",
   "chat.search_none": "Tidak ditemukan",
   "aria.private_comment": "Komentar secara privat",
 

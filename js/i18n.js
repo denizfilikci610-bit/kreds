@@ -236,6 +236,7 @@ const DA = {
   "chat.do_del": "Slet",
   "chat.search_ph": "Søg",
   "chat.search_msgs": "Beskeder",
+  "chat.search_kredse": "Kredse med {name}",
   "chat.search_none": "Intet fundet",
   "aria.private_comment": "Kommentér privat",
 
@@ -752,6 +753,7 @@ const EN = {
   "chat.do_del": "Delete",
   "chat.search_ph": "Search",
   "chat.search_msgs": "Messages",
+  "chat.search_kredse": "Circles with {name}",
   "chat.search_none": "Nothing found",
   "aria.private_comment": "Comment privately",
 

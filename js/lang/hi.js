@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "हटाएँ",
   "chat.search_ph": "खोजें",
   "chat.search_msgs": "संदेश",
+  "chat.search_kredse": "{name} के साथ सर्कल",
   "chat.search_none": "कुछ नहीं मिला",
   "aria.private_comment": "निजी टिप्पणी करें",
 

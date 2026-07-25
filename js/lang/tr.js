@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Sil",
   "chat.search_ph": "Ara",
   "chat.search_msgs": "Mesajlar",
+  "chat.search_kredse": "{name} ile ortak çemberler",
   "chat.search_none": "Bir şey bulunamadı",
   "aria.private_comment": "Özel yorum yap",
 

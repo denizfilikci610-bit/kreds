@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Poista",
   "chat.search_ph": "Hae",
   "chat.search_msgs": "Viestit",
+  "chat.search_kredse": "Piirit, joissa on {name}",
   "chat.search_none": "Mitään ei löytynyt",
   "aria.private_comment": "Kommentoi yksityisesti",
 

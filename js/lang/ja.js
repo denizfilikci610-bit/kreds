@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "削除",
   "chat.search_ph": "検索",
   "chat.search_msgs": "メッセージ",
+  "chat.search_kredse": "{name}さんとのサークル",
   "chat.search_none": "見つかりませんでした",
   "aria.private_comment": "プライベートにコメント",
 

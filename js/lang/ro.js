@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Șterge",
   "chat.search_ph": "Caută",
   "chat.search_msgs": "Mesaje",
+  "chat.search_kredse": "Cercuri cu {name}",
   "chat.search_none": "Nimic găsit",
   "aria.private_comment": "Comentează privat",
 

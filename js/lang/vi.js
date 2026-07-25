@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Xóa",
   "chat.search_ph": "Tìm kiếm",
   "chat.search_msgs": "Tin nhắn",
+  "chat.search_kredse": "Vòng tròn chung với {name}",
   "chat.search_none": "Không tìm thấy gì",
   "aria.private_comment": "Bình luận riêng tư",
 

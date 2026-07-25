@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "删除",
   "chat.search_ph": "搜索",
   "chat.search_msgs": "消息",
+  "chat.search_kredse": "与 {name} 共同的圈子",
   "chat.search_none": "没有找到",
   "aria.private_comment": "私下评论",
 

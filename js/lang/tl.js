@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Burahin",
   "chat.search_ph": "Hanapin",
   "chat.search_msgs": "Mga mensahe",
+  "chat.search_kredse": "Mga circle kasama si {name}",
   "chat.search_none": "Walang nahanap",
   "aria.private_comment": "Mag-komento nang pribado",
 

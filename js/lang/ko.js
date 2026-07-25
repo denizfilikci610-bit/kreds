@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "삭제",
   "chat.search_ph": "검색",
   "chat.search_msgs": "메시지",
+  "chat.search_kredse": "{name}님과 함께하는 서클",
   "chat.search_none": "결과가 없어요",
   "aria.private_comment": "비공개로 댓글 달기",
 

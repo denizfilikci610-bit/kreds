@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Radera",
   "chat.search_ph": "Sök",
   "chat.search_msgs": "Meddelanden",
+  "chat.search_kredse": "Kretsar med {name}",
   "chat.search_none": "Inget hittades",
   "aria.private_comment": "Kommentera privat",
 

@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Slett",
   "chat.search_ph": "Søk",
   "chat.search_msgs": "Meldinger",
+  "chat.search_kredse": "Kretser med {name}",
   "chat.search_none": "Ingenting funnet",
   "aria.private_comment": "Kommenter privat",
 

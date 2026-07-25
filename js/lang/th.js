@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "ลบ",
   "chat.search_ph": "ค้นหา",
   "chat.search_msgs": "ข้อความ",
+  "chat.search_kredse": "วงร่วมกับ {name}",
   "chat.search_none": "ไม่พบอะไรเลย",
   "aria.private_comment": "แสดงความคิดเห็นแบบส่วนตัว",
 

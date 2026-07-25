@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Vee uit",
   "chat.search_ph": "Soek",
   "chat.search_msgs": "Boodskappe",
+  "chat.search_kredse": "Kringe met {name}",
   "chat.search_none": "Niks gevind nie",
   "aria.private_comment": "Lewer privaat kommentaar",
 

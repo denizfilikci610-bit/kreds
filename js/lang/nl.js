@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Verwijderen",
   "chat.search_ph": "Zoeken",
   "chat.search_msgs": "Berichten",
+  "chat.search_kredse": "Kringen met {name}",
   "chat.search_none": "Niets gevonden",
   "aria.private_comment": "Privé reageren",
 

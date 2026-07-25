@@ -884,10 +884,18 @@ function renderSearchResults(q, msgRows){
       f.memberIds.forEach(function(id){ if(id !== me.id) covered.add(id); });
     }
   });
-  const friendRows = (state.humanFriends || []).filter(function(h){
+  /* Alle VENNER søgningen rammer. Blokerede er aldrig med: block_user sletter ganske vist
+     venskabet i databasen, men listen her er det sidste værn, hvis en blokering endnu ikke
+     er slået igennem lokalt. Kun venner er med (ejer-valg) — man kan sagtens dele en kreds
+     med en, man ikke er ven med, og dem viser vi ikke. */
+  const blockedIds = state.blockedIds || [];
+  const friendHits = (state.humanFriends || []).filter(function(h){
     const uu = user(h);
-    return ((uu.name || h).toLowerCase().indexOf(ql) >= 0 || h.toLowerCase().indexOf(ql) >= 0)
-      && !covered.has(uu.id);
+    if(uu.id && blockedIds.indexOf(uu.id) >= 0) return false;
+    return (uu.name || h).toLowerCase().indexOf(ql) >= 0 || h.toLowerCase().indexOf(ql) >= 0;
+  });
+  const friendRows = friendHits.filter(function(h){
+    return !covered.has(user(h).id);
   }).map(function(h){
     return '<button class="chatrow" data-friend="'+esc(h)+'">'+
       '<span class="chatava">'+avaHTML(h, 52)+'</span>'+
@@ -913,8 +921,28 @@ function renderSearchResults(q, msgRows){
       '</span>'+
     '</button>';
   }).join("");
+  /* Fælles kredse med den person, man søger efter. Søger man "Mikkel", er hans private tråd
+     med i listen ovenfor (den HEDDER "Mikkel"), men "Familie" og "Brødre" gør ikke, selvom
+     han er medlem af begge. Dem samler vi her.
+     Kun når søgningen rammer PRÆCIS ÉN ven (ejer-valg): ellers ville en søgning på "m" give
+     en blok pr. person, og listen ville drukne. Alt er lokalt — hver kreds bærer sine
+     memberIds — så der er ingen forespørgsel og intet at vente på, mens man taster.
+     state.feeds rummer kun rigtige kredse; DM-tråde ligger i state.dms. */
+  let kredsHtml = "", kredsLabel = "";
+  if(friendHits.length === 1){
+    const h = friendHits[0], uid = user(h).id;
+    const alleredeVist = new Set(matched.map(function(f){ return f.id; }));
+    const shared = (state.feeds || []).filter(function(f){
+      return uid && f.memberIds.indexOf(uid) >= 0 && !alleredeVist.has(f.id);
+    });
+    if(shared.length){
+      kredsHtml = shared.map(chatRowHTML).join("");
+      kredsLabel = t("chat.search_kredse", { name: (user(h).name || h).split(/\s+/)[0] });
+    }
+  }
   const html = threadRows +
     (friendRows ? '<div class="sectionlabel">'+t("stats.friends")+'</div>'+friendRows : "") +
+    (kredsHtml ? '<div class="sectionlabel">'+esc(kredsLabel)+'</div>'+kredsHtml : "") +
     (msgsHtml ? '<div class="sectionlabel">'+t("chat.search_msgs")+'</div>'+msgsHtml : "");
   box.innerHTML = html || '<div class="emptynote">'+t("chat.search_none")+'</div>';
 }

@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Elimina",
   "chat.search_ph": "Cerca",
   "chat.search_msgs": "Messaggi",
+  "chat.search_kredse": "Cerchie con {name}",
   "chat.search_none": "Nessun risultato",
   "aria.private_comment": "Commenta in privato",
 

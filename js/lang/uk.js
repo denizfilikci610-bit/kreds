@@ -190,6 +190,7 @@ export default {
   "chat.do_del": "Видалити",
   "chat.search_ph": "Пошук",
   "chat.search_msgs": "Повідомлення",
+  "chat.search_kredse": "Кола з {name}",
   "chat.search_none": "Нічого не знайдено",
   "aria.private_comment": "Прокоментувати приватно",
 
