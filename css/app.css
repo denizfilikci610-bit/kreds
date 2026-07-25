@@ -1827,6 +1827,30 @@
   /* Reklame-arket har et politik-link mellem tekst og knapper, der giver luften. Invitations-
      arket har ikke det link, så den første knap sad klods op ad teksten. */
   #inviteview .consent-btn.primary{margin-top:22px}
+  /* ---- Blød ind OG ud (symmetrisk) ----
+     Arket arvede display:none/flex fra reklame-arket: baggrunds-dæmpningen sprang frem på én
+     gang mens selve arket gled op, og ved luk forsvandt begge dele brat. Her styres det med
+     opacity+visibility i stedet, så dæmpningen fader og arket glider begge veje. visibility
+     skifter først EFTER fade-out (forsinket transition), ellers ville arket forsvinde med det
+     samme og tage animationen med sig. Ingen JS-timer involveret. */
+  #inviteview{
+    display:flex;opacity:0;visibility:hidden;
+    /* pointer-events er bælte og seler: visibility skifter først EFTER fade-out, og skulle den
+       transition af en eller anden grund ikke fyre, må et lukket ark alligevel aldrig ligge
+       usynligt og opsnappe tryk fra listen bagved. */
+    pointer-events:none;
+    transition:opacity .26s ease, visibility 0s linear .26s;
+  }
+  #inviteview.on{
+    opacity:1;visibility:visible;pointer-events:auto;
+    transition:opacity .26s ease, visibility 0s;
+  }
+  #inviteview .consent-inner{
+    transform:translateY(45%);
+    transition:transform .3s cubic-bezier(.2,.8,.25,1);
+    animation:none; /* erstatter reklame-arkets consentup, som kun kan spille indad */
+  }
+  #inviteview.on .consent-inner{transform:translateY(0)}
   .consent-btn:active{opacity:.7}
 
   /* ---- Privatliv (Rediger profil): politik-link under samtykke-chips ---- */
