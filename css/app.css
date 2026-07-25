@@ -881,15 +881,23 @@
     text-align:left;
   }
   .pv-unfriend:active{opacity:.6}
-  .pbtns{display:flex;gap:8px;padding:0 16px 14px}
+  /* Tre knapper på én række blev trange, da "Inviter venner" kom til: de lange danske ord
+     havde kun 7 px luft i hver side, og på sprog med længere ord (russisk "Редактировать
+     профиль", vietnamesisk "Chỉnh sửa trang cá nhân") blev teksten klippet.
+     wrap gør rækken selvregulerende: knapperne deler pladsen efter deres eget indhold, og de
+     sprog der ikke kan være på én linje, får en ekstra række i stedet for afhuggede ord. */
+  .pbtns{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 14px}
   .chipbtn{
-    flex:1;
+    flex:1 1 auto;min-width:0;
     background:var(--chip);
     border-radius:8px;
-    padding:8px 0;
-    font-weight:700;font-size:14px;
+    padding:8px 10px;
+    font-weight:700;font-size:13px;
     color:var(--ink);
     text-align:center;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis; /* sidste værn, hvis selv en hel række er for smal */
   }
   .chipbtn:active{opacity:.7}
 
