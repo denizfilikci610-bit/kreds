@@ -59,8 +59,8 @@ function mapMsg(r){
     postId: r.post_id || null,
     /* ⚠️ Kun BILLED-grenene skaleres: render/image-endpointet svarer HTTP 400 på en
        video-sti, og de to slags medier deler samme imgUrl. Bredderne følger CSS'en
-       (.cv-thumb 150 px, .cv-mimg maks. 210 px) gange 3 for retina. */
-    thumb: post && post.image_path ? imgUrl(post.image_path, 480) : "",
+       (.cv-thumb 190 px, .cv-mimg maks. 210 px) gange 3 for retina. */
+    thumb: post && post.image_path ? imgUrl(post.image_path, 576) : "",
     thumbVideo: post && !post.image_path && post.video_path ? imgUrl(post.video_path) : "",
     mimg: r.image_path ? imgUrl(r.image_path, 640) : "",   // beskedens EGET billede
     mimgPath: r.image_path || null,                        // rå sti (storage-oprydning)
@@ -1104,13 +1104,21 @@ function snip(s, n){ return s && s.length > n ? s.slice(0, n - 1) + "…" : (s |
 function msgHTML(m, first, last){
   const mine = !!(me && m.authorId === me.id);
   /* loading="lazy" KUN på <img>: attributten betyder ingenting på <video>, og de to slags
-     medier deler klassenavn her. Miniaturerne har faste mål i CSS (.cv-thumb 150 px,
-     .cv-qthumb og .cv-ctxthumb 36 px), så de kan ikke skubbe tråden når de lander. */
+     medier deler klassenavn her. .cv-qthumb og .cv-ctxthumb har faste mål i CSS og kan
+     derfor ikke skubbe tråden, når de lander; .cv-thumb har fast BREDDE og fri højde (se
+     nedenfor), så den kan flytte lidt — load-lytteren på #cv-body holder tråden i bunden. */
+  const shareMedia = m.thumb
+    ? '<img class="cv-thumb" src="'+esc(m.thumb)+'" alt="" loading="lazy" decoding="async">'
+    : m.thumbVideo
+    ? '<video class="cv-thumb" src="'+esc(m.thumbVideo)+'#t=0.1" muted playsinline preload="metadata"></video>'
+    : '';
+  /* Et delt minde blev før klemt ind i en 150×150 kvadrat, så et højformat-minde fik skåret
+     top og bund af. Nu vises det i sit eget format, og "delte et minde" ligger som en lille
+     etiket OVENPÅ i stedet for at bruge en hel linje under. Uden medie (fx et rent
+     tekst-minde) falder den tilbage til den gamle tekst-under-hinanden-form. */
   const share = m.postId
-    ? '<button class="cv-share" data-post="'+esc(m.postId)+'">'+
-        (m.thumb ? '<img class="cv-thumb" src="'+esc(m.thumb)+'" alt="" loading="lazy" decoding="async">'
-         : m.thumbVideo ? '<video class="cv-thumb" src="'+esc(m.thumbVideo)+'#t=0.1" muted playsinline preload="metadata"></video>'
-         : '')+
+    ? '<button class="cv-share'+(shareMedia ? " has-media" : "")+'" data-post="'+esc(m.postId)+'">'+
+        shareMedia+
         '<span class="cv-sharetxt">'+t("chat.shared_memory")+'</span>'+
       '</button>'
     : '';

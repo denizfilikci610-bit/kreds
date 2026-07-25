@@ -1548,10 +1548,23 @@
   }
   .cv-unread::before,.cv-unread::after{content:"";flex:1;height:1px;background:var(--line)}
   /* Minde-deling i en boble: miniature + "delte et minde" — tap åbner opslaget */
+  /* ---- Delt minde i en besked ----
+     Miniaturen var låst til 150×150, så et minde i højformat fik skåret top og bund af.
+     Nu er kun BREDDEN fast, og højden følger mediets eget format (max-height klipper først
+     ved det meget høje, hvor en fuld 9:16 ellers ville fylde en halv skærm). */
   .cv-share{display:flex;flex-direction:column;gap:6px;align-items:flex-start;padding:0;color:inherit;text-align:left}
   .cv-share:active{opacity:.7}
-  .cv-thumb{width:150px;height:150px;object-fit:cover;border-radius:12px;display:block}
+  .cv-thumb{width:190px;height:auto;max-height:250px;object-fit:cover;border-radius:12px;display:block}
   .cv-sharetxt{font-size:13px;font-weight:600;opacity:.85}
+  /* Med medie ligger etiketten OVENPÅ billedet i stedet for at bruge en hel linje under det. */
+  .cv-share.has-media{position:relative;display:block}
+  .cv-share.has-media .cv-sharetxt{
+    position:absolute;left:8px;bottom:8px;
+    background:rgba(0,0,0,.55);color:#fff;
+    padding:3px 9px;border-radius:999px;
+    font-size:11.5px;font-weight:700;opacity:1;
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  }
   /* Composer i bunden af tråden: blød skygge i stedet for en streg */
   .cv-composer{
     flex:0 0 auto;
