@@ -1,6 +1,7 @@
 import { sb } from "./config.js";
 import { me, state, ID2H } from "./store.js";
 import { el, esc, avaHTML, user, toast, fmtTime, imgUrl, registerProfile } from "./helpers.js";
+import { reconcile, keepMedia } from "./reconcile.js";
 import { t } from "./i18n.js";
 import { feedById, findPost, switchTab, loadFeeds } from "./feed.js";
 import { openProfile, closeProfile, doBlockUser } from "./profile.js";
@@ -24,6 +25,13 @@ const MSG_SELECT = "*, author_profile:profiles!author(*), post:posts(id, image_p
 
 let chatFeed = null;   // åben tråds feed_id (null = lukket)
 let msgs = [];         // den åbne tråds beskeder (ældste først)
+/* Paginering bagud: tråden åbner på de nyeste 300, og ruller man til toppen, hentes de
+   næste 300 ældre. Ankeret er den ældste HENTEDE række (created_at + id), ikke msgs[0]:
+   "Ryd chatten" kan have filtreret rækker væk efter hentningen, og så ville msgs[0] hente
+   det samme igen i ring. Nulstilles ved trådskift, luk, logud og "Ryd chatten". */
+let oldestAnchor = null;   // { created, id } eller null = intet at hente ældre end
+let loadingOlder = false;
+let noMoreOlder = false;
 let lastByFeed = {};   // feed_id -> seneste besked (listens previews)
 let chatSeq = 0;       // supersession: kun nyeste åbning må skrive tråden
 let reads = {};        // åben tråd: user_id -> last_read_at (set-kvitteringer)
@@ -168,7 +176,12 @@ export async function renderChatList(fetchLasts){
     if(ta !== tb) return tb - ta;
     return new Date(a.created) - new Date(b.created);
   });
-  box.innerHTML = feeds.map(chatRowHTML).join("");
+  /* Rækkerne skifter rækkefølge ved hver ny besked (nyeste øverst, fastgjorte først), så
+     de flyttes i stedet for at blive bygget om. Søgningen ejer den samme boks og skriver
+     rækker uden data-vfk; dem rydder afstemningen af sig selv, når søgningen slippes. */
+  reconcile(box, feeds.map(function(f){
+    return { key: "t:" + String(f.id), html: chatRowHTML(f) };
+  }), keepChatMedia);
 }
 /* Kredsens "ansigt" (Messenger-agtigt): én andens avatar, eller to stablede for grupper.
    Private tråde (DM) får en lille lås på avataren, så man altid kan SE at tråden er
@@ -272,11 +285,20 @@ export async function openKredsChat(feedId){
   if(!pres.error && pres.data) prefs[feedId] = mapPref(pres.data);
   const pf = prefs[feedId] || {};
   // Hentet nyest-først; vend til ældst→nyest, som tråden vises.
-  msgs = (mres.data || []).slice().reverse().map(mapMsg);
+  const rows = mres.data || [];
+  msgs = rows.slice().reverse().map(mapMsg);
+  // Ankeret til "hent ældre" sættes af den ÆLDSTE HENTEDE række (sidst i nyest-først-
+  // listen), FØR clearedAt-filteret — ellers ville et ryddet mærke sende os i ring.
+  const oldestRow = rows.length ? rows[rows.length - 1] : null;
+  oldestAnchor = oldestRow ? { created: oldestRow.created_at, id: oldestRow.id } : null;
+  noMoreOlder = rows.length < 300;   // færre end en fuld side = vi har hele historikken
+  loadingOlder = false;
   // Ryddet historik ("Ryd/Slet chatten") gælder kun mig: skjul alt før mit mærke
   if(pf.clearedAt){
     const cl = new Date(pf.clearedAt).getTime();
+    const before = msgs.length;
     msgs = msgs.filter(function(m){ return new Date(m.created).getTime() > cl; });
+    if(msgs.length < before) noMoreOlder = true; // mærket er nået: intet ældre må vises
   }
   // Åbning nulstiller en manuel "Markér som ulæst"
   if(pf.markedUnread) setPref(feedId, { markedUnread: false });
@@ -293,6 +315,53 @@ export async function openKredsChat(feedId){
   }
   renderThread(true);
   markThreadRead();
+}
+
+/* ---- Hent ældre beskeder (rul til toppen) ----
+   Tråden åbnede før på de nyeste 300 og kom ikke længere: var samtalen ældre end det,
+   kunne man ikke se begyndelsen. Her hentes de næste 300 ældre, når man rammer toppen.
+
+   Keyset, ikke offset: ankeret er (created_at, id) på den ældste række vi har hentet, og
+   der spørges efter alt der ligger før det. To beskeder kan dele created_at ned til
+   mikrosekundet, og derfor er id med som stabil andenprioritet — ellers kunne en besked
+   blive sprunget over eller hentet dobbelt netop ved sidegrænsen. Databasens indeks
+   (feed_id, created_at desc) dækker forespørgslen. */
+async function loadOlderMsgs(){
+  if(loadingOlder || noMoreOlder || !oldestAnchor || chatFeed == null || !me) return;
+  loadingOlder = true;
+  const feedId = chatFeed, seq = chatSeq, a = oldestAnchor;
+  const { data, error } = await sb.from("kreds_messages")
+    .select(MSG_SELECT)
+    .eq("feed_id", feedId)
+    .or('created_at.lt."'+a.created+'",and(created_at.eq."'+a.created+'",id.lt.'+a.id+')')
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(300);
+  // Samme vagt som ved åbning: svaret må ikke lande i en tråd der er lukket/skiftet imens
+  if(chatFeed !== feedId || seq !== chatSeq){ loadingOlder = false; return; }
+  loadingOlder = false;
+  if(error){ console.error(error); return; }
+  const rows = data || [];
+  if(rows.length < 300) noMoreOlder = true;
+  const oldestRow = rows.length ? rows[rows.length - 1] : null;
+  if(oldestRow) oldestAnchor = { created: oldestRow.created_at, id: oldestRow.id };
+  let older = rows.slice().reverse().map(mapMsg);
+  const pf = prefs[feedId] || {};
+  if(pf.clearedAt){
+    const cl = new Date(pf.clearedAt).getTime();
+    const before = older.length;
+    older = older.filter(function(m){ return new Date(m.created).getTime() > cl; });
+    if(older.length < before) noMoreOlder = true;
+  }
+  // Realtime kan have lagt en af dem ind allerede
+  const have = {};
+  msgs.forEach(function(m){ have[String(m.id)] = 1; });
+  older = older.filter(function(m){ return !have[String(m.id)]; });
+  if(!older.length) return;
+  msgs = older.concat(msgs);
+  // unreadAtId, reads og markThreadRead røres IKKE: ulæst-linjen er frosset ved åbning,
+  // og at læse gammel historik ændrer ikke hvad der er nyt.
+  renderThread(false, true);
 }
 
 /* Konteksten over composeren: et minde der svares på, en besked der citeres, eller en
@@ -430,6 +499,7 @@ function markThreadRead(){
 }
 export function closeKredsChat(){
   chatFeed = null;
+  oldestAnchor = null; loadingOlder = false; noMoreOlder = false;
   pendingShare = null; pendingReply = null; editingMsg = null;
   renderCtxBar();
   leaveTyping();
@@ -520,7 +590,7 @@ function unpinChat(){
 }
 function queueFit(){ if(!kbRaf) kbRaf = requestAnimationFrame(fitChatToViewport); }
 export function resetChat(){
-  closeKredsChat();
+  closeKredsChat(); // nulstiller også paginerings-tilstanden
   msgs = [];
   lastByFeed = {};
   reads = {}; readsOk = false; unreadAtId = null; myReadSent = 0;
@@ -536,10 +606,27 @@ export function resetChat(){
    reaktioner, tmp→rigtig-byttet efter send) er som før — øjeblikkelige og uden animation. */
 let animateMid = null;
 
-function renderThread(scrollBottom){
+/* Tilstand der sættes DIREKTE på boblerne af anden kode og derfor ikke står i msgHTML:
+   indglidnings-animationen, fremhævningen ved hop til en citeret besked og swipe-for-at-
+   citere. Før blev de gratis nulstillet af innerHTML; nu hvor en boble kan genbruges,
+   skal de ryddes eksplicit, ellers brænder de fast. */
+function clearBubbleState(box){
+  box.querySelectorAll(".cv-msg.msg-new, .cv-msg.swiped, .cv-msg[style]").forEach(function(n){
+    n.classList.remove("msg-new", "swiped");
+    n.style.transform = "";
+    n.style.transition = "";
+  });
+  box.querySelectorAll(".cv-bubble.flash").forEach(function(n){ n.classList.remove("flash"); });
+}
+const keepChatMedia = keepMedia(".cv-thumb, .cv-mimg, .cv-qthumb");
+
+/* prepend: ældre beskeder er netop sat ind FORAN de viste. Så skal hverken bunden eller
+   den gamle position bruges — vi holder fast i det brugeren kigger på ved at lægge den
+   tilkomne højde oven i rullepositionen. */
+function renderThread(scrollBottom, prepend){
   const box = el("cv-body");
   const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-  const prevTop = box.scrollTop;
+  const prevH = box.scrollHeight, prevTop = box.scrollTop;
   const seenBy = readReceipts();
   // Læst/Ikke læst med småt under MIN sidste besked, når den er trådens nyeste
   // (læst = mindst ét andet medlem har sit læse-mærke ved eller efter den)
@@ -557,28 +644,40 @@ function renderThread(scrollBottom){
   // Messenger-agtig gruppering: beskeder i træk fra samme afsender klumpes — navn kun
   // øverst i gruppen, avatar og tid kun ved gruppens sidste boble. "Ulæste beskeder"-
   // linjen bryder en gruppe, så boblen efter linjen får navn/avatar igen.
-  box.innerHTML = msgs.length
+  /* Ét kort pr. besked. Kortet er HELE blokken omkring boblen: "Ulæste beskeder"-linjen
+     før den, kvitteringerne og Læst-status efter den — de er søskende til boblen, ikke
+     børn, og skal derfor følges ad. Kortets HTML er samtidig dets signatur, så alt der
+     kan ændre udseendet er dækket: naboernes gruppering (first/last), et citat der slås
+     op lokalt i tråden, reaktioner der muteres ind i beskeden, redigering og kvitteringer.
+     Nøglen er String(m.id), fordi et id skifter type undervejs: en netop sendt besked har
+     strengen "tmp-…" indtil serverens talværdi kommer retur. */
+  const cards = msgs.length
     ? msgs.map(function(m, i){
         const first = i === 0 || msgs[i - 1].authorId !== m.authorId || m.id === unreadAtId;
         const last = i === msgs.length - 1 || msgs[i + 1].authorId !== m.authorId ||
                      msgs[i + 1].id === unreadAtId;
-        return (m.id === unreadAtId ? '<div class="cv-unread">'+t("chat.unread")+'</div>' : '')+
-               msgHTML(m, first, last)+
-               (seenBy[m.id] ? readsHTML(seenBy[m.id], m.id) : '')+
-               (status && status.id === m.id
-                 ? '<span class="cv-status">'+t(status.seen ? "chat.read" : "chat.notread")+'</span>'
-                 : '');
-      }).join("")
-    : '<div class="emptynote">'+t("chat.no_messages")+'</div>';
+        return { key: "m:" + String(m.id), html:
+          (m.id === unreadAtId ? '<div class="cv-unread">'+t("chat.unread")+'</div>' : '')+
+          msgHTML(m, first, last)+
+          (seenBy[m.id] ? readsHTML(seenBy[m.id], m.id) : '')+
+          (status && status.id === m.id
+            ? '<span class="cv-status">'+t(status.seen ? "chat.read" : "chat.notread")+'</span>'
+            : '') };
+      })
+    : [{ key: "empty", html: '<div class="emptynote">'+t("chat.no_messages")+'</div>' }];
+  clearBubbleState(box);        // genbrugte bobler må ikke bære gammel animation/swipe
+  reconcile(box, cards, keepChatMedia);
   const fresh = animateMid != null ? box.querySelector('.cv-msg[data-mid="'+animateMid+'"]') : null;
   animateMid = null;
   if(fresh) fresh.classList.add("msg-new");
-  if(scrollBottom || nearBottom){
+  if(prepend){
+    // Indholdet voksede OVER brugeren: læg den tilkomne højde til, så billedet står stille
+    box.scrollTop = prevTop + (box.scrollHeight - prevH);
+  } else if(scrollBottom || nearBottom){
     if(fresh) box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
     else box.scrollTop = box.scrollHeight;
-  } else {
-    box.scrollTop = prevTop;
   }
+  // Ingen else-gren mere: rullepositionen bliver kun nulstillet af innerHTML, og den er væk.
 }
 /* Set-kvitteringer: for hvert andet medlem findes den sidste besked (id) de har læst.
    Er ankeret medlemmets egen besked, vises ingen kvittering (som Messenger: at man
@@ -843,7 +942,12 @@ function doClearThread(f){
   setPref(f.id, { clearedAt: new Date().toISOString(), markedUnread: false });
   if(chatFeed === f.id){
     if(f.isDm) closeKredsChat();
-    else { msgs = []; renderThread(false); }
+    else {
+      msgs = [];
+      // Historikken er netop ryddet for mig: et rul til toppen må ikke hente den ind igen
+      oldestAnchor = null; noMoreOlder = true; loadingOlder = false;
+      renderThread(false);
+    }
   }
   renderChatList(false);
 }
@@ -971,9 +1075,12 @@ async function doReportMsg(m){
 function snip(s, n){ return s && s.length > n ? s.slice(0, n - 1) + "…" : (s || ""); }
 function msgHTML(m, first, last){
   const mine = !!(me && m.authorId === me.id);
+  /* loading="lazy" KUN på <img>: attributten betyder ingenting på <video>, og de to slags
+     medier deler klassenavn her. Miniaturerne har faste mål i CSS (.cv-thumb 150 px,
+     .cv-qthumb og .cv-ctxthumb 36 px), så de kan ikke skubbe tråden når de lander. */
   const share = m.postId
     ? '<button class="cv-share" data-post="'+esc(m.postId)+'">'+
-        (m.thumb ? '<img class="cv-thumb" src="'+esc(m.thumb)+'" alt="">'
+        (m.thumb ? '<img class="cv-thumb" src="'+esc(m.thumb)+'" alt="" loading="lazy" decoding="async">'
          : m.thumbVideo ? '<video class="cv-thumb" src="'+esc(m.thumbVideo)+'#t=0.1" muted playsinline preload="metadata"></video>'
          : '')+
         '<span class="cv-sharetxt">'+t("chat.shared_memory")+'</span>'+
@@ -981,7 +1088,7 @@ function msgHTML(m, first, last){
     : '';
   // Beskedens eget billede/video (uden boble-baggrund når det står alene, som Messenger)
   const media = m.mimg
-    ? '<img class="cv-mimg" src="'+esc(m.mimg)+'" alt="">'
+    ? '<img class="cv-mimg" src="'+esc(m.mimg)+'" alt="" loading="lazy" decoding="async">'
     : m.mvideo
     ? '<video class="cv-mimg" src="'+esc(m.mvideo)+'" controls playsinline preload="metadata"></video>'
     : '';
@@ -997,7 +1104,7 @@ function msgHTML(m, first, last){
       const rimg = rm.mimg || rm.thumb;
       const rvid = rimg ? "" : (rm.mvideo || rm.thumbVideo);
       const rthumb = rimg
-        ? '<img class="cv-qthumb" src="'+esc(rimg)+'" alt="">'
+        ? '<img class="cv-qthumb" src="'+esc(rimg)+'" alt="" loading="lazy" decoding="async">'
         : rvid
         ? '<video class="cv-qthumb" src="'+esc(rvid)+'#t=0.1" muted playsinline preload="metadata"></video>'
         : '';
@@ -1389,6 +1496,18 @@ export function initChat(){
      Lodret bevægelse vinder altid (scroll), og en udløst long-press sluger det
      efterfølgende klik. Højreklik (desktop) åbner også menuen. */
   const body = el("cv-body");
+  /* Rul til toppen henter de næste 300 ældre. loadOlderMsgs vogter selv mod dobbelt-kald
+     og mod at der ikke er mere at hente, så lytteren kan være så enkel som her. */
+  body.addEventListener("scroll", function(){
+    if(body.scrollTop < 200) loadOlderMsgs();
+  }, { passive: true });
+  /* Et lazy-billede der lander ændrer trådens højde. Var vi i bunden, skal vi blive i
+     bunden: Safari har ingen automatisk forankring af rullepositionen. load bobler ikke,
+     derfor capture-fasen. */
+  body.addEventListener("load", function(e){
+    if(!e.target || e.target.tagName !== "IMG") return;
+    if(body.scrollHeight - body.scrollTop - body.clientHeight < 120) body.scrollTop = body.scrollHeight;
+  }, true);
   let lpTimer = 0, sx = 0, sy = 0, swipeEl = null, swipeMid = 0, swiping = false, lpFired = false;
   body.addEventListener("touchstart", function(e){
     lpFired = false; swiping = false; swipeEl = null;
