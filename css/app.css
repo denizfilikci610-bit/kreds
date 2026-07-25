@@ -121,8 +121,9 @@
      beholdes i DOM'en for skærmlæsere, men skjules visuelt. */
   /* Genvej til Ny kreds i topbarens HØJRE side. Topbarens space-between gør resten: logoet
      bliver liggende helt til venstre, præcis hvor det altid har været, og knappen lander
-     modsat. Vises KUN på Hjem og Beskeder, hvor kredse er det man arbejder med (switchTab
-     sætter body[data-tab], så synligheden er ren CSS). */
+     modsat. Vises KUN på Beskeder (ejer-valg): på Hjem har kreds-baren allerede sin egen
+     "+ Ny kreds"-pille, så to knapper til det samme ville støje. (switchTab sætter
+     body[data-tab], så synligheden er ren CSS.) */
   .topnew{
     display:none;
     position:relative; /* bærer plus-badgen, som .cmtp-btn bærer lås-badgen */
@@ -131,7 +132,6 @@
     width:26px;height:26px;
     color:var(--ink);
   }
-  body[data-tab="feed"] .topnew,
   body[data-tab="chat"] .topnew{display:flex}
   .topnew > svg{width:24px;height:24px}
   .topnew svg .stroke{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}
