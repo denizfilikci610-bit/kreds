@@ -33,7 +33,14 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.unit.dp
 import dk.vibefeed.app.bridge.VfBridge
+import dk.vibefeed.app.composer.ComposerModel
+import dk.vibefeed.app.composer.ComposerScreen
+import dk.vibefeed.app.composer.Purpose
+import dk.vibefeed.app.composer.Uploader
 import org.json.JSONObject
 import java.io.File
 
@@ -77,6 +84,12 @@ class MainActivity : AppCompatActivity() {
     /** Besked-broen til web, den samme kontrakt som iOS bruger. */
     private var bridge: VfBridge? = null
 
+    /** De native skærme lægger sig her, oven på webviewet. */
+    private lateinit var overlay: ComposeView
+
+    /** Den native medie-komposer (minder og stories). */
+    private val composer = ComposerModel()
+
     private val filePicker =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             deliverFiles(result.resultCode, result.data)
@@ -89,6 +102,7 @@ class MainActivity : AppCompatActivity() {
 
         root = findViewById(R.id.root)
         web = findViewById(R.id.web)
+        overlay = findViewById(R.id.native_overlay)
         errorView = findViewById(R.id.error)
         findViewById<Button>(R.id.retry).setOnClickListener { reload() }
 
@@ -362,22 +376,113 @@ class MainActivity : AppCompatActivity() {
      * må derfor først med den dag begge findes native på Android.
      */
     private fun installBridge() {
-        bridge = VfBridge(
+        val b = VfBridge(
             web = web,
             allowedOrigins = INTERNAL_HOSTS.map { "https://$it" }.toSet(),
             onMessage = ::onBridgeMessage,
         )
-        bridge?.install(emptySet())
+        bridge = b
+        // ⚠️ INGEN capabilities endnu, og det er en bevidst beslutning.
+        //
+        // Den native medie-komposer er færdig og virker: den åbner, henter fra galleriet,
+        // tager billeder og sender vfMemory af sted. Men RETURVEJEN findes ikke uden
+        // __vfNative. window.vfMemory, vfMemoryUploaded, vfMemoryUploadFailed, vfMemoryCancel
+        // og vfMemoryFallback defineres alle INDE i `if(window.__vfNative)` i js/main.js:71.
+        // Uden det flag kan komposeren åbne, men aldrig gøre sig færdig, og så står brugeren
+        // med en spinner der ikke stopper.
+        //
+        // __vfNative kan til gengæld først sættes når BÅDE fanebjælken og kreds-baren findes
+        // native, for css/app.css skjuler dem begge i samme øjeblik flaget er sat. De to barer
+        // er altså ikke bare pynt: de er nøglen der låser hele retur-fladen op.
+        b.install(emptySet())
+        overlay.setContent { NativeOverlay() }
     }
 
     private fun onBridgeMessage(type: String, json: JSONObject) {
-        // Endnu ingen native skærme at sende beskederne videre til. Ukendte typer må aldrig
-        // kaste, kun ignoreres, præcis som Swift gør.
-        if (BuildConfig.DEBUG) {
-            // Kun feltnavne. Beskeder som creds bærer et enheds-token, og det har intet
-            // at gøre i enhedens log.
-            android.util.Log.d("VibeFeed", "bro: $type felter=${json.keys().asSequence().toList()}")
+        when (type) {
+            "photolib" -> onPhotoLib(json)
+            // Web sender også beskeder appen aldrig skal gøre noget ved (fsheet, msheet,
+            // ads, consent, creds). En ukendt type må aldrig kaste, kun ignoreres.
+            else -> Unit
         }
+    }
+
+    /**
+     * Rækkefølgen her er bindende: upload-ordren skal tjekkes FØR kvitteringen og før
+     * åbningen, ellers går ordren tabt fordi beskederne deler samme type.
+     */
+    private fun onPhotoLib(json: JSONObject) {
+        json.optJSONObject("upload")?.let { order ->
+            val bytes = composer.pendingBytes
+            if (bytes == null) {
+                bridge?.call("vfMemoryUploadFailed")
+                return
+            }
+            Thread {
+                val ok = Uploader.upload(order, bytes)
+                runOnUiThread {
+                    composer.pendingBytes = null
+                    bridge?.call(if (ok) "vfMemoryUploaded" else "vfMemoryUploadFailed")
+                }
+            }.start()
+            return
+        }
+
+        val result = json.optString("result")
+        if (result.isNotBlank()) {
+            composer.result(result)
+            if (!composer.open) hideOverlay()
+            return
+        }
+
+        if (json.optBoolean("open")) {
+            composer.start(json)
+            showOverlay()
+        }
+    }
+
+    // ---------------------------------------------------------------- native skærme
+
+    @Composable
+    private fun NativeOverlay() {
+        if (!composer.open) return
+        val d = resources.displayMetrics.density
+        ComposerScreen(
+            model = composer,
+            topPad = (safeArea.top / d).dp,
+            bottomPad = (safeArea.bottom / d).dp,
+            onShare = { bytes, isVideo, caption, dest ->
+                composer.pendingBytes = bytes
+                composer.sharing = true
+                val obj = JSONObject()
+                    .put("isVideo", isVideo)
+                    .put("caption", caption)
+                    .put("dest", dest)
+                    .put("ext", if (isVideo) "mp4" else "jpg")
+                    .put("mime", if (isVideo) "video/mp4" else "image/jpeg")
+                    .put("forCompose", composer.purpose == Purpose.COMPOSE)
+                    .put("isStory", composer.isStory)
+                bridge?.call("vfMemory", obj)
+            },
+            onCancel = {
+                composer.close()
+                hideOverlay()
+                bridge?.call("vfMemoryCancel")
+            },
+            onDenied = {
+                composer.close()
+                hideOverlay()
+                bridge?.call("vfMemoryFallback")
+            },
+        )
+    }
+
+    private fun showOverlay() {
+        overlay.visibility = View.VISIBLE
+    }
+
+    private fun hideOverlay() {
+        overlay.visibility = View.GONE
     }
 
     // ---------------------------------------------------------------- tilbage
@@ -390,6 +495,13 @@ class MainActivity : AppCompatActivity() {
     private fun registerBackHandling() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                // Den native komposer ligger øverst og skal lukkes først
+                if (composer.open) {
+                    composer.close()
+                    hideOverlay()
+                    bridge?.call("vfMemoryCancel")
+                    return
+                }
                 web.evaluateJavascript(
                     "(window.__vfAndroidBack && window.__vfAndroidBack()) === true"
                 ) { handled ->

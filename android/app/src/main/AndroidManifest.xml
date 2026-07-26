@@ -12,6 +12,19 @@
     -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!--
+      Den native medie-komposer har sit eget kamera og sit eget galleri-gitter, som på iOS,
+      og dét kræver de tilladelser systemets fotovælger ellers slap for. Begge spørges der
+      om FØRST når brugeren åbner komposeren, aldrig ved opstart, og siger man nej, overtager
+      web sin egen filvælger i stedet.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
     <!-- Kameraet er valgfrit: appen virker fint på enheder uden -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 

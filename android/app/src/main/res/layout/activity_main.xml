@@ -10,6 +10,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- De native skærme lægger sig oven på webviewet, som på iOS -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/native_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/error"
         android:layout_width="match_parent"

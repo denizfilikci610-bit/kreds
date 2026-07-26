@@ -102,6 +102,9 @@ dependencies {
     // Miniaturer i galleri-gitteret
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // EXIF, så et billede taget på højkant ikke lander på siden
+    implementation("androidx.exifinterface:exifinterface:1.4.1")
+
     // Upload direkte til den URL web udleverer
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
