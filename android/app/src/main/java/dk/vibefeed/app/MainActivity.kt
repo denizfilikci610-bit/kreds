@@ -86,10 +86,11 @@ class MainActivity : AppCompatActivity() {
 
         /**
          * Web-fladens zoom. En Pixel er ~412 punkter bred mod iPhonens ~393, så uden
-         * justering står alt en anelse mindre end på iPhone. Skal holdes i sync med
-         * Z i assets/zoom.js. 1.0 slår zoomen fra.
+         * justering står alt en anelse mindre end på iPhone. 1.05 er ren iPhone-paritet;
+         * ejeren har bedt om lidt mere. Skal holdes i sync med Z i assets/zoom.js.
+         * 1.0 slår zoomen fra.
          */
-        const val VF_ZOOM = 1.06f
+        const val VF_ZOOM = 1.12f
 
         /** Samme liste som ios/VibeFeed/WebView.swift: alt andet åbnes uden for appen. */
         val INTERNAL_HOSTS = setOf(

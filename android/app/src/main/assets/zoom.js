@@ -12,7 +12,7 @@
   "use strict";
   if (window.__vfZoomet) return;
   window.__vfZoomet = true;
-  var Z = 1.06;
+  var Z = 1.12;
   var m = document.querySelector('meta[name="viewport"]');
   if (!m) return;
   m.setAttribute(
