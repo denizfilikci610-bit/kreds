@@ -63,6 +63,8 @@ import dk.vibefeed.app.pages.ListPageHost
 import dk.vibefeed.app.pages.ListPageModel
 import dk.vibefeed.app.post.PostPageHost
 import dk.vibefeed.app.post.PostPageModel
+import dk.vibefeed.app.profil.EditProfilePageHost
+import dk.vibefeed.app.profil.EsheetModel
 import dk.vibefeed.app.sheets.GlassSheetHost
 import dk.vibefeed.app.sheets.SheetModel
 import org.json.JSONObject
@@ -134,6 +136,9 @@ class MainActivity : AppCompatActivity() {
 
     /** Opslags-siden for tanker. */
     private val postPage = PostPageModel()
+
+    /** Rediger profil-siden. */
+    private val esheet = EsheetModel()
 
     /** Sat når broen kan bære de native barer. Uden dem må __vfNative aldrig sættes. */
     private var nativeBars = false
@@ -473,6 +478,7 @@ class MainActivity : AppCompatActivity() {
                 setOf(
                     "__vfNative", "__vfPhotoLib", "__vfComposeCamera",
                     "__vfGlassCard", "__vfListPage", "__vfComments", "__vfPostPage",
+                    "__vfEsheet",
                 )
             } else {
                 emptySet()
@@ -494,6 +500,7 @@ class MainActivity : AppCompatActivity() {
             "listpage" -> onListPage(json)
             "comments" -> onComments(json)
             "postpage" -> onPostPage(json)
+            "esheet" -> onEsheet(json)
             "share" -> onShare(json)
             // Web sender også beskeder appen aldrig skal gøre noget ved (fsheet, msheet,
             // ads, consent, creds). En ukendt type må aldrig kaste, kun ignoreres.
@@ -623,6 +630,12 @@ class MainActivity : AppCompatActivity() {
         if (postPage.open) showOverlay() else if (!composer.open) hideOverlay()
     }
 
+    /** Rediger profil-siden. */
+    private fun onEsheet(json: JSONObject) {
+        esheet.apply(json)
+        if (esheet.open) showOverlay() else if (!composer.open) hideOverlay()
+    }
+
     /**
      * navigator.share-shimmen (assets/share.js): åbn Androids dele-ark med det indhold
      * web ville have delt gennem iPhonens navigator.share.
@@ -722,6 +735,19 @@ class MainActivity : AppCompatActivity() {
                 bundIndhak = bottom,
                 onEvent = { obj -> bridge?.call("vfComments", obj) },
             )
+            // Rediger profil ligger over barerne (web skjuler dem selv) og bærer sin egen
+            // beskærer indeni.
+            EditProfilePageHost(
+                model = esheet,
+                blæk = ink,
+                baggrund = bg,
+                topIndhak = top,
+                onEvent = { obj -> bridge?.call("vfEsheet", obj) },
+                onAvatar = { dataUrl -> bridge?.call("vfAvatar", dataUrl) },
+                onBanner = { dataUrl -> bridge?.call("vfBanner", dataUrl) },
+                onPolitik = { url -> politikUrl = url },
+            )
+
             if (composer.open) Composer(top, bottom)
 
             // Politik-arket tegner i sit eget vindue og ligger derfor altid øverst.
@@ -780,7 +806,7 @@ class MainActivity : AppCompatActivity() {
     private fun hideOverlay() {
         overlay.visibility =
             if (nativeBars || sheet.request != null || listPage.open ||
-                comments.open || postPage.open
+                comments.open || postPage.open || esheet.open
             ) {
                 View.VISIBLE
             } else {
@@ -834,6 +860,17 @@ class MainActivity : AppCompatActivity() {
                 // Liste-siden: glid ud først, dismiss bagefter (samme vej som pilen).
                 if (listPage.open) {
                     listPage.exit()
+                    return
+                }
+                // Rediger profil: slet-trinnet spiser ét tilbage; ellers glid ud og
+                // dismiss, med nødværn hvis web ikke ekkoer close.
+                if (esheet.open) {
+                    if (esheet.deleteStep) {
+                        esheet.deleteStep = false
+                    } else {
+                        esheet.exit()
+                        overlay.postDelayed({ if (esheet.open) esheet.lukLokalt() }, 1200)
+                    }
                     return
                 }
                 web.evaluateJavascript(

@@ -216,6 +216,198 @@ fun CropScreen(
 }
 
 /**
+ * Profil-beskæreren til Rediger profil: frit forhold, evt. cirkulær maske, faste mål og
+ * INGEN format-piller. Deler ramme-, klemme- og beskæringsformlerne med minde-beskæreren,
+ * plus den animerede dobbelttryk-zoom fra iOS (250 ms).
+ */
+@Composable
+fun ProfilCropScreen(
+    billede: ImageBitmap,
+    forhold: Float,
+    cirkulaer: Boolean,
+    maalB: Int,
+    maalH: Int,
+    titel: String,
+    annullerLabel: String,
+    brugLabel: String,
+    topPad: androidx.compose.ui.unit.Dp,
+    bottomPad: androidx.compose.ui.unit.Dp,
+    onCancel: () -> Unit,
+    onDone: (Bitmap) -> Unit,
+) {
+    var zoom by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    var justerer by remember { mutableStateOf(false) }
+    var zoomMål by remember { mutableStateOf<Float?>(null) }
+    var rammeB by remember { mutableFloatStateOf(0f) }
+    var rammeH by remember { mutableFloatStateOf(0f) }
+    var skala by remember { mutableFloatStateOf(1f) }
+    var brugtOffset by remember { mutableStateOf(Offset.Zero) }
+    val gitter by animateFloatAsState(if (justerer) 1f else 0f, tween(250), label = "gitter")
+
+    // Dobbelttryk: animer zoom og position over 250 ms, som iOS. Træk og knib skriver
+    // stadig direkte.
+    LaunchedEffect(zoomMål) {
+        val mål = zoomMål ?: return@LaunchedEffect
+        val startZoom = zoom
+        val startOffset = offset
+        androidx.compose.animation.core.animate(
+            0f, 1f,
+            animationSpec = tween(250, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        ) { f, _ ->
+            zoom = startZoom + (mål - startZoom) * f
+            offset = Offset(startOffset.x * (1f - f), startOffset.y * (1f - f))
+        }
+        zoomMål = null
+    }
+
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val tæthed = LocalDensity.current
+            val fladeB = with(tæthed) { maxWidth.toPx() }
+            val fladeH = with(tæthed) { maxHeight.toPx() }
+            val margen = with(tæthed) { 24.dp.toPx() }
+
+            val maxB = fladeB - margen
+            val maxH = fladeH * 0.72f
+            var rB = maxB
+            var rH = rB / forhold
+            if (rH > maxH) { rH = maxH; rB = rH * forhold }
+            val rammeBredde = rB
+            val rammeHoejde = rH
+
+            val imgB = billede.width.toFloat()
+            val imgH = billede.height.toFloat()
+            val dæk = max(rammeBredde / imgB, rammeHoejde / imgH)
+            val t = dæk * zoom
+
+            fun klem(o: Offset): Offset {
+                val maxX = max(0f, (imgB * t - rammeBredde) / 2f)
+                val maxY = max(0f, (imgH * t - rammeHoejde) / 2f)
+                return Offset(min(maxX, max(-maxX, o.x)), min(maxY, max(-maxY, o.y)))
+            }
+
+            val faktisk = klem(offset)
+            rammeB = rammeBredde; rammeH = rammeHoejde; skala = t; brugtOffset = faktisk
+            val midte = Offset(fladeB / 2f, fladeH / 2f)
+
+            Canvas(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(billede) {
+                        detectTransformGestures { _, pan, zoomChange, _ ->
+                            justerer = true
+                            zoom = min(5f, max(1f, zoom * zoomChange))
+                            offset = klem(offset + pan)
+                        }
+                    }
+                    .pointerInput(billede) {
+                        detectTapGestures(onDoubleTap = {
+                            zoomMål = if (zoom > 1.01f) 1f else 2f
+                        })
+                    },
+            ) {
+                val r = Rect(
+                    midte.x - rammeBredde / 2f, midte.y - rammeHoejde / 2f,
+                    midte.x + rammeBredde / 2f, midte.y + rammeHoejde / 2f,
+                )
+                val ramme = if (cirkulaer) {
+                    Path().apply { addOval(r) }
+                } else {
+                    Path().apply {
+                        addRoundRect(
+                            androidx.compose.ui.geometry.RoundRect(
+                                r,
+                                androidx.compose.ui.geometry.CornerRadius(6.dp.toPx()),
+                            )
+                        )
+                    }
+                }
+
+                clipPath(ramme) {
+                    drawImage(
+                        image = billede,
+                        dstOffset = IntOffset(
+                            (midte.x - imgB * t / 2f + faktisk.x).roundToInt(),
+                            (midte.y - imgH * t / 2f + faktisk.y).roundToInt(),
+                        ),
+                        dstSize = IntSize((imgB * t).roundToInt(), (imgH * t).roundToInt()),
+                    )
+                }
+
+                if (cirkulaer) {
+                    // KUN cirkel-stregen: intet gitter, ingen hjørner.
+                    drawPath(ramme, Color.White.copy(alpha = 0.9f), style = Stroke(2.dp.toPx()))
+                } else {
+                    drawPath(ramme, Color.White.copy(alpha = 0.4f), style = Stroke(1.dp.toPx()))
+                    if (gitter > 0f) tegnGitter(r, gitter)
+                    tegnHjørner(r)
+                }
+            }
+        }
+
+        Column(Modifier.fillMaxSize().padding(top = topPad, bottom = bottomPad)) {
+            Text(
+                titel,
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp),
+            )
+            Spacer(Modifier.weight(1f))
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CropKnapPublic(annullerLabel, false, Modifier.weight(1f), onCancel)
+                CropKnapPublic(brugLabel, true, Modifier.weight(1f)) {
+                    onDone(beskærTilMaal(billede, maalB, maalH, rammeB, rammeH, skala, brugtOffset))
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(zoom, offset) {
+        justerer = true
+        kotlinx.coroutines.delay(260)
+        justerer = false
+    }
+}
+
+/** Som [beskær], men med frie mål i stedet for minde-formaterne. */
+private fun beskærTilMaal(
+    billede: ImageBitmap,
+    maalB: Int,
+    maalH: Int,
+    rammeB: Float,
+    rammeH: Float,
+    t: Float,
+    offset: Offset,
+): Bitmap {
+    val kilde = billede.asAndroidBitmap()
+    val ud = Bitmap.createBitmap(maalB, maalH, Bitmap.Config.ARGB_8888)
+    if (rammeB <= 0f || rammeH <= 0f || t <= 0f) return ud
+
+    val synligB = rammeB / t
+    val synligH = rammeH / t
+    val cx = kilde.width / 2f - offset.x / t
+    val cy = kilde.height / 2f - offset.y / t
+    val vx = cx - synligB / 2f
+    val vy = cy - synligH / 2f
+    val k = maalB / synligB
+
+    val lærred = AndroidCanvas(ud)
+    val maling = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true }
+    lærred.drawBitmap(
+        kilde,
+        null,
+        RectF(-vx * k, -vy * k, (-vx + kilde.width) * k, (-vy + kilde.height) * k),
+        maling,
+    )
+    return ud
+}
+
+/**
  * Selve udsnittet, med præcis de samme formler som cropped() i CropView.swift: det synlige
  * område regnes tilbage til billedets egne koordinater og tegnes skaleret ind i målet.
  */
