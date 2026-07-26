@@ -266,8 +266,10 @@ fun CameraStep(
                 Spacer(Modifier.height(6.dp))
             }
             if (!cam.recording) {
+                // iOS har den her hårdkodet på dansk. Vi lægger den i strings, så den
+                // følger telefonens sprog i stedet for kun at virke for danskere.
                 Pille(
-                    model.labels.or("trimHint", "Tryk for foto, hold for video"),
+                    androidx.compose.ui.res.stringResource(dk.vibefeed.app.R.string.camera_hint),
                     Modifier.align(Alignment.CenterHorizontally),
                 )
                 Spacer(Modifier.height(8.dp))

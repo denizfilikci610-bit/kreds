@@ -2,4 +2,5 @@
 <resources>
     <string name="offline">Der er ikke forbindelse til VibeFeed. Tjek dit netværk.</string>
     <string name="retry">Prøv igen</string>
+    <string name="camera_hint">Tryk for foto, hold for video</string>
 </resources>
