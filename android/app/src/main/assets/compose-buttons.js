@@ -19,14 +19,19 @@
 (function () {
   if (document.getElementById("vf-fabs")) return;
 
+  /* Fanebjælken skal FORSVINDE når man scroller ned, som den native bjælke gør på iOS
+     (TabBarView: offset 130 + opacity 0 ved compact). Web-css'en krymper den kun til .86,
+     fordi den regel er skrevet til browseren. Vi retter den her i appen, ikke i css/app.css,
+     som deles med iOS-appen der er i review. */
   var LAG = "\
+body.hidebar .tabbar{transform:translateY(150%);opacity:0;pointer-events:none}\
 #vf-fabs{position:fixed;z-index:51;right:16px;\
 bottom:calc(max(8px, env(safe-area-inset-bottom) - 8px) + 72px);\
 display:flex;flex-direction:column;gap:14px;\
 opacity:0;visibility:hidden;pointer-events:none;\
-transition:opacity .2s ease, visibility .2s ease, transform .34s cubic-bezier(.32,.72,.25,1)}\
+transition:opacity .2s ease, visibility .2s ease, transform .42s cubic-bezier(.28,.9,.32,1.2)}\
 #vf-fabs.on{opacity:1;visibility:visible;pointer-events:auto}\
-body.hidebar #vf-fabs{transform:translateY(8px)}\
+body.hidebar #vf-fabs{transform:translateY(44px)}\
 [dir=rtl] #vf-fabs{right:auto;left:16px}\
 #vf-fabs button{width:56px;height:56px;border-radius:999px;border:0;padding:0;\
 display:flex;align-items:center;justify-content:center;\
