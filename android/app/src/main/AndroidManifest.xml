@@ -12,6 +12,10 @@
     -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Notifikationer kræver siden Android 13 en runtime-tilladelse. Der spørges når
+         web melder login (creds), samme øjeblik som iOS spørger. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!--
       Den native medie-komposer har sit eget kamera og sit eget galleri-gitter, som på iOS,
       og dét kræver de tilladelser systemets fotovælger ellers slap for. Begge spørges der
@@ -66,6 +70,16 @@
                 <data android:scheme="https" android:host="www.vibefeed.dk" />
             </intent-filter>
         </activity>
+
+        <!-- FCM-beskeder. Serveren sender rent data, tjenesten tegner selv notifikationen
+             og lægger deep-link-payloaden i tap-intenten. -->
+        <service
+            android:name=".notif.VfMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
         <!-- Midlertidig fil til kamera-optagelser, saa kamera-appen kan skrive resultatet -->
         <provider

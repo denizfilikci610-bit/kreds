@@ -4,6 +4,13 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// FCM virker først når ejeren har lagt google-services.json her i app-mappen (fra
+// Firebase-konsollen). Indtil da bygger appen fint uden, og notifikationerne kommer
+// gennem kvarters-pollen i stedet. Pluginet må derfor kun anvendes når filen findes.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // Signeringen læses fra ~/.gradle/gradle.properties, ALDRIG fra repoet. Så ligger hverken
 // nøglefilen eller kodeordet et sted hvor de kan blive committet ved et uheld, og en build
 // på en maskine uden nøglen fejler ikke, den laver bare en usigneret udgave.
@@ -115,4 +122,9 @@ dependencies {
 
     // Upload direkte til den URL web udleverer
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Notifikationer: FCM-push når Firebase er sat op, ellers kvarters-pollen som
+    // sikkerhedsnet (samme arbejdsdeling som iOS' APNs + BGAppRefresh)
+    implementation("com.google.firebase:firebase-messaging:24.1.0")
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
 }

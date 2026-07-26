@@ -54,7 +54,9 @@ import dk.vibefeed.app.bridge.VfBridge
 import dk.vibefeed.app.composer.ComposerModel
 import dk.vibefeed.app.composer.ComposerScreen
 import dk.vibefeed.app.composer.Purpose
+import dk.vibefeed.app.browser.PolitikSkaerm
 import dk.vibefeed.app.composer.Uploader
+import dk.vibefeed.app.notif.VfNotifikationer
 import dk.vibefeed.app.pages.ListPageHost
 import dk.vibefeed.app.pages.ListPageModel
 import dk.vibefeed.app.sheets.GlassSheetHost
@@ -129,9 +131,24 @@ class MainActivity : AppCompatActivity() {
     /** Brugerens sprogvalg, meldt af web i creds-beskeden. Styrer den native søgetekst. */
     private var lang = "da"
 
+    /** Politik-fremviseren (i-app-ark). Sat = åben. */
+    private var politikUrl by mutableStateOf<String?>(null)
+
+    // Tap-to-open fra en notifikation: single flight med frisk budget per payload.
+    // 60 forsøg à 500 ms er nok til en kold start; web venter derefter selv på sin boot.
+    private var ventendeTap: String? = null
+    private var forsoegTilbage = 0
+    private var leveringKoerer = false
+
     private val filePicker =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             deliverFiles(result.resultCode, result.data)
+        }
+
+    /** POST_NOTIFICATIONS. Tokenet hentes KUN når der er sagt ja, som på iOS. */
+    private val notifPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { givet ->
+            if (givet) VfNotifikationer.hentOgRegistrerToken(applicationContext)
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -156,12 +173,16 @@ class MainActivity : AppCompatActivity() {
         } else {
             web.restoreState(savedInstanceState)
         }
+
+        // Startet af et notifikations-tap (kold start): payloaden venter til web er klar.
+        tapFrom(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         linkFrom(intent)?.let { web.loadUrl(it) }
+        tapFrom(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -185,6 +206,9 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         web.onResume()
+        // Appen er fremme: notifikationerne er "set". Skyggen tømmes og serverens
+        // badge-tæller nulstilles gennem registreringen.
+        VfNotifikationer.appAktiveret(applicationContext)
     }
 
     override fun onDestroy() {
@@ -349,8 +373,18 @@ class MainActivity : AppCompatActivity() {
                     v: WebView,
                     request: WebResourceRequest
                 ): Boolean {
-                    openOutside(request.url)
-                    v.destroy()
+                    val url = request.url
+                    val skema = url.scheme?.lowercase()
+                    // Politik- og vilkårssiderne åbner i i-app-arket, som på iPhone.
+                    // Alt andet (og alle ikke-http-skemaer, tjekket FØRST) går udenfor.
+                    // Forkontrollen er broen (nativeBars), ikke forgrunds-tilstanden.
+                    if (nativeBars && (skema == "http" || skema == "https") && isInternal(url)) {
+                        politikUrl = url.toString()
+                    } else {
+                        openOutside(url)
+                    }
+                    // Aldrig rive et WebView ned midt i dets eget callback.
+                    v.post { v.destroy() }
                     return true
                 }
             }
@@ -443,7 +477,8 @@ class MainActivity : AppCompatActivity() {
         when (type) {
             "tab" -> tabBar.apply(json)
             "kreds" -> kredsBar.apply(json)
-            "creds" -> lang = json.optString("lang").ifBlank { lang }
+            "creds" -> onCreds(json)
+            "logout" -> VfNotifikationer.onLogout(applicationContext)
             "photolib" -> onPhotoLib(json)
             "sheet" -> onSheet(json)
             "listpage" -> onListPage(json)
@@ -499,6 +534,62 @@ class MainActivity : AppCompatActivity() {
         sheet.apply(json)
         if (json.opt("close") != true) web.clearFocus()
         if (sheet.request != null) showOverlay() else hideOverlay()
+    }
+
+    /**
+     * {type:"creds"} efter login og ved hvert sprogskifte: sproget til kreds-barens
+     * søgetekst, og hele notifikations-kæden. Tilladelsen spørges her, samme øjeblik som
+     * iOS spørger, og tokenet hentes KUN når der allerede er (eller lige er blevet) sagt ja.
+     */
+    private fun onCreds(json: JSONObject) {
+        lang = json.optString("lang").ifBlank { lang }
+        if (!VfNotifikationer.onCreds(applicationContext, json)) return
+        if (Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            VfNotifikationer.hentOgRegistrerToken(applicationContext)
+        } else {
+            notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    // ------------------------------------------------- notifikations-tap (deep link)
+
+    /** Egen action og extras, aldrig en data-URI, så App Links-filteret ikke forveksles. */
+    private fun tapFrom(intent: Intent?) {
+        if (intent?.action != VfNotifikationer.ACTION_TAP) return
+        val payload = intent.getStringExtra(VfNotifikationer.EXTRA_PAYLOAD) ?: return
+        // En nyere payload afløser en uleveret ældre og får sit EGET friske budget.
+        ventendeTap = payload
+        forsoegTilbage = 60
+        if (!leveringKoerer) {
+            leveringKoerer = true
+            leverTap()
+        }
+    }
+
+    /**
+     * Leveringsløkken. VfBridge.call duer ikke her, den smider returværdien væk; udtrykket
+     * er iOS' eksakte: sandheden kommer fra komma-operatoren, ikke fra vfOpenNotif selv
+     * (den er async og returnerer undefined). JSON for en boolean har ingen anførselstegn,
+     * så alt andet end "true", herunder null, betyder "prøv igen".
+     */
+    private fun leverTap() {
+        val json = ventendeTap ?: run { leveringKoerer = false; return }
+        val udtryk = "window.vfOpenNotif ? (window.vfOpenNotif($json), true) : false"
+        web.evaluateJavascript(udtryk) { v ->
+            if (v == "true") {
+                if (ventendeTap == json) ventendeTap = null
+                leverTap() // der kan være landet en nyere imens
+            } else if (forsoegTilbage > 0) {
+                forsoegTilbage--
+                web.postDelayed({ leverTap() }, 500)
+            } else {
+                ventendeTap = null
+                leveringKoerer = false
+            }
+        }
     }
 
     /** Liste-siden. Må ikke rive komposeren væk når den lukker. */
@@ -570,6 +661,18 @@ class MainActivity : AppCompatActivity() {
                 onAction = { a -> bridge?.call("vfSheet", a) },
             )
             if (composer.open) Composer(top, bottom)
+
+            // Politik-arket tegner i sit eget vindue og ligger derfor altid øverst.
+            politikUrl?.let { url ->
+                PolitikSkaerm(
+                    url = url,
+                    blæk = ink,
+                    baggrund = bg,
+                    topIndhak = top,
+                    onLuk = { politikUrl = null },
+                    onEksternt = ::openOutside,
+                )
+            }
         }
     }
 
@@ -627,6 +730,11 @@ class MainActivity : AppCompatActivity() {
     private fun registerBackHandling() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                // Politik-arket ligger i sit eget vindue, allerøverst.
+                if (politikUrl != null) {
+                    politikUrl = null
+                    return
+                }
                 // Den native komposer ligger øverst og skal lukkes først
                 if (composer.open) {
                     composer.close()
