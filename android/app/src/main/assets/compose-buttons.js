@@ -26,7 +26,7 @@
   var LAG = "\
 body.hidebar .tabbar{transform:translateY(150%);opacity:0;pointer-events:none}\
 #vf-fabs{position:fixed;z-index:51;right:16px;\
-bottom:calc(max(8px, env(safe-area-inset-bottom) - 8px) + 72px);\
+bottom:calc(max(8px, var(--vf-sab, 0px) - 8px) + 72px);\
 display:flex;flex-direction:column;gap:14px;\
 opacity:0;visibility:hidden;pointer-events:none;\
 transition:opacity .2s ease, visibility .2s ease, transform .42s cubic-bezier(.28,.9,.32,1.2)}\

@@ -26,6 +26,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -67,6 +68,9 @@ class MainActivity : AppCompatActivity() {
 
     /** Filen kamera-appen skriver til, når web beder om capture="environment". */
     private var cameraOutput: Uri? = null
+
+    /** Systemets indhak, som siden får at vide gennem window.__vfInsets. */
+    private var safeArea: Insets = Insets.NONE
 
     private val filePicker =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -134,18 +138,47 @@ class MainActivity : AppCompatActivity() {
     // ---------------------------------------------------------------- systemets kanter
 
     /**
-     * Fra Android 15 tegner apps kant til kant. Web-koden regner med env(safe-area-inset-*),
-     * som et WebView altid rapporterer som nul, så i stedet lægger vi systemets indhak som
-     * polstring omkring selve WebViewet. Tastaturet tæller med, så siden krymper når det
-     * åbner (chat-composeren skal ligge oven på tastaturet, ikke bag det).
+     * Appen fylder HELE skærmen, som på iPhone: feedet flyder ind under uret og hjemme-
+     * streget, og barerne lægger sig neden under dem.
+     *
+     * Web-koden gør det med env(safe-area-inset-*) 31 steder i css/app.css, og et WebView
+     * rapporterer altid nul. Derfor polstrer vi ikke, men melder de rigtige indhak videre
+     * til siden (assets/safe-area.js skriver reglerne om med de målte tal).
+     *
+     * Kun tastaturet polstres. Der SKAL selve fladen krympe, ellers ligger chat-feltet bag
+     * tastaturet. Mens det er oppe, er der ingen navigationsbjælke at tage hensyn til, så
+     * bund-indhakket meldes som nul.
      */
     private fun applySystemBars() {
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
-            view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, ime.bottom))
+            view.setPadding(0, 0, 0, ime.bottom)
+            safeArea = Insets.of(
+                maxOf(bars.left, cutout.left),
+                maxOf(bars.top, cutout.top),
+                maxOf(bars.right, cutout.right),
+                if (ime.bottom > 0) 0 else bars.bottom
+            )
+            pushSafeArea()
             WindowInsetsCompat.CONSUMED
         }
+    }
+
+    /**
+     * Punkter i Android er ikke det samme som CSS-pixels. Siden står på initial-scale=1,
+     * så én CSS-px er én dp, og indhakkene skal derfor divideres med skærmens tæthed.
+     */
+    private fun pushSafeArea() {
+        val d = resources.displayMetrics.density
+        fun css(v: Int) = (v / d).toInt()
+        web.evaluateJavascript(
+            "window.__vfInsets && window.__vfInsets(" +
+                "${css(safeArea.top)},${css(safeArea.right)}," +
+                "${css(safeArea.bottom)},${css(safeArea.left)})",
+            null
+        )
     }
 
     private fun applyThemeColors() {
@@ -346,12 +379,15 @@ class MainActivity : AppCompatActivity() {
      * native fanebjælke, men som web-fanebjælken ikke har.
      */
     private fun injectScripts(view: WebView) {
-        for (name in listOf("back.js", "compose-buttons.js")) {
+        // safe-area.js FØRST: den skriver sidens egne env()-regler om, og de to andre
+        // lag læner sig op ad de variabler den sætter.
+        for (name in listOf("safe-area.js", "back.js", "compose-buttons.js")) {
             val js = runCatching {
                 assets.open(name).bufferedReader().use { it.readText() }
             }.getOrNull() ?: continue
             view.evaluateJavascript(js, null)
         }
+        pushSafeArea()
     }
 
     // ---------------------------------------------------------------- filvalg
