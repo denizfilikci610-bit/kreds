@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.max
+import kotlin.math.min
 
 private val BRAND = Color(0xFFE0402F)
 
@@ -89,7 +91,46 @@ fun ComposerScreen(
                 )
 
                 Step.GALLERY -> GalleryStep(model, context, baggrund, blæk, topPad, onCancel, onDenied)
+
+                Step.TRIM -> TrimStep(
+                    model = model,
+                    baggrund = baggrund,
+                    blæk = blæk,
+                    topPad = topPad,
+                    bottomPad = bottomPad,
+                    onCancel = { model.step = Step.GALLERY },
+                    onNext = { efterVideo(model) },
+                )
+
                 Step.CROP -> CropStep(model, context, topPad, bottomPad)
+
+                Step.VIDEOCROP -> {
+                    val v = model.picked
+                    if (v != null) {
+                        VideoCropScreen(
+                            kilde = v.uri,
+                            videoBredde = model.videoBredde,
+                            videoHoejde = model.videoHoejde,
+                            startMs = model.trimStartMs,
+                            laengdeMs = model.trimLaengdeMs,
+                            erStory = model.isStory,
+                            startFormat = Format.STAAENDE,
+                            formatLabel = model.labels.or("fit", "Tilpas udsnittet"),
+                            annullerLabel = model.labels.or("cancel", "Annuller"),
+                            brugLabel = model.labels.or("next", "Videre"),
+                            topPad = topPad,
+                            bottomPad = bottomPad,
+                            onCancel = {
+                                model.step = if (model.visTrim) Step.TRIM else Step.GALLERY
+                            },
+                            onDone = { format, udsnit ->
+                                model.videoFormat = format
+                                model.videoUdsnit = udsnit
+                                model.step = Step.CAPTION
+                            },
+                        )
+                    }
+                }
                 Step.CAPTION -> CaptionStep(model, context, baggrund, blæk, topPad, bottomPad, onShare)
             }
         }
@@ -141,7 +182,7 @@ private fun GalleryStep(
                 // Minde og story går tilbage til kameraet. En tanke lukker helt.
                 if (model.purpose == Purpose.COMPOSE) onCancel() else model.step = Step.CAMERA
             },
-            onAction = { videre(model) },
+            onAction = { videre(model, context) },
         )
 
         if (adgang == Adgang.NÆGTET) {
@@ -277,13 +318,33 @@ private fun NægtetGalleri(
     }
 }
 
-/** Videre-knappen: billeder til beskæreren, video videre i sit eget spor. */
-private fun videre(model: ComposerModel) {
+/** Videre-knappen: billeder til beskæreren, video ad sit eget spor gennem trim. */
+private fun videre(model: ComposerModel, context: Context) {
     val v = model.valgt ?: return
     if (model.forbereder) return
     model.picked = v
-    // Trim-trinnet er endnu ikke bygget, så video går direkte til billedteksten.
-    model.step = if (v.isVideo) Step.CAPTION else Step.CROP
+    if (!v.isVideo) { model.step = Step.CROP; return }
+
+    // Varigheden kender vi allerede fra MediaStore. Målene læses, så beskæreren og
+    // eksporten regner på videoens OPREJSTE mål og ikke på de roterede.
+    val (b, h, meta) = VideoExport.mål(context, v.uri)
+    val varighed = if (v.durationMs > 0) v.durationMs else meta
+    model.videoBredde = if (b > 0) b else 1080
+    model.videoHoejde = if (h > 0) h else 1920
+    model.videoVarighedMs = varighed
+    model.trimStartMs = 0L
+    model.trimLaengdeMs = min(MAKS_VIDEO_MS, max(100L, varighed))
+    model.visTrim = varighed > TRIM_GRAENSE_MS
+    model.step = if (model.visTrim) Step.TRIM else { efterVideo(model); return }
+}
+
+/** Efter trim: en story eller en tanke går direkte videre, et minde skal beskæres. */
+private fun efterVideo(model: ComposerModel) {
+    model.step = when {
+        model.purpose == Purpose.COMPOSE -> Step.CAPTION
+        model.isStory -> Step.CAPTION
+        else -> Step.VIDEOCROP
+    }
 }
 
 /* ============================================================ Beskærer */
@@ -558,6 +619,58 @@ private fun MentionAvatar(kort: MentionCard) {
     ) {
         Text(kort.initials, color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
     }
+}
+
+/**
+ * Eksporterer videoen: klip til det valgte vindue, brugerens udsnit, og målstørrelsen.
+ *
+ * Vagten på 90 sekunder gælder BÅDE galleri- og kamera-video. iOS har den kun på den ene
+ * vej, og en hængende kamera-eksport lader derfor Del-spinneren stå for evigt der.
+ */
+private fun eksporterVideo(
+    model: ComposerModel,
+    context: Context,
+    valgt: Picked,
+    færdig: (ByteArray?) -> Unit,
+) {
+    val (b, h) = if (model.videoUdsnit != null) {
+        // Brugeren har selv beskåret: målet følger det format der blev valgt
+        model.videoFormat.let { it.bredde to it.hoejde }
+    } else if (valgt.uri.scheme == "file") {
+        // Kamera-klip uden beskæring: vandret motiv bliver liggende, ellers 4:5
+        model.kameraTarget(model.videoBredde, model.videoHoejde)
+    } else {
+        model.target()
+    }
+
+    // Uden brugerudsnit laves et centreret dæk-udsnit, så intet strækkes
+    val udsnit = model.videoUdsnit
+        ?: VideoExport.daekUdsnit(model.videoBredde, model.videoHoejde, b, h)
+
+    var svaret = false
+    val transformer = VideoExport.start(
+        context,
+        VideoExport.Ordre(
+            kilde = valgt.uri,
+            startMs = model.trimStartMs,
+            laengdeMs = model.trimLaengdeMs,
+            udsnit = udsnit,
+            maalBredde = b,
+            maalHoejde = h,
+        ),
+    ) { fil ->
+        if (svaret) return@start
+        svaret = true
+        færdig(fil?.readBytes())
+    }
+
+    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+        if (!svaret) {
+            svaret = true
+            runCatching { transformer.cancel() }
+            færdig(null)
+        }
+    }, VideoExport.TIMEOUT_MS)
 }
 
 private fun hexTilFarve(hex: String): Color? = runCatching {

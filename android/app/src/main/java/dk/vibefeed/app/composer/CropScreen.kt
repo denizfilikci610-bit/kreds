@@ -199,8 +199,8 @@ fun CropScreen(
                 Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                CropKnap(annullerLabel, false, Modifier.weight(1f), onCancel)
-                CropKnap(brugLabel, true, Modifier.weight(1f)) {
+                CropKnapPublic(annullerLabel, false, Modifier.weight(1f), onCancel)
+                CropKnapPublic(brugLabel, true, Modifier.weight(1f)) {
                     onDone(beskær(billede, format, rammeB, rammeH, skala, brugtOffset))
                 }
             }
@@ -261,12 +261,12 @@ private fun FormatPille(f: Format, valgt: Format, onClick: (Format) -> Unit) {
             .clickable { onClick(f) },
         contentAlignment = Alignment.Center,
     ) {
-        FormatIkon(f, if (on) Color.White else Color.White.copy(alpha = 0.6f))
+        FormatIkonPublic(f, if (on) Color.White else Color.White.copy(alpha = 0.6f))
     }
 }
 
 @androidx.compose.runtime.Composable
-private fun FormatIkon(f: Format, farve: Color) {
+fun FormatIkonPublic(f: Format, farve: Color) {
     val b: Float
     val h: Float
     when (f) {
@@ -284,7 +284,7 @@ private fun FormatIkon(f: Format, farve: Color) {
 }
 
 @androidx.compose.runtime.Composable
-private fun CropKnap(tekst: String, primær: Boolean, modifier: Modifier, onClick: () -> Unit) {
+fun CropKnapPublic(tekst: String, primær: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Box(
         modifier
             .clip(CircleShape)

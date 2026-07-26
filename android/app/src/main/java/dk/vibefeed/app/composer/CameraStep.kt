@@ -515,8 +515,19 @@ private fun startOptagelse(
                 if (event is VideoRecordEvent.Finalize) {
                     onFærdig()
                     if (!event.hasError()) {
-                        model.picked = Picked(Uri.fromFile(fil), isVideo = true)
-                        // Video går direkte til billedteksten indtil video-beskæreren er bygget
+                        val uri = Uri.fromFile(fil)
+                        // Målene skal læses, ellers kan eksporten ikke regne udsnittet ud
+                        val (b, h, varighed) = VideoExport.mål(context, uri)
+                        model.videoBredde = if (b > 0) b else 1080
+                        model.videoHoejde = if (h > 0) h else 1920
+                        model.videoVarighedMs = varighed
+                        model.trimStartMs = 0L
+                        model.trimLaengdeMs = varighed.coerceIn(100L, MAKS_VIDEO_MS)
+                        model.visTrim = false // nedtællingen har allerede holdt den under 6 sekunder
+                        model.videoUdsnit = null
+                        model.picked = Picked(uri, isVideo = true, durationMs = varighed)
+                        // Kamera-klip går aldrig gennem trim, og de beskæres automatisk
+                        // efter motivets orientering, som på iOS.
                         model.step = Step.CAPTION
                     }
                 }

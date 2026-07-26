@@ -105,6 +105,14 @@ dependencies {
     // EXIF, så et billede taget på højkant ikke lander på siden
     implementation("androidx.exifinterface:exifinterface:1.4.1")
 
+    // Video: loopende preview i trim og beskærer, plus selve eksporten med klip,
+    // beskæring og målstørrelse
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
+    implementation("androidx.media3:media3-ui:1.5.1")
+    implementation("androidx.media3:media3-transformer:1.5.1")
+    implementation("androidx.media3:media3-effect:1.5.1")
+    implementation("androidx.media3:media3-common:1.5.1")
+
     // Upload direkte til den URL web udleverer
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }

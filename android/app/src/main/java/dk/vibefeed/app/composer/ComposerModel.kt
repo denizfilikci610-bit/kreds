@@ -2,15 +2,23 @@ package dk.vibefeed.app.composer
 
 import android.net.Uri
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import org.json.JSONObject
+
+/** Video må højst vare 6 sekunder, samme grænse som iOS. */
+const val MAKS_VIDEO_MS = 6_000L
+
+/** Trim-trinnet vises først over den her, så en video på præcis 6 sekunder slipper forbi. */
+const val TRIM_GRAENSE_MS = 6_050L
 
 /** Hvilket flow web bad om. Sendes som "purpose" i photolib-beskeden. */
 enum class Purpose { MEMORY, COMPOSE, STORY }
 
 /** Trinnene i komposeren, samme rækkefølge som på iOS. */
-enum class Step { CAMERA, GALLERY, CROP, CAPTION }
+enum class Step { CAMERA, GALLERY, TRIM, CROP, VIDEOCROP, CAPTION }
 
 /** En kreds i destinations-vælgeren. */
 data class Feed(val id: String, val name: String)
@@ -57,6 +65,28 @@ class ComposerModel {
 
     /** Kandidater til @-omtaler, pr. destination. Følger den valgte kreds. */
     var mentionables by mutableStateOf<Map<String, List<MentionCard>>>(emptyMap())
+
+    /* ---- Video ---- */
+
+    /** Videoens fulde længde. Kendes fra MediaStore, så der skal ikke gættes. */
+    var videoVarighedMs by mutableLongStateOf(0L)
+
+    /** Videoens oprejste pixelmål, altså efter rotationen er regnet med. */
+    var videoBredde by mutableIntStateOf(0)
+    var videoHoejde by mutableIntStateOf(0)
+
+    /** Vinduet brugeren har valgt. Længden er fast, kun starten kan flyttes. */
+    var trimStartMs by mutableLongStateOf(0L)
+    var trimLaengdeMs by mutableLongStateOf(MAKS_VIDEO_MS)
+
+    /** Sat når trim-trinnet skal vises, altså når videoen er længere end grænsen. */
+    var visTrim by mutableStateOf(false)
+
+    /** Brugerens video-udsnit i 0 til 1 med top-venstre origo. */
+    var videoUdsnit by mutableStateOf<VideoExport.Udsnit?>(null)
+
+    /** Det format video-beskæreren endte på. Bestemmer output-målet. */
+    var videoFormat by mutableStateOf(Format.STAAENDE)
     var caption by mutableStateOf("")
 
     /** Tændt mens web arbejder, så der ikke kan deles to gange. */
@@ -95,6 +125,10 @@ class ComposerModel {
         valgt = null
         cropped = null
         forbereder = false
+        videoUdsnit = null
+        trimStartMs = 0L
+        trimLaengdeMs = MAKS_VIDEO_MS
+        visTrim = false
         caption = ""
         sharing = false
         pendingBytes = null
@@ -107,6 +141,10 @@ class ComposerModel {
         valgt = null
         forbereder = false
         cropped = null
+        videoUdsnit = null
+        trimStartMs = 0L
+        trimLaengdeMs = MAKS_VIDEO_MS
+        visTrim = false
         caption = ""
         sharing = false
         pendingBytes = null
@@ -117,9 +155,21 @@ class ComposerModel {
         if (value == "ok") close() else sharing = false
     }
 
-    /** Målet for det færdige medie. Præcis de tal iOS bruger. */
-    fun target(): Pair<Int, Int> = when {
+    /**
+     * Output-målet for et minde-udsnit ud fra det VALGTE format, præcis som memTarget på iOS.
+     * En story er altid 9:16 og har intet valg.
+     */
+    fun target(forhold: Float = 0.8f): Pair<Int, Int> = when {
         isStory -> 1080 to 1920
+        kotlin.math.abs(forhold - 1f) < 0.02f -> 1080 to 1080
+        forhold > 1.4f -> 1080 to 566
+        else -> 1080 to 1350
+    }
+
+    /** Målet for et KAMERA-klip: vandret motiv bliver liggende, ellers 4:5. */
+    fun kameraTarget(b: Int, h: Int): Pair<Int, Int> = when {
+        isStory -> 1080 to 1920
+        b > h -> 1080 to 566
         else -> 1080 to 1350
     }
 
