@@ -134,11 +134,12 @@ fun CameraStep(
             animationSpec = tween(400),
             label = "ramme",
         )
-        val topMargen by animateDpAsState(
+        val topMargenRå by animateDpAsState(
             targetValue = if (model.isStory) 0.dp else 106.dp,
             animationSpec = tween(400),
             label = "rammeTop",
         )
+        val topMargen = topMargenRå.coerceAtLeast(0.dp)
 
         Box(
             Modifier

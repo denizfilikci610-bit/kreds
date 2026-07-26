@@ -36,6 +36,9 @@ import androidx.webkit.WebViewFeature
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -88,8 +91,14 @@ class MainActivity : AppCompatActivity() {
     /** Filen kamera-appen skriver til, når web beder om capture="environment". */
     private var cameraOutput: Uri? = null
 
-    /** Systemets indhak, som siden får at vide gennem window.__vfInsets. */
-    private var safeArea: Insets = Insets.NONE
+    /**
+     * Systemets indhak, som siden får at vide gennem window.__vfInsets.
+     *
+     * SKAL være Compose-tilstand. Som almindelig var opdagede de native barer aldrig at
+     * indhakkene kom, og lagde sig derfor efter nul: kreds-baren oven i ordmærket og
+     * fanebjælken helt nede på kanten.
+     */
+    private var safeArea by mutableStateOf(Insets.NONE)
 
     /** Besked-broen til web, den samme kontrakt som iOS bruger. */
     private var bridge: VfBridge? = null

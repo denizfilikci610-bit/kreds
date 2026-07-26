@@ -121,7 +121,9 @@ fun NativeTabBar(
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
-            .padding(bottom = bottomInset)
+            // Samme placering som web-bjælken havde: max(8, indhak - 8) over kanten, så den
+            // ikke klistrer til hjemme-streget.
+            .padding(bottom = maxOf(8.dp, bottomInset - 8.dp))
             .offset(y = yOffset)
             .alpha(alpha)
             .padding(horizontal = 16.dp),
@@ -269,11 +271,14 @@ fun NativeKredsBar(
         if (!model.visible) { søger = false; query = "" }
     }
 
-    val topPad by animateDpAsState(
+    val topPadRå by animateDpAsState(
         targetValue = if (model.compact) 0.dp else 52.dp,
         animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow),
         label = "kredsTop",
     )
+    // En fjeder UNDERSKYDER under målet. Går den under nul, kaster Compose
+    // "Padding must be non-negative" og hele appen går ned. Derfor klemmes den fast.
+    val topPad = topPadRå.coerceAtLeast(0.dp)
     val alpha by animateFloatAsState(
         targetValue = if (model.visible) 1f else 0f,
         animationSpec = tween(180),
