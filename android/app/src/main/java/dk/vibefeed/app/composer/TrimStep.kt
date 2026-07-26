@@ -68,8 +68,11 @@ fun TrimStep(
     }
     DisposableEffect(Unit) { onDispose { afspiller.release() } }
 
-    // Løkken låses til det valgte vindue gennem klipningen, så der ikke skal søges konstant
-    LaunchedEffect(kilde, model.trimStartMs, model.trimLaengdeMs) {
+    // Løkken låses til det valgte vindue gennem klipningen, men KUN når der ikke
+    // scrubbes: under trækket ville hvert delta ellers genopbygge afspilleren og
+    // overtrumfe pausen fra onDragStart, så intet billede nogensinde frøs.
+    LaunchedEffect(kilde, model.trimStartMs, model.trimLaengdeMs, model.scrubber) {
+        if (model.scrubber) return@LaunchedEffect
         afspiller.setMediaItem(
             MediaItem.Builder().setUri(kilde).setClippingConfiguration(
                 MediaItem.ClippingConfiguration.Builder()
@@ -172,9 +175,11 @@ fun TrimStep(
                                 grund = model.trimStartMs
                                 samlet = 0f
                                 // Billedet fryser mens man scrubber, så man kan se hvor man er
+                                model.scrubber = true
                                 afspiller.pause()
                             },
-                            onDragEnd = { afspiller.play() },
+                            onDragEnd = { model.scrubber = false },
+                            onDragCancel = { model.scrubber = false },
                         ) { _, træk ->
                             // detectDragGestures giver et DELTA pr. hændelse, ikke den samlede
                             // flytning som på iOS. Derfor lægges det sammen her.

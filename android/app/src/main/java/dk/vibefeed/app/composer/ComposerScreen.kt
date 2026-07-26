@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -75,23 +76,36 @@ fun ComposerScreen(
     val context = LocalContext.current
     val cam = remember { CameraState() }
 
+    // Som iOS: fotoadgangen spørges og biblioteket hentes STRAKS ved åbning, mens
+    // kameraet vises. Så er gitteret fyldt i samme øjeblik galleriet åbnes, og kameraets
+    // 48 dp-miniature kan vise det nyeste billede fra første besøg.
+    val bibliotekSpørg = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        if (medieAdgang(context) != Adgang.NÆGTET) {
+            Thread { model.seneste = Media.recent(context) }.start()
+        }
+    }
+    LaunchedEffect(model.open) {
+        if (!model.open) return@LaunchedEffect
+        if (medieAdgang(context) == Adgang.NÆGTET) {
+            bibliotekSpørg.launch(medieTilladelser())
+        } else {
+            model.seneste = withContext(Dispatchers.IO) { Media.recent(context) }
+        }
+    }
+
     // Tankens "upload straks": intet beskærings- eller billedtekst-trin. Billeder
-    // nedskaleres til 1440/JPEG 87, videoer klippes KUN hvis trim-vinduet er kortere end
-    // klippet, ellers sendes de som de er, i egne mål, som på iPhone.
+    // nedskaleres til 1440/JPEG 87. Videoer går ALTID gennem eksporten som på iPhone,
+    // også uden klip: re-encodningen til H.264/AAC er en del af kontrakten, en rå fil
+    // fra galleriet kunne være HEVC eller noget andet feedet ikke kan afspille.
     LaunchedEffect(model.uploadStraks) {
         if (!model.uploadStraks) return@LaunchedEffect
         val p = model.picked ?: run { model.uploadStraks = false; return@LaunchedEffect }
         if (!p.isVideo) {
             val bytes = withContext(Dispatchers.IO) { Media.prepareCompose(context, p.uri) }
             model.uploadStraks = false
-            if (bytes != null) onShare(bytes, false, "", model.dest)
-            return@LaunchedEffect
-        }
-        val skalKlippes = model.videoVarighedMs > model.trimLaengdeMs + 50
-        if (!skalKlippes) {
-            val bytes = withContext(Dispatchers.IO) { Media.readBytes(context, p.uri) }
-            model.uploadStraks = false
-            if (bytes != null) onShare(bytes, true, "", model.dest)
+            if (bytes != null && model.open) onShare(bytes, false, "", model.dest)
             return@LaunchedEffect
         }
         eksporterVideo(
@@ -99,7 +113,7 @@ fun ComposerScreen(
             udsnitOgMaal = false, // kun klip: ingen beskæring, videoens egne mål
         ) { bytes ->
             model.uploadStraks = false
-            if (bytes != null) onShare(bytes, true, "", model.dest)
+            if (bytes != null && model.open) onShare(bytes, true, "", model.dest)
         }
     }
 
@@ -361,6 +375,10 @@ private fun videre(model: ComposerModel, context: Context) {
     val v = model.valgt ?: return
     if (model.forbereder) return
     model.picked = v
+    // Rester fra et TIDLIGERE valg må aldrig overleve: ellers viser billedteksten
+    // billede A's udsnit efter man har fortrudt og valgt video B (iOS nulstiller i goNext).
+    model.cropped = null
+    model.videoUdsnit = null
     // En tanke: intet beskærings-trin, billedet uploades straks (maks 1440, JPEG 87).
     if (!v.isVideo && model.purpose == Purpose.COMPOSE) {
         model.uploadStraks = true
@@ -368,17 +386,25 @@ private fun videre(model: ComposerModel, context: Context) {
     }
     if (!v.isVideo) { model.step = Step.CROP; return }
 
-    // Varigheden kender vi allerede fra MediaStore. Målene læses, så beskæreren og
-    // eksporten regner på videoens OPREJSTE mål og ikke på de roterede.
-    val (b, h, meta) = VideoExport.mål(context, v.uri)
-    val varighed = if (v.durationMs > 0) v.durationMs else meta
-    model.videoBredde = if (b > 0) b else 1080
-    model.videoHoejde = if (h > 0) h else 1920
-    model.videoVarighedMs = varighed
-    model.trimStartMs = 0L
-    model.trimLaengdeMs = min(MAKS_VIDEO_MS, max(100L, varighed))
-    model.visTrim = varighed > TRIM_GRAENSE_MS
-    model.step = if (model.visTrim) Step.TRIM else { efterVideo(model); return }
+    // Varigheden kender vi allerede fra MediaStore. Målene læses så beskæreren og
+    // eksporten regner på videoens OPREJSTE mål, men IKKE på main-tråden: for et
+    // cloud-medie (Google Fotos) kan setDataSource blokere i sekunder.
+    model.forbereder = true
+    Thread {
+        val (b, h, meta) = VideoExport.mål(context, v.uri)
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            model.forbereder = false
+            if (model.picked !== v || !model.open) return@post
+            val varighed = if (v.durationMs > 0) v.durationMs else meta
+            model.videoBredde = if (b > 0) b else 1080
+            model.videoHoejde = if (h > 0) h else 1920
+            model.videoVarighedMs = varighed
+            model.trimStartMs = 0L
+            model.trimLaengdeMs = min(MAKS_VIDEO_MS, max(100L, varighed))
+            model.visTrim = varighed > TRIM_GRAENSE_MS
+            if (model.visTrim) model.step = Step.TRIM else efterVideo(model)
+        }
+    }.start()
 }
 
 /** Efter trim: en tanke uploader straks, en story går til billedteksten, et minde beskæres. */
@@ -399,8 +425,15 @@ private fun CropStep(model: ComposerModel, context: Context, topPad: Dp, bottomP
 
     LaunchedEffect(valgt.uri) {
         model.forbereder = true
-        billede = withContext(Dispatchers.IO) { Media.loadForCrop(context, valgt.uri) }
+        val b = withContext(Dispatchers.IO) { Media.loadForCrop(context, valgt.uri) }
         model.forbereder = false
+        // Kan billedet ikke afkodes (korrupt fil, dødt cloud-medie), må brugeren ALDRIG
+        // strande på en evig spinner uden knapper: tilbage til der hvor valget kom fra.
+        if (b == null) {
+            model.step = if (valgt.uri.scheme == "file") Step.CAMERA else Step.GALLERY
+        } else {
+            billede = b
+        }
     }
 
     val b = billede
@@ -457,10 +490,13 @@ private fun CaptionStep(
             // Bevidst ingen streg her: renere look om kreds-vælgeren
             visSkillelinje = false,
             onCancel = {
-                // Ét trin tilbage ad gangen, i den rækkefølge iOS bruger
+                // Ét trin tilbage ad gangen, i PRÆCIS iOS' rækkefølge: kamera-medie først,
+                // så beskåret billede, så beskåret video, så trim, ellers galleriet.
                 model.step = when {
-                    model.cropped != null -> Step.CROP
                     valgt.uri.scheme == "file" -> Step.CAMERA
+                    model.cropped != null -> Step.CROP
+                    model.videoUdsnit != null -> Step.VIDEOCROP
+                    model.visTrim -> Step.TRIM
                     else -> Step.GALLERY
                 }
             },
@@ -474,7 +510,9 @@ private fun CaptionStep(
                     // der sendte et 30-sekunders klip uklippet.
                     eksporterVideo(model, context, valgt) { bytes ->
                         arbejder = false
-                        if (bytes != null) onShare(bytes, true, model.caption, model.dest)
+                        if (bytes != null && model.open) {
+                            onShare(bytes, true, model.caption, model.dest)
+                        }
                     }
                     return@ComposerNavBar
                 }
@@ -496,7 +534,11 @@ private fun CaptionStep(
                     }
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
                         arbejder = false
-                        if (bytes != null) onShare(bytes, false, model.caption, model.dest)
+                        // Lukkede brugeren komposeren mens der blev kodet (tilbage-knappen),
+                        // må det sene resultat ALDRIG poste et opslag.
+                        if (bytes != null && model.open) {
+                            onShare(bytes, false, model.caption, model.dest)
+                        }
                     }
                 }.start()
             },
@@ -545,17 +587,30 @@ private fun CaptionStep(
                     }
                 }
 
+                // TextFieldValue, ikke String: ellers hopper markøren til position 0
+                // når en mention-chip skriver teksten om. Fælden fra spec'en.
+                var felt by remember {
+                    mutableStateOf(
+                        androidx.compose.ui.text.input.TextFieldValue(
+                            model.caption,
+                            androidx.compose.ui.text.TextRange(model.caption.length),
+                        )
+                    )
+                }
                 BasicTextField(
-                    value = model.caption,
-                    onValueChange = { model.caption = it },
+                    value = felt,
+                    onValueChange = { felt = it; model.caption = it.text },
                     textStyle = TextStyle(color = blæk, fontSize = 16.sp),
                     cursorBrush = SolidColor(BRAND),
                     maxLines = 5,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
+                    ),
                     modifier = Modifier.fillMaxWidth()
                         .padding(horizontal = 16.dp)
                         .padding(top = 14.dp, bottom = 12.dp),
                     decorationBox = { indre ->
-                        if (model.caption.isEmpty()) {
+                        if (felt.text.isEmpty()) {
                             Text(
                                 model.labels.or("captionPlaceholder", "Skriv en tekst"),
                                 color = blæk.copy(alpha = 0.45f),
@@ -566,7 +621,13 @@ private fun CaptionStep(
                     },
                 )
 
-                MentionStrip(model, blæk)
+                MentionStrip(model, blæk) { nyTekst ->
+                    felt = androidx.compose.ui.text.input.TextFieldValue(
+                        nyTekst,
+                        androidx.compose.ui.text.TextRange(nyTekst.length),
+                    )
+                    model.caption = nyTekst
+                }
                 Spacer(Modifier.height(bottomPad))
             }
         }
@@ -583,6 +644,10 @@ private fun Preview(model: ComposerModel, valgt: Picked, modifier: Modifier) {
             contentScale = ContentScale.Fit,
             modifier = modifier,
         )
+    } else if (valgt.isVideo) {
+        // Videoen SPILLER i loop med lyd, som på iPhone; et stillbillede med ▶ var
+        // ikke en forhåndsvisning.
+        VideoLoopPreview(valgt.uri, modifier)
     } else {
         Box(modifier, contentAlignment = Alignment.Center) {
             AsyncImage(
@@ -591,11 +656,32 @@ private fun Preview(model: ComposerModel, valgt: Picked, modifier: Modifier) {
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),
             )
-            if (valgt.isVideo) {
-                Text("▶", color = Color.White.copy(alpha = 0.85f), fontSize = 34.sp)
-            }
         }
     }
+}
+
+@Composable
+private fun VideoLoopPreview(uri: android.net.Uri, modifier: Modifier) {
+    val context = LocalContext.current
+    val player = remember(uri) {
+        androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
+            setMediaItem(androidx.media3.common.MediaItem.fromUri(uri))
+            repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE
+            prepare()
+            playWhenReady = true
+        }
+    }
+    DisposableEffect(player) { onDispose { player.release() } }
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            androidx.media3.ui.PlayerView(ctx).apply {
+                useController = false
+                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                this.player = player
+            }
+        },
+    )
 }
 
 @Composable
@@ -629,7 +715,7 @@ private fun DestPille(
 
 /** Forslag mens man skriver et @-token. Følger den valgte destination. */
 @Composable
-private fun MentionStrip(model: ComposerModel, blæk: Color) {
+private fun MentionStrip(model: ComposerModel, blæk: Color, onInsert: (String) -> Unit) {
     val træf = remember(model.caption, model.dest, model.mentionables) {
         Mentions.hits(model.caption, model.aktuelleMentions)
     }
@@ -646,7 +732,7 @@ private fun MentionStrip(model: ComposerModel, blæk: Color) {
                     .clip(CircleShape)
                     .background(blæk.copy(alpha = 0.08f))
                     .border(1.dp, blæk.copy(alpha = 0.10f), CircleShape)
-                    .clickable { model.caption = Mentions.insert(model.caption, kort.handle) }
+                    .clickable { onInsert(Mentions.insert(model.caption, kort.handle)) }
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -694,8 +780,13 @@ private fun eksporterVideo(
     udsnitOgMaal: Boolean = true,
     færdig: (ByteArray?) -> Unit,
 ) {
+    // En story-video fra galleriet beholder sine EGNE mål og beskæres ALDRIG, som iOS:
+    // den trimmes kun. Kamera-story er allerede 9:16 gennem kameraTarget.
+    val storyUdenBeskæring =
+        model.isStory && valgt.uri.scheme != "file" && model.videoUdsnit == null
+
     val (b, h) = when {
-        !udsnitOgMaal -> model.videoBredde to model.videoHoejde
+        !udsnitOgMaal || storyUdenBeskæring -> model.videoBredde to model.videoHoejde
         model.videoUdsnit != null ->
             // Brugeren har selv beskåret: målet følger det format der blev valgt
             model.videoFormat.let { it.bredde to it.hoejde }
@@ -706,8 +797,14 @@ private fun eksporterVideo(
     }
 
     // Uden brugerudsnit laves et centreret dæk-udsnit, så intet strækkes
-    val udsnit = if (!udsnitOgMaal) null else model.videoUdsnit
+    val udsnit = if (!udsnitOgMaal || storyUdenBeskæring) null else model.videoUdsnit
         ?: VideoExport.daekUdsnit(model.videoBredde, model.videoHoejde, b, h)
+
+    // Et sent resultat fra en lukket (eller lukket og genåbnet) komposer smides væk
+    val seq = model.reqSeq
+    val lever: (ByteArray?) -> Unit = { bytes ->
+        færdig(if (model.reqSeq == seq) bytes else null)
+    }
 
     var svaret = false
     val transformer = VideoExport.start(
@@ -723,14 +820,14 @@ private fun eksporterVideo(
     ) { fil ->
         if (svaret) return@start
         svaret = true
-        færdig(fil?.readBytes())
+        lever(fil?.readBytes())
     }
 
     android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
         if (!svaret) {
             svaret = true
             runCatching { transformer.cancel() }
-            færdig(null)
+            lever(null)
         }
     }, VideoExport.TIMEOUT_MS)
 }

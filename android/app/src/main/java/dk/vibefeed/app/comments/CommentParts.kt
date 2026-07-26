@@ -15,9 +15,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -90,14 +94,19 @@ fun KommentarRække(
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(start = if (række.indent > 0) indent else 0.dp)
+            // Fremhævningen spænder over HELE rækken, 8 dp fra kanterne uanset niveau:
+            // indrykningen bor derfor INDE i formen, som på iPhone. Ellers startede
+            // flashen på et indrykket svar 42 dp inde og var 34 dp smallere.
             .padding(horizontal = 8.dp)
             // Formen er ALTID der, kun alfaen skifter: det er dét der gør udtoningen mulig.
             .clip(RoundedCornerShape(14.dp))
             .background(blæk.copy(alpha = fremhævAlpha)),
     ) {
         Row(
-            Modifier.padding(horizontal = 8.dp).padding(vertical = 8.dp),
+            Modifier
+                .padding(start = if (række.indent > 0) indent else 0.dp)
+                .padding(horizontal = 8.dp)
+                .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.Top,
         ) {
@@ -203,10 +212,13 @@ fun KommentarComposer(
     val sekundær = blæk.copy(alpha = 0.6f)
     val fokus = remember { FocusRequester() }
 
+    // Første komposition tæller IKKE: focusToken ryddes ikke ved close, så en genåbning
+    // af arket ville ellers rejse tastaturet uopfordret.
+    var sidsteFokusToken by remember { mutableIntStateOf(model.focusToken) }
     LaunchedEffect(model.focusToken) {
-        if (model.focusToken > 0 && model.canPost) {
-            runCatching { fokus.requestFocus() }
-        }
+        if (model.focusToken == sidsteFokusToken) return@LaunchedEffect
+        sidsteFokusToken = model.focusToken
+        if (model.canPost) runCatching { fokus.requestFocus() }
     }
 
     val sendTekst: (String) -> Unit = { tekst ->
@@ -219,17 +231,22 @@ fun KommentarComposer(
         }
     }
 
+    // Hårstregen ligger på composerens ABSOLUTTE overkant som iOS' overlay, derfor
+    // ingen top-polstring på selve Column'en.
     Column(
-        Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 10.dp),
+        Modifier.fillMaxWidth().padding(bottom = 10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(Modifier.fillMaxWidth().height(0.5.dp).background(blæk.copy(alpha = 0.1f)))
 
         // Mention-strip, kun med kandidater og kun når man overhovedet kan poste.
+        // Vandret scroll: seks kandidater med lange handles løber ellers ud over kanten.
         val hits = if (model.canPost) Mentions.hits(model.text, model.mentionables) else emptyList()
         if (hits.isNotEmpty()) {
             Row(
-                Modifier.padding(horizontal = 12.dp),
+                Modifier
+                    .horizontalScroll(androidx.compose.foundation.rememberScrollState())
+                    .padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 hits.forEach { kandidat ->
@@ -304,6 +321,8 @@ fun KommentarComposer(
                                 sendTekst(e)
                                 model.replyingToId = null
                                 model.replyingToHandle = ""
+                                // Listen ruller mod bunden som efter et almindeligt svar
+                                model.scrollToken++
                             },
                     )
                 }
@@ -314,7 +333,7 @@ fun KommentarComposer(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
+                    .padding(horizontal = 16.dp)
                     .padding(bottom = bundPolstring),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -338,6 +357,10 @@ fun KommentarComposer(
                         maxLines = 4,
                         textStyle = TextStyle(fontSize = 15.sp, color = blæk),
                         cursorBrush = SolidColor(BRAND),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            capitalization =
+                                androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
+                        ),
                         modifier = Modifier.fillMaxWidth().focusRequester(fokus),
                     )
                 }

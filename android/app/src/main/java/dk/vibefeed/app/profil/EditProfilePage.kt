@@ -104,6 +104,7 @@ fun EditProfilePageHost(
     blæk: Color,
     baggrund: Color,
     topIndhak: Dp,
+    bundIndhak: Dp,
     onEvent: (JSONObject) -> Unit,
     onAvatar: (String) -> Unit,
     onBanner: (String) -> Unit,
@@ -119,6 +120,13 @@ fun EditProfilePageHost(
         // Beskæreren: hvilken flade der beskæres til, og billedet der er hentet ind.
         var cropBillede by remember { mutableStateOf<ImageBitmap?>(null) }
         var cropErAvatar by remember { mutableStateOf(true) }
+
+        // Tilbage-knappen skal kun lukke BESKÆREREN når den er fremme, aldrig hele
+        // siden: ellers kasseres alle stagede ændringer. Modellen bærer signalet.
+        LaunchedEffect(cropBillede) { model.cropperAaben = cropBillede != null }
+        LaunchedEffect(model.cropLukTick) {
+            if (model.cropLukTick > 0) cropBillede = null
+        }
 
         fun glidUd(hurtigt: Boolean) {
             scope.launch {
@@ -243,7 +251,9 @@ fun EditProfilePageHost(
                         annullerLabel = model.cancelLabel,
                         brugLabel = model.useLabel,
                         topPad = topIndhak,
-                        bottomPad = 16.dp,
+                        // Det ægte bund-indhak, som minde-beskæreren: 16 dp fast lagde
+                        // knapperne under hjemme-streget på kant-til-kant-skærme.
+                        bottomPad = maxOf(bundIndhak, 16.dp),
                         onCancel = { cropBillede = null },
                         onDone = { bitmap ->
                             scope.launch {
@@ -756,9 +766,12 @@ private fun SprogVaelger(model: EsheetModel, blæk: Color, baggrund: Color) {
 
     val aktivNavn = model.langs.firstOrNull { it.first == model.lang }?.second ?: model.lang
     Box(Modifier.padding(horizontal = 16.dp)) {
+        // Fuldbredde-bjælke med chevronen skubbet ud til højre kant, som iOS' HStack
+        // med Spacer. En indholdsbred chip lignede en anden kontrol.
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
+                .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
                 .background(blæk.copy(alpha = 0.06f))
                 .clickable(
@@ -768,7 +781,7 @@ private fun SprogVaelger(model: EsheetModel, blæk: Color, baggrund: Color) {
                 .padding(horizontal = 14.dp, vertical = 12.dp),
         ) {
             Text(aktivNavn, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = blæk)
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.weight(1f))
             Box(Modifier.alpha(0.6f)) { VfIcon(VfIcons.ChevronRight, blæk, 12.dp) }
         }
         androidx.compose.material3.DropdownMenu(

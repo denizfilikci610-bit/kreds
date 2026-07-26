@@ -24,6 +24,12 @@ class EsheetModel {
     var open by mutableStateOf(false)
         private set
 
+    /** Sand mens den native beskærer er fremme: tilbage-knappen skal kun lukke DEN. */
+    var cropperAaben by mutableStateOf(false)
+
+    /** Bump beder siden om at lukke beskæreren (systemets tilbage-knap). */
+    var cropLukTick by mutableIntStateOf(0)
+
     /** Gemmes, bruges aldrig. */
     var token = 0
         private set

@@ -118,8 +118,9 @@ fun PostPageHost(
             if (model.open) {
                 synlig = true
                 dragX.animateTo(0f, tween(280, easing = EaseOut))
-            } else if (synlig && dragX.value == 0f) {
-                // Uopfordret close (opslaget forsvandt, logout): glid ud uden dismiss.
+            } else if (synlig) {
+                // Uopfordret close (opslaget forsvandt, logout): glid ud uden dismiss,
+                // OGSÅ midt i ind-animationen, ellers fryser siden halvvejs på skærmen.
                 dragX.animateTo(breddePx, tween(280, easing = EaseOut))
                 synlig = false
             }
@@ -176,7 +177,14 @@ fun PostPageHost(
                                 scope.launch { dragX.animateTo(0f, spring(0.85f, 440f)) }
                             }
                         },
-                        onDragCancel = { iGang = false },
+                        onDragCancel = {
+                            // Et annulleret træk skal fjedre tilbage, ellers står siden
+                            // forskudt på den delvise offset.
+                            if (iGang) {
+                                iGang = false
+                                scope.launch { dragX.animateTo(0f, spring(0.85f, 440f)) }
+                            }
+                        },
                     )
                 },
         ) {
@@ -212,22 +220,31 @@ fun PostPageHost(
 
             // Deep-link-fremhævning, samme to parallelle timere som kommentar-arket.
             // +1 for opslags-blokken der ligger som første element i listen.
+            // Timerne bor i deres EGEN effekt, nøglet på målet: web pusher et snapshot
+            // ved hver feed-render, og lå timerne i token-effekten, blev de annulleret
+            // af det næste snapshot før flashen nåede at falme.
+            var fremhævMål by remember { mutableStateOf<Pair<String, Int>?>(null) }
             LaunchedEffect(model.token) {
                 val id = model.focusId ?: return@LaunchedEffect
                 val idx = model.comments.indexOfFirst { it.id == id }
                 if (idx < 0) return@LaunchedEffect
                 model.focusId = null
+                fremhævMål = id to idx
+            }
+            LaunchedEffect(fremhævMål) {
+                val (id, idx) = fremhævMål ?: return@LaunchedEffect
                 fremhævet = id
                 fremhævAlpha.snapTo(0.08f)
                 launch {
                     delay(300)
-                    listState.animateScrollToItem(idx + 1)
+                    // Kommentaren lander omkring MIDTEN af viewporten, som iOS' .center
+                    val vp = listState.layoutInfo.viewportEndOffset
+                    listState.animateScrollToItem(idx + 1, scrollOffset = -vp / 3)
                 }
-                launch {
-                    delay(2200)
-                    fremhævAlpha.animateTo(0f, tween(400))
-                    fremhævet = null
-                }
+                delay(2200)
+                fremhævAlpha.animateTo(0f, tween(400))
+                fremhævet = null
+                fremhævMål = null
             }
 
             LaunchedEffect(model.scrollToken) {
@@ -253,6 +270,21 @@ fun PostPageHost(
             LazyColumn(state = listState, modifier = Modifier.weight(1f).fillMaxWidth()) {
                 item(key = "__post") {
                     model.post?.let { OpslagsBlok(it, blæk, model, send) }
+                }
+                if (model.comments.isEmpty() && model.post != null) {
+                    // Tom tråd: samme midterlagte tekst som iOS (padding vertical 34)
+                    item(key = "__tom") {
+                        Box(
+                            Modifier.fillMaxWidth().padding(vertical = 34.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                model.labels.empty,
+                                fontSize = 14.sp,
+                                color = blæk.copy(alpha = 0.55f),
+                            )
+                        }
+                    }
                 }
                 items(model.comments.size, key = { model.comments[it].id }) { i ->
                     val række = model.comments[i]
@@ -281,7 +313,9 @@ fun PostPageHost(
                 }
             }
 
-            KommentarComposer(model, blæk, maxOf(bundIndhak - 10.dp, 0.dp), send)
+            // Det ÆGTE bund-indhak: iOS lægger insets.bottom oven i composerens interne
+            // polstring, minus 10 lagde feltet 10 dp for lavt.
+            KommentarComposer(model, blæk, bundIndhak, send)
         }
     }
 }
@@ -514,11 +548,12 @@ private fun Afstemning(
 
     Column(Modifier.padding(top = 6.dp)) {
         if (poll.head.isNotEmpty()) {
+            // Blækfarven, ikke sekundær: iOS tegner governance-overskriften i primary
             Text(
                 poll.head,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Black,
-                color = sekundær,
+                color = blæk,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
         }

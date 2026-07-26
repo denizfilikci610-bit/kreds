@@ -99,6 +99,17 @@ class ComposerModel {
      */
     var uploadStraks by mutableStateOf(false)
 
+    /** Sand mens trim-vinduet trækkes: afspilleren skal stå stille og fryse billedet. */
+    var scrubber by mutableStateOf(false)
+
+    /**
+     * Sekvensnummer for den aktuelle åbning. En langsom eksport der først bliver færdig
+     * efter at komposeren er lukket (eller lukket og genåbnet), må ALDRIG poste sit sene
+     * resultat: kaldere husker nummeret ved start og smider svaret væk hvis det er skiftet.
+     */
+    var reqSeq: Int = 0
+        private set
+
     /** Det færdigt beskårne billede. Sat når beskæreren er brugt. */
     var cropped by mutableStateOf<android.graphics.Bitmap?>(null)
 
@@ -107,6 +118,7 @@ class ComposerModel {
     var pendingMime: String = "image/jpeg"
 
     fun start(json: JSONObject) {
+        reqSeq += 1
         purpose = when (json.optString("purpose")) {
             "story" -> Purpose.STORY
             "compose" -> Purpose.COMPOSE
@@ -139,11 +151,13 @@ class ComposerModel {
         caption = ""
         sharing = false
         uploadStraks = false
+        scrubber = false
         pendingBytes = null
         open = true
     }
 
     fun close() {
+        reqSeq += 1
         open = false
         picked = null
         valgt = null
@@ -156,6 +170,7 @@ class ComposerModel {
         caption = ""
         sharing = false
         uploadStraks = false
+        scrubber = false
         pendingBytes = null
     }
 

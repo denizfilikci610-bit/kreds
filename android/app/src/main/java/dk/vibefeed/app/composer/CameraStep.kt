@@ -12,6 +12,7 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recorder
@@ -101,14 +102,67 @@ fun CameraStep(
     var optagelse by remember { mutableStateOf<Recording?>(null) }
     var fokusPunkt by remember { mutableStateOf<Offset?>(null) }
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
+    var provider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
-    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        cam.authorized = ok
+    // Forlader man kamera-trinnet (galleri, beskærer, luk), SKAL sessionen slippes:
+    // ellers holder appen kameraet (og privatlivs-prikken) åbent i baggrunden.
+    DisposableEffect(Unit) {
+        onDispose {
+            runCatching { optagelse?.stop() }
+            optagelse = null
+            runCatching { kamera?.cameraControl?.enableTorch(false) }
+            runCatching { provider?.unbindAll() }
+        }
+    }
+
+    // Aktiviteten er portræt-låst som iPhone-appen, så capture-rotationen skal følge
+    // TELEFONENS fysiske retning i hånden: kun sådan bliver et vandret motiv liggende.
+    DisposableEffect(billedeUd, videoUd) {
+        val lytter = object : android.view.OrientationEventListener(context) {
+            override fun onOrientationChanged(grader: Int) {
+                if (grader == ORIENTATION_UNKNOWN) return
+                val rotation = when {
+                    grader >= 315 || grader < 45 -> android.view.Surface.ROTATION_0
+                    grader < 135 -> android.view.Surface.ROTATION_270
+                    grader < 225 -> android.view.Surface.ROTATION_180
+                    else -> android.view.Surface.ROTATION_90
+                }
+                billedeUd?.targetRotation = rotation
+                videoUd?.targetRotation = rotation
+            }
+        }
+        lytter.enable()
+        onDispose { lytter.disable() }
+    }
+
+    // Kamera og mikrofon spørges SAMMEN, som iOS. Mikrofonen er valgfri: nægtes den,
+    // optages der stadig video, blot uden lyd, mens kameraet er hårdt påkrævet.
+    val ask = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { svar ->
+        cam.authorized = svar[Manifest.permission.CAMERA] == true ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
     }
     LaunchedEffect(Unit) {
         cam.authorized = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
             android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (!cam.authorized) ask.launch(Manifest.permission.CAMERA)
+        if (!cam.authorized) {
+            ask.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
+        }
+    }
+
+    // Kommer man tilbage fra systemindstillingerne med nyt ja, skal kameraet vågne selv
+    DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                cam.authorized = ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.CAMERA
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
 
     // Fokus-firkanten forsvinder igen efter et sekund, som på iOS
@@ -175,33 +229,45 @@ fun CameraStep(
                             previewView = it
                         }
                     },
-                    update = { view ->
-                        val future = ProcessCameraProvider.getInstance(context)
-                        future.addListener({
-                            val provider = future.get()
-                            val preview = Preview.Builder().build()
-                                .also { it.surfaceProvider = view.surfaceProvider }
-                            val billede = ImageCapture.Builder()
-                                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                                .build()
-                            val optager = Recorder.Builder()
-                                .setQualitySelector(QualitySelector.from(Quality.FHD))
-                                .build()
-                            val video = VideoCapture.withOutput(optager)
-                            val vælger = if (cam.back) CameraSelector.DEFAULT_BACK_CAMERA
-                            else CameraSelector.DEFAULT_FRONT_CAMERA
-                            runCatching {
-                                provider.unbindAll()
-                                kamera = provider.bindToLifecycle(
-                                    lifecycleOwner, vælger, preview, billede, video,
-                                )
-                                billedeUd = billede
-                                videoUd = video
-                                kamera?.cameraControl?.setZoomRatio(cam.zoom)
-                            }
-                        }, ContextCompat.getMainExecutor(context))
-                    },
                 )
+                // Bind sessionen ÉN gang per kamera-valg, aldrig i AndroidViews update:
+                // dér kørte den ved hver rekomposition, så et knib-zoom rev hele sessionen
+                // ned og op for hvert gestus-delta.
+                LaunchedEffect(previewView, cam.back) {
+                    val view = previewView ?: return@LaunchedEffect
+                    val future = ProcessCameraProvider.getInstance(context)
+                    future.addListener({
+                        val p = runCatching { future.get() }.getOrNull() ?: return@addListener
+                        provider = p
+                        val preview = Preview.Builder().build()
+                            .also { it.surfaceProvider = view.surfaceProvider }
+                        val billede = ImageCapture.Builder()
+                            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                            .build()
+                        // FHD med fald tilbage: uden FallbackStrategy fejler bindingen
+                        // stumt på enheder der ikke kan optage 1080p.
+                        val optager = Recorder.Builder()
+                            .setQualitySelector(
+                                QualitySelector.from(
+                                    Quality.FHD,
+                                    FallbackStrategy.higherQualityOrLowerThan(Quality.SD),
+                                )
+                            )
+                            .build()
+                        val video = VideoCapture.withOutput(optager)
+                        val vælger = if (cam.back) CameraSelector.DEFAULT_BACK_CAMERA
+                        else CameraSelector.DEFAULT_FRONT_CAMERA
+                        runCatching {
+                            p.unbindAll()
+                            kamera = p.bindToLifecycle(
+                                lifecycleOwner, vælger, preview, billede, video,
+                            )
+                            billedeUd = billede
+                            videoUd = video
+                            kamera?.cameraControl?.setZoomRatio(cam.zoom)
+                        }
+                    }, ContextCompat.getMainExecutor(context))
+                }
                 fokusPunkt?.let { p ->
                     Box(
                         Modifier
@@ -216,7 +282,18 @@ fun CameraStep(
                     )
                 }
             } else {
-                NægtetPanel(model) { ask.launch(Manifest.permission.CAMERA) }
+                // Efter to afslag viser Android slet ingen dialog mere, så knappen fører
+                // til appens indstillinger, hvor tilladelsen faktisk kan gives igen.
+                NægtetPanel(model) {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(
+                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                android.net.Uri.fromParts("package", context.packageName, null),
+                            )
+                        )
+                    }
+                }
             }
 
             // Tynd ramme om optageområdet, kun for minder
@@ -257,7 +334,11 @@ fun CameraStep(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                IkonKnap(if (cam.flashOn) "⚡" else "⚡̸") { cam.flashOn = !cam.flashOn }
+                IkonKnap(if (cam.flashOn) "⚡" else "⚡̸") {
+                    cam.flashOn = !cam.flashOn
+                    // Midt i en optagelse ER blitzen lygten, så den skal følge med straks
+                    if (cam.recording) kamera?.cameraControl?.enableTorch(cam.flashOn)
+                }
             }
 
             Spacer(Modifier.weight(1f))
@@ -313,7 +394,10 @@ fun CameraStep(
                     },
                 )
                 Spacer(Modifier.weight(1f))
+                // Vend-knappen er død mens der optages: et kameraskift midt i en
+                // optagelse ville rive sessionen ned under Recorderen.
                 IkonKnap("⟳") {
+                    if (cam.recording) return@IkonKnap
                     cam.back = !cam.back
                     cam.zoom = 1f
                 }
@@ -516,8 +600,14 @@ private fun startOptagelse(
     val dir = File(context.cacheDir, "captures").apply { mkdirs() }
     val fil = File(dir, "video_${System.nanoTime()}.mp4")
     val output = androidx.camera.video.FileOutputOptions.Builder(fil).build()
+    // Lyd som på iPhone, men kun når mikrofonen faktisk er givet: withAudioEnabled uden
+    // tilladelsen kaster SecurityException.
+    val måOptageLyd = ContextCompat.checkSelfPermission(
+        context, Manifest.permission.RECORD_AUDIO
+    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
     return runCatching {
         videoUd.output.prepareRecording(context, output)
+            .apply { if (måOptageLyd) withAudioEnabled() }
             .start(ContextCompat.getMainExecutor(context)) { event ->
                 if (event is VideoRecordEvent.Finalize) {
                     onFærdig()

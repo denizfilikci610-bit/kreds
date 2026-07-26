@@ -35,6 +35,7 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -120,6 +121,14 @@ class MainActivity : AppCompatActivity() {
      */
     private var safeArea by mutableStateOf(Insets.NONE)
 
+    /** Tastaturets højde i px. Root polstres med den, så bund-barerne skal skubbes
+     *  tilbage NED bag tastaturet for at stå stille, som på iPhone. */
+    private var imeBottom by mutableStateOf(0)
+
+    /** Temafarverne som Compose-tilstand, så barerne følger et lys/mørk-skift. */
+    private var inkArgb by mutableStateOf(0xFF161616.toInt())
+    private var bgArgb by mutableStateOf(0xFFFAF9F6.toInt())
+
     /** Besked-broen til web, den samme kontrakt som iOS bruger. */
     private var bridge: VfBridge? = null
 
@@ -179,6 +188,14 @@ class MainActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_main)
 
+        // Coil skal kunne tegne video-miniaturer (galleri-gitteret, forhåndsvisninger).
+        // Uden dekoderen er alle video-flader blanke.
+        coil.Coil.setImageLoader(
+            coil.ImageLoader.Builder(this)
+                .components { add(coil.decode.VideoFrameDecoder.Factory()) }
+                .build()
+        )
+
         root = findViewById(R.id.root)
         web = findViewById(R.id.web)
         overlay = findViewById(R.id.native_overlay)
@@ -193,8 +210,10 @@ class MainActivity : AppCompatActivity() {
 
         if (savedInstanceState == null) {
             web.loadUrl(linkFrom(intent) ?: START_URL)
-        } else {
-            web.restoreState(savedInstanceState)
+        } else if (web.restoreState(savedInstanceState) == null) {
+            // restoreState MÅ fejle (beskåret eller ugyldig state), og uden fallback
+            // stod appen så permanent blank.
+            web.loadUrl(START_URL)
         }
 
         // Startet af et notifikations-tap (kold start): payloaden venter til web er klar.
@@ -261,6 +280,7 @@ class MainActivity : AppCompatActivity() {
             val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
             view.setPadding(0, 0, 0, ime.bottom)
+            imeBottom = ime.bottom
             safeArea = Insets.of(
                 maxOf(bars.left, cutout.left),
                 maxOf(bars.top, cutout.top),
@@ -292,6 +312,10 @@ class MainActivity : AppCompatActivity() {
         val bg = ContextCompat.getColor(this, R.color.vf_bg)
         root.setBackgroundColor(bg)
         web.setBackgroundColor(bg)
+        // Compose-tilstand: ellers stod de native barer i den GAMLE tone efter et
+        // lys/mørk-skift, for configChanges betyder at aktiviteten ikke genskabes.
+        bgArgb = bg
+        inkArgb = ContextCompat.getColor(this, R.color.vf_ink)
         val light = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) !=
             Configuration.UI_MODE_NIGHT_YES
         WindowInsetsControllerCompat(window, root).apply {
@@ -351,6 +375,9 @@ class MainActivity : AppCompatActivity() {
             view: WebView,
             request: WebResourceRequest
         ): Boolean {
+            // Kun HOVEDframens navigationer må omdirigeres: en iframe (fx en indlejret
+            // afspiller) må ikke kapres ud i en Custom Tab.
+            if (!request.isForMainFrame) return false
             val url = request.url
             if (isInternal(url)) return false
             openOutside(url)
@@ -358,6 +385,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
+            // En vellykket indlæsning SKAL rydde en tidligere fejlskærm, som iOS'
+            // didFinish sætter failed=false. Ellers stod skærmen der for evigt.
+            errorView.visibility = View.GONE
+            web.visibility = View.VISIBLE
             injectScripts(view)
         }
 
@@ -367,8 +398,20 @@ class MainActivity : AppCompatActivity() {
             error: WebResourceError
         ) {
             // Kun hvis det er selve siden der fejler. Et enkelt billede der ikke kan
-            // hentes må ikke smide en fejlskærm op over en app der kører fint.
-            if (request.isForMainFrame) showError()
+            // hentes må ikke smide en fejlskærm op over en app der kører fint, og en
+            // AFBRUDT indlæsning (reload midt i en anden, ERROR_UNKNOWN) er ikke en fejl.
+            if (request.isForMainFrame && error.errorCode != ERROR_UNKNOWN) showError()
+        }
+
+        override fun onRenderProcessGone(
+            view: WebView,
+            detail: android.webkit.RenderProcessGoneDetail
+        ): Boolean {
+            // Dør WebViewets renderer (OOM under den mediatunge feed), må Android ikke
+            // dræbe hele appen. Aktiviteten genskabes, og med den et friskt WebView med
+            // broen geninstalleret.
+            recreate()
+            return true
         }
     }
 
@@ -512,7 +555,7 @@ class MainActivity : AppCompatActivity() {
             "esheet" -> onEsheet(json)
             "share" -> onShare(json)
             // Web sender også beskeder appen aldrig skal gøre noget ved (fsheet, msheet,
-            // ads, consent, creds). En ukendt type må aldrig kaste, kun ignoreres.
+            // ads, consent). En ukendt type må aldrig kaste, kun ignoreres.
             else -> Unit
         }
     }
@@ -588,7 +631,13 @@ class MainActivity : AppCompatActivity() {
     /** Egen action og extras, aldrig en data-URI, så App Links-filteret ikke forveksles. */
     private fun tapFrom(intent: Intent?) {
         if (intent?.action != VfNotifikationer.ACTION_TAP) return
+        // Genåbning fra recents/launcher GENLEVERER taskens oprindelige intent. Uden de to
+        // værn her deep-linkede appen til det gamle opslag ved hver genskabelse: iOS kan
+        // ikke genafspille et tap (payloaden bor kun i hukommelsen i selve tap-øjeblikket).
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
         val payload = intent.getStringExtra(VfNotifikationer.EXTRA_PAYLOAD) ?: return
+        // Forbrugt er forbrugt: en senere genlevering af samme intent skal være tom.
+        intent.removeExtra(VfNotifikationer.EXTRA_PAYLOAD)
         // En nyere payload afløser en uleveret ældre og får sit EGET friske budget.
         ventendeTap = payload
         forsoegTilbage = 60
@@ -674,8 +723,11 @@ class MainActivity : AppCompatActivity() {
         val d = resources.displayMetrics.density
         val top = (safeArea.top / d).dp
         val bottom = (safeArea.bottom / d).dp
-        val ink = Color(ContextCompat.getColor(this, R.color.vf_ink))
-        val bg = Color(ContextCompat.getColor(this, R.color.vf_bg))
+        // Root er polstret med tastaturets højde, så bund-barerne skubbes tilbage NED
+        // bag tastaturet: på iPhone rider fanebjælken heller ikke oven på tastaturet.
+        val imeDp = (imeBottom / d).dp
+        val ink = Color(inkArgb)
+        val bg = Color(bgArgb)
 
         Box(Modifier.fillMaxSize()) {
             if (nativeBars) {
@@ -688,7 +740,7 @@ class MainActivity : AppCompatActivity() {
                     søgTekst = if (lang == "da") "Søg i dine kredse …" else "Search your circles …",
                     onTap = { id -> bridge?.call("vfKreds", id) },
                 )
-                Box(Modifier.align(Alignment.BottomCenter)) {
+                Box(Modifier.align(Alignment.BottomCenter).offset(y = imeDp)) {
                     NativeTabBar(
                         model = tabBar,
                         ink = ink,
@@ -697,7 +749,7 @@ class MainActivity : AppCompatActivity() {
                         onTap = { id -> bridge?.call("vfTab", id) },
                     )
                 }
-                Box(Modifier.align(Alignment.BottomEnd)) {
+                Box(Modifier.align(Alignment.BottomEnd).offset(y = imeDp)) {
                     NativeComposeButtons(
                         model = tabBar,
                         bottomInset = bottom,
@@ -705,8 +757,25 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
             }
-            // Liste-siden ligger over barerne (web skjuler dem selv via nativeSheetOpen)
-            // men under glaskortet og komposeren.
+            // Opslags-siden ligger nederst af de native sider, som på iPhone, og UNDER
+            // glaskortet: ⋯ på andres opslag skal kunne lægge menuen OVENPÅ siden.
+            PostPageHost(
+                model = postPage,
+                blæk = ink,
+                baggrund = bg,
+                topIndhak = top,
+                bundIndhak = bottom,
+                onEvent = { obj ->
+                    bridge?.call("vfPostPage", obj)
+                    // Nødværn: ekkoer web aldrig close (reload-vindue, opslag væk), må
+                    // siden ikke stå usynligt "åben" og æde alle tilbage-tryk.
+                    if (obj.optString("kind") == "dismiss") {
+                        overlay.postDelayed({ if (postPage.open) postPage.lukLokalt() }, 800)
+                    }
+                },
+            )
+            // Liste-siden ligger over opslags-siden (som på iPhone) og over barerne
+            // (web skjuler dem selv via nativeSheetOpen), men under glaskortet.
             ListPageHost(
                 model = listPage,
                 blæk = ink,
@@ -714,16 +783,6 @@ class MainActivity : AppCompatActivity() {
                 topIndhak = top,
                 bundIndhak = bottom,
                 onEvent = { obj -> bridge?.call("vfListPage", obj) },
-            )
-            // Opslags-siden ligger UNDER glaskortet: ⋯ på andres opslag skal kunne lægge
-            // menuen OVENPÅ siden, ellers er den død (web lukker bevidst ikke siden).
-            PostPageHost(
-                model = postPage,
-                blæk = ink,
-                baggrund = bg,
-                topIndhak = top,
-                bundIndhak = bottom,
-                onEvent = { obj -> bridge?.call("vfPostPage", obj) },
             )
             // Glaskortet ligger OVER barerne (scrimen skal dæmpe dem) men UNDER komposeren,
             // præcis som på iPhone. Det må IKKE ligge inde i if (nativeBars).
@@ -751,7 +810,15 @@ class MainActivity : AppCompatActivity() {
                 blæk = ink,
                 baggrund = bg,
                 topIndhak = top,
-                onEvent = { obj -> bridge?.call("vfEsheet", obj) },
+                bundIndhak = bottom,
+                onEvent = { obj ->
+                    bridge?.call("vfEsheet", obj)
+                    // Samme nødværn som tilbage-knappen har: chevron og swipe må heller
+                    // ikke kunne efterlade en usynligt åben side hvis web tier.
+                    if (obj.optString("kind") == "dismiss") {
+                        overlay.postDelayed({ if (esheet.open) esheet.lukLokalt() }, 1200)
+                    }
+                },
                 onAvatar = { dataUrl -> bridge?.call("vfAvatar", dataUrl) },
                 onBanner = { dataUrl -> bridge?.call("vfBanner", dataUrl) },
                 onPolitik = { url -> politikUrl = url },
@@ -846,10 +913,10 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 // Glaskortet: tilbage svarer til et tryk på scrimen. Web lukker kortet.
-                // Gennem samme lås som knapperne, så tilbage ikke kan sende __cancel oven
-                // i en handling der allerede er på vej.
+                // Bevidst UDEN om låsen: __cancel skal altid kunne sendes, ellers er der
+                // ingen vej ud hvis web aldrig svarer på den første handling.
                 if (sheet.request != null) {
-                    if (sheet.lås()) bridge?.call("vfSheet", "__cancel")
+                    bridge?.call("vfSheet", "__cancel")
                     return
                 }
                 // Kommentar-arket: dismiss er en rundtur, og web ekkoer close. Svarer web
@@ -871,14 +938,17 @@ class MainActivity : AppCompatActivity() {
                     listPage.exit()
                     return
                 }
-                // Rediger profil: slet-trinnet spiser ét tilbage; ellers glid ud og
+                // Rediger profil: beskæreren spiser ét tilbage (kun DEN lukkes, de
+                // stagede ændringer består), slet-trinnet spiser ét; ellers glid ud og
                 // dismiss, med nødværn hvis web ikke ekkoer close.
                 if (esheet.open) {
-                    if (esheet.deleteStep) {
-                        esheet.deleteStep = false
-                    } else {
-                        esheet.exit()
-                        overlay.postDelayed({ if (esheet.open) esheet.lukLokalt() }, 1200)
+                    when {
+                        esheet.cropperAaben -> esheet.cropLukTick++
+                        esheet.deleteStep -> esheet.deleteStep = false
+                        else -> {
+                            esheet.exit()
+                            overlay.postDelayed({ if (esheet.open) esheet.lukLokalt() }, 1200)
+                        }
                     }
                     return
                 }
@@ -958,7 +1028,9 @@ class MainActivity : AppCompatActivity() {
         } catch (_: ActivityNotFoundException) {
             fileCallback?.onReceiveValue(null)
             fileCallback = null
-            false
+            // Callbacken ER besvaret ovenfor, så vi skal returnere true: false ville få
+            // WebViewet til at besvare den IGEN, og dobbeltsvar er en kontraktbrud.
+            true
         }
     }
 

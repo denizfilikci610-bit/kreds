@@ -20,8 +20,12 @@ import kotlin.math.max
  */
 object Media {
 
-    /** Seneste billeder og videoer, nyeste først, som i iOS-galleriet. */
-    fun recent(context: Context, limit: Int = 300): List<Picked> {
+    /**
+     * Billeder og videoer, nyeste først, som i iOS-galleriet: HELE biblioteket, sorteret
+     * på hvornår mediet kom til (DATE_ADDED). DATE_MODIFIED var forkert: et gammelt
+     * billede der blev redigeret hoppede øverst. Kun id'er læses, så listen er billig.
+     */
+    fun recent(context: Context, limit: Int = Int.MAX_VALUE): List<Picked> {
         val out = mutableListOf<Picked>()
         val uri = MediaStore.Files.getContentUri("external")
         val projection = arrayOf(
@@ -34,7 +38,7 @@ object Media {
             MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString(),
             MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString(),
         )
-        val order = "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
+        val order = "${MediaStore.Files.FileColumns.DATE_ADDED} DESC"
 
         context.contentResolver.query(uri, projection, selection, args, order)?.use { c ->
             val idCol = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)

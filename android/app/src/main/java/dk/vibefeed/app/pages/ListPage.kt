@@ -230,8 +230,10 @@ fun ListPageHost(
             if (model.open) {
                 synlig = true
                 dragX.animateTo(0f, tween(280, easing = EaseOut))
-            } else if (synlig && dragX.value == 0f) {
-                // Web lukkede uden vores dismiss (fx log ud): glid ud og forsvind.
+            } else if (synlig) {
+                // Web lukkede uden vores dismiss (fx log ud): glid ud og forsvind, OGSÅ
+                // hvis close ankom midt i ind-animationen eller et swipe. Kravet om
+                // dragX == 0 lod ellers siden fryse halvvejs på skærmen.
                 dragX.animateTo(breddePx, tween(280, easing = EaseOut))
                 synlig = false
             }
@@ -401,7 +403,14 @@ private fun ListPageContent(
         }
 
         val q = model.query.trim()
+        // Scroller man i listen, glider tastaturet væk, som iOS' scrollDismissesKeyboard
+        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+        val fokus = androidx.compose.ui.platform.LocalFocusManager.current
+        LaunchedEffect(listState.isScrollInProgress) {
+            if (listState.isScrollInProgress) fokus.clearFocus()
+        }
         LazyColumn(
+            state = listState,
             contentPadding = PaddingValues(top = 4.dp, bottom = maxOf(16.dp, bundIndhak)),
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -458,6 +467,18 @@ private fun Fane(
     modifier: Modifier,
     onTap: () -> Unit,
 ) {
+    // Farverne GLIDER ved faneskift som iOS' withAnimation(.easeOut 0.18); et hårdt
+    // snap lignede en anden app.
+    val tekstFarve by androidx.compose.animation.animateColorAsState(
+        targetValue = if (aktiv) blæk else blæk.copy(alpha = 0.6f),
+        animationSpec = tween(180, easing = EaseOut),
+        label = "faneTekst",
+    )
+    val stregFarve by androidx.compose.animation.animateColorAsState(
+        targetValue = if (aktiv) blæk else Color.Transparent,
+        animationSpec = tween(180, easing = EaseOut),
+        label = "faneStreg",
+    )
     Column(
         modifier.vfPress(VfPress.FADE, onClick = onTap),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -466,7 +487,7 @@ private fun Fane(
             text = tekst,
             fontSize = 15.sp,
             fontWeight = if (aktiv) FontWeight.Bold else FontWeight.SemiBold,
-            color = if (aktiv) blæk else blæk.copy(alpha = 0.6f),
+            color = tekstFarve,
             modifier = Modifier.padding(vertical = 12.dp),
         )
         // Understregningen fylder HELE halvdelens bredde. Ingen skillelinje under
@@ -475,7 +496,7 @@ private fun Fane(
             Modifier
                 .fillMaxWidth()
                 .height(2.dp)
-                .background(if (aktiv) blæk else Color.Transparent),
+                .background(stregFarve),
         )
     }
 }
@@ -561,9 +582,10 @@ private fun KredsRække(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (kreds.requested) blæk.copy(alpha = 0.6f) else Color.White,
+                // vfPress FORREST: graphicsLayer skalerer kun det der ligger efter den i
+                // kæden, så stod kapslen stille mens teksten skrumpede. iOS skalerer
+                // hele pillen.
                 modifier = Modifier
-                    .clip(CircleShape)
-                    .background(if (kreds.requested) blæk.copy(alpha = 0.06f) else BRAND)
                     .vfPress(VfPress.POP) {
                         onEvent(
                             JSONObject()
@@ -572,6 +594,8 @@ private fun KredsRække(
                                 .put("on", !kreds.requested)
                         )
                     }
+                    .clip(CircleShape)
+                    .background(if (kreds.requested) blæk.copy(alpha = 0.06f) else BRAND)
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             )
         }
@@ -618,7 +642,8 @@ private fun Spinner() {
         Modifier.fillMaxWidth().padding(vertical = 40.dp),
         contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator(color = BRAND)
+        // Utonet grå som iOS' ProgressView, ikke brand-rød
+        CircularProgressIndicator(color = Color.Gray, strokeWidth = 2.5.dp)
     }
 }
 

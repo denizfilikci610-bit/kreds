@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -130,6 +131,9 @@ fun CommentsSheetHost(
                         .pointerInput(Unit) {
                             var akk = 0f
                             var sidsteDelta = 0f
+                            // Flick-tærsklen i DP, ikke rå pixels: 16 rå px var tre
+                            // gange for følsomt på en density-3-skærm.
+                            val flick16 = 16.dp.toPx()
                             detectDragGestures(
                                 onDragStart = { akk = 0f; sidsteDelta = 0f },
                                 onDrag = { change, delta ->
@@ -140,8 +144,8 @@ fun CommentsSheetHost(
                                 },
                                 onDragEnd = {
                                     // Flick nedad tæller som luk, ligesom iOS' forudsagte
-                                    // slutposition. 16 px per frame ved 60 Hz er ~1000 dp/s.
-                                    if (dragY.value > luk110 || sidsteDelta > 16f) dismiss()
+                                    // slutposition. 16 dp per frame ved 60 Hz er ~1000 dp/s.
+                                    if (dragY.value > luk110 || sidsteDelta > flick16) dismiss()
                                     scope.launch { dragY.animateTo(0f, spring(0.85f, 440f)) }
                                 },
                                 onDragCancel = {
@@ -165,7 +169,8 @@ fun CommentsSheetHost(
 
                 Tråd(model, blæk, send, Modifier.weight(1f, fill = false))
 
-                KommentarComposer(model, blæk, maxOf(bundIndhak - 10.dp, 0.dp), send)
+                // Det ægte indhak lægges OVEN I composerens interne polstring, som iOS
+                KommentarComposer(model, blæk, bundIndhak, send)
             }
         }
     }
@@ -183,28 +188,39 @@ private fun Tråd(
     val fremhævAlpha = remember { Animatable(0f) }
 
     // Deep-link: scroll og fremhævning kører som TO parallelle timere fra samme
-    // nulpunkt, fordi animateScrollToItem suspenderer.
+    // nulpunkt, fordi animateScrollToItem suspenderer. Timerne bor i deres EGEN effekt,
+    // nøglet på målet: web pusher et snapshot ved hver render, og lå de i token-
+    // effekten, blev flashen annulleret af det næste snapshot før den nåede at falme.
+    var fremhævMål by remember { mutableStateOf<Pair<String, Int>?>(null) }
     LaunchedEffect(model.token) {
         val id = model.focusId ?: return@LaunchedEffect
         val idx = model.comments.indexOfFirst { it.id == id }
         if (idx < 0) return@LaunchedEffect
         model.focusId = null
+        fremhævMål = id to idx
+    }
+    LaunchedEffect(fremhævMål) {
+        val (id, idx) = fremhævMål ?: return@LaunchedEffect
         fremhævet = id
         fremhævAlpha.snapTo(0.08f)
         launch {
             delay(250)
             listState.animateScrollToItem(idx)
         }
-        launch {
-            delay(2200)
-            fremhævAlpha.animateTo(0f, tween(400))
-            fremhævet = null
-        }
+        delay(2200)
+        fremhævAlpha.animateTo(0f, tween(400))
+        fremhævet = null
+        fremhævMål = null
     }
 
     // Efter egen afsendelse ruller listen til bunden, springes over ved tom liste.
+    // Første komposition tæller IKKE: scrollToken ryddes ikke ved close, så en
+    // genåbning af arket ville ellers auto-scrolle til bunden med det samme.
+    var sidsteScrollToken by remember { mutableIntStateOf(model.scrollToken) }
     LaunchedEffect(model.scrollToken) {
-        if (model.scrollToken > 0 && model.comments.isNotEmpty()) {
+        if (model.scrollToken == sidsteScrollToken) return@LaunchedEffect
+        sidsteScrollToken = model.scrollToken
+        if (model.comments.isNotEmpty()) {
             listState.animateScrollToItem(model.comments.lastIndex)
         }
     }
@@ -219,7 +235,7 @@ private fun Tråd(
 
     if (model.comments.isEmpty()) {
         Box(
-            Modifier.fillMaxWidth().padding(vertical = 40.dp),
+            Modifier.fillMaxWidth().padding(vertical = 34.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(model.labels.empty, fontSize = 14.sp, color = blæk.copy(alpha = 0.6f))

@@ -7,6 +7,12 @@ plugins {
 // FCM virker først når ejeren har lagt google-services.json her i app-mappen (fra
 // Firebase-konsollen). Indtil da bygger appen fint uden, og notifikationerne kommer
 // gennem kvarters-pollen i stedet. Pluginet må derfor kun anvendes når filen findes.
+//
+// ⚠️ DEPLOY-RÆKKEFØLGE, ufravigelig: FCM-grenen i supabase/functions/send-push SKAL være
+// deployet FØR denne fil lægges ind. Ellers registrerer appen et FCM-token, send-push
+// poster det til APNs, får BadDeviceToken og rydder tokenet SERVER-side, mens klienten
+// beholder det LOKALT og derfor slår kvarters-pollen fra. Resultat: hverken push eller
+// poll, i fuld tavshed, på alle Android-enheder.
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
 }
@@ -108,6 +114,9 @@ dependencies {
 
     // Miniaturer i galleri-gitteret
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // Video-miniaturer i galleri-gitteret og forhåndsvisningerne. Uden dekoderen er
+    // ALLE video-flader blanke grå plader med et varigheds-badge.
+    implementation("io.coil-kt:coil-video:2.7.0")
 
     // EXIF, så et billede taget på højkant ikke lander på siden
     implementation("androidx.exifinterface:exifinterface:1.4.1")

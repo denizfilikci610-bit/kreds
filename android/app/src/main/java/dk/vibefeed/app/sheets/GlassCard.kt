@@ -191,7 +191,11 @@ fun GlassSheetHost(
     LaunchedEffect(req) { if (req != null) sidste = req }
 
     val send: (String) -> Unit = { handling ->
-        if (model.lås()) onAction(handling)
+        // Låsen gælder kun HANDLINGER (mod dobbelt-tryk på fx "Slet"). __cancel skal
+        // ALTID kunne sendes, ellers findes der ingen vej ud hvis web aldrig svarer på
+        // den første handling: webs vfSheet er alligevel idempotent for __cancel.
+        if (handling == "__cancel") onAction(handling)
+        else if (model.lås()) onAction(handling)
     }
 
     Box(Modifier.fillMaxSize()) {

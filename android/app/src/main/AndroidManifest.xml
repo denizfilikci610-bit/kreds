@@ -23,8 +23,13 @@
       web sin egen filvælger i stedet.
     -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Uden denne er kamera-videoer LYDLØSE. iPhone-appen optager med lyd. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <!-- Android 14's "udvalgte billeder": beder man om den uden at deklarere den,
+         afvises den tavst, og et delvist valg lignede et blankt nej. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
@@ -43,10 +48,13 @@
         android:usesCleartextTraffic="false"
         android:theme="@style/Theme.VibeFeed">
 
+        <!-- screenOrientation: iPhone-appen er portræt-låst, og hele fladen (kamera-rammen,
+             zoom.js' layout-bredde, de native barer) er bygget til det. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|locale|layoutDirection">
 
