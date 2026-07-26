@@ -65,6 +65,33 @@ Telefonen skal have Udviklerindstillinger og USB-fejlfinding slået til, og den 
 godkende computerens nøgle første gang (`adb devices` skal vise `device`, ikke
 `unauthorized`).
 
+## Til Google Play
+
+Play tager kun imod en **AAB**, ikke en APK, og den skal være signeret med en uploadnøgle.
+Nøglen laves én gang, af ejeren, så kodeordet aldrig passerer gennem nogen andens hænder:
+
+```bash
+keytool -genkeypair -v -keystore ~/vibefeed-upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Derefter skrives fire linjer i `~/.gradle/gradle.properties`, altså i hjemmemappen, **ikke** i
+repoet:
+
+```
+vfStoreFile=/Users/DITNAVN/vibefeed-upload.jks
+vfStorePassword=…
+vfKeyAlias=upload
+vfKeyPassword=…
+```
+
+Så bygger `./gradlew bundleRelease` en signeret AAB i
+`app/build/outputs/bundle/release/app-release.aab`. Uden nøglen bygger den stadig, bare
+usigneret, så en anden maskine ikke går i stå.
+
+Med Play App Signing er denne nøgle kun en **uploadnøgle**. Mister du den, kan Google udstede
+en ny. Selve app-signeringsnøglen ligger hos Google, og det er dens SHA-256-fingeraftryk der
+skal ind i `.well-known/assetlinks.json`.
+
 ## Udestående
 
 - **App Links.** Manifestet er klar, men `.well-known/assetlinks.json` på vibefeed.dk
