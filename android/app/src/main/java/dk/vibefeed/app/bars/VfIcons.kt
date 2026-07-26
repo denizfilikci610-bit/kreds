@@ -80,6 +80,8 @@ object VfIcons {
 
     val Plus = VfIcon(fyldt = emptyList(), streg = listOf("M12 5v14", "M5 12h14"))
     val Close = VfIcon(fyldt = emptyList(), streg = listOf("M6 6 18 18", "M18 6 6 18"))
+    val ChevronLeft = VfIcon(fyldt = emptyList(), streg = listOf("M15 6 9 12l6 6"))
+    val ChevronRight = VfIcon(fyldt = emptyList(), streg = listOf("M9 6l6 6-6 6"))
     val Photo = VfIcon(
         fyldt = listOf("M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm1.6 12h12.8l-4-5.2-3.1 3.9-2.1-2.5L5.6 17ZM8 10.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"),
         streg = emptyList(),

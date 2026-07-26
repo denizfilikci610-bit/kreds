@@ -55,6 +55,8 @@ import dk.vibefeed.app.composer.ComposerModel
 import dk.vibefeed.app.composer.ComposerScreen
 import dk.vibefeed.app.composer.Purpose
 import dk.vibefeed.app.composer.Uploader
+import dk.vibefeed.app.pages.ListPageHost
+import dk.vibefeed.app.pages.ListPageModel
 import dk.vibefeed.app.sheets.GlassSheetHost
 import dk.vibefeed.app.sheets.SheetModel
 import org.json.JSONObject
@@ -117,6 +119,9 @@ class MainActivity : AppCompatActivity() {
 
     /** Glaskortet: appens ti handlings-menuer, drevet af web over broen. */
     private val sheet = SheetModel()
+
+    /** Liste-siden: Venner og Kredse med faner og søgning. */
+    private val listPage = ListPageModel()
 
     /** Sat når broen kan bære de native barer. Uden dem må __vfNative aldrig sættes. */
     private var nativeBars = false
@@ -421,7 +426,10 @@ class MainActivity : AppCompatActivity() {
         // derfor først sættes nu, hvor både fanebjælken og kreds-baren findes native.
         b.install(
             if (b.isSupported) {
-                setOf("__vfNative", "__vfPhotoLib", "__vfComposeCamera", "__vfGlassCard")
+                setOf(
+                    "__vfNative", "__vfPhotoLib", "__vfComposeCamera",
+                    "__vfGlassCard", "__vfListPage",
+                )
             } else {
                 emptySet()
             }
@@ -438,6 +446,7 @@ class MainActivity : AppCompatActivity() {
             "creds" -> lang = json.optString("lang").ifBlank { lang }
             "photolib" -> onPhotoLib(json)
             "sheet" -> onSheet(json)
+            "listpage" -> onListPage(json)
             // Web sender også beskeder appen aldrig skal gøre noget ved (fsheet, msheet,
             // ads, consent, creds). En ukendt type må aldrig kaste, kun ignoreres.
             else -> Unit
@@ -492,6 +501,12 @@ class MainActivity : AppCompatActivity() {
         if (sheet.request != null) showOverlay() else hideOverlay()
     }
 
+    /** Liste-siden. Må ikke rive komposeren væk når den lukker. */
+    private fun onListPage(json: JSONObject) {
+        listPage.apply(json)
+        if (listPage.open) showOverlay() else if (!composer.open) hideOverlay()
+    }
+
     // ---------------------------------------------------------------- native skærme
 
     /**
@@ -534,6 +549,16 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
             }
+            // Liste-siden ligger over barerne (web skjuler dem selv via nativeSheetOpen)
+            // men under glaskortet og komposeren.
+            ListPageHost(
+                model = listPage,
+                blæk = ink,
+                baggrund = bg,
+                topIndhak = top,
+                bundIndhak = bottom,
+                onEvent = { obj -> bridge?.call("vfListPage", obj) },
+            )
             // Glaskortet ligger OVER barerne (scrimen skal dæmpe dem) men UNDER komposeren,
             // præcis som på iPhone. Det må IKKE ligge inde i if (nativeBars).
             GlassSheetHost(
@@ -586,10 +611,10 @@ class MainActivity : AppCompatActivity() {
         overlay.visibility = View.VISIBLE
     }
 
-    /** Barerne og et åbent glaskort bliver liggende; kun komposeren forsvinder. */
+    /** Barerne, et åbent glaskort og liste-siden bliver liggende; kun komposeren forsvinder. */
     private fun hideOverlay() {
         overlay.visibility =
-            if (nativeBars || sheet.request != null) View.VISIBLE else View.GONE
+            if (nativeBars || sheet.request != null || listPage.open) View.VISIBLE else View.GONE
     }
 
     // ---------------------------------------------------------------- tilbage
@@ -614,6 +639,11 @@ class MainActivity : AppCompatActivity() {
                 // i en handling der allerede er på vej.
                 if (sheet.request != null) {
                     if (sheet.lås()) bridge?.call("vfSheet", "__cancel")
+                    return
+                }
+                // Liste-siden: glid ud først, dismiss bagefter (samme vej som pilen).
+                if (listPage.open) {
+                    listPage.exit()
                     return
                 }
                 web.evaluateJavascript(

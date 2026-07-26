@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +54,84 @@ fun VfPlainAvatar(
         loading = { Box(Modifier.fillMaxSize().background(blæk.copy(alpha = 0.2f))) },
         error = { InitialCirkel(Modifier.fillMaxSize(), initialer, blæk, størrelse) },
     )
+}
+
+/**
+ * Profilernes gradient-avatar, GlassAvatar-reglerne fra iPhone-appen.
+ *
+ * Chippen (gradient plus hvide initialer) vises BÅDE mens billedet hentes og hvis det
+ * fejler, ligesom iOS' to-lukke-AsyncImage. Gradienten er LODRET af de to første farver,
+ * ikke web-CSS'ens 140 grader, så de to apps er ens.
+ */
+@Composable
+fun VfGlassAvatar(
+    url: String,
+    initialer: String,
+    gradient: List<String>,
+    størrelse: Dp,
+) {
+    val form = Modifier.size(størrelse).clip(CircleShape)
+
+    if (url.isEmpty()) {
+        GradientChip(form, initialer, gradient, størrelse)
+        return
+    }
+
+    SubcomposeAsyncImage(
+        model = url,
+        contentDescription = null,
+        modifier = form,
+        contentScale = ContentScale.Crop,
+        loading = { GradientChip(Modifier.fillMaxSize(), initialer, gradient, størrelse) },
+        error = { GradientChip(Modifier.fillMaxSize(), initialer, gradient, størrelse) },
+    )
+}
+
+@Composable
+private fun GradientChip(
+    modifier: Modifier,
+    initialer: String,
+    gradient: List<String>,
+    størrelse: Dp,
+) {
+    val farver = if (gradient.size >= 2) {
+        listOf(
+            parseHex(gradient[0]) ?: Color.Gray,
+            parseHex(gradient[1]) ?: Color.Gray.copy(alpha = 0.7f),
+        )
+    } else {
+        listOf(Color.Gray, Color.Gray.copy(alpha = 0.7f))
+    }
+    Box(
+        modifier.clip(CircleShape).background(Brush.verticalGradient(farver)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (initialer.isNotEmpty()) {
+            Text(
+                text = initialer,
+                fontSize = (størrelse.value * 0.36f).sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+            )
+        }
+    }
+}
+
+/** Web-farverne kommer som #rgb eller #rrggbb. Alt andet falder tilbage til grå. */
+private fun parseHex(s: String): Color? {
+    val h = s.removePrefix("#").trim()
+    return runCatching {
+        when (h.length) {
+            3 -> {
+                val r = h[0].digitToInt(16) * 17
+                val g = h[1].digitToInt(16) * 17
+                val b = h[2].digitToInt(16) * 17
+                Color(r, g, b)
+            }
+            6 -> Color(0xFF000000 or h.toLong(16))
+            else -> null
+        }
+    }.getOrNull()
 }
 
 /**
