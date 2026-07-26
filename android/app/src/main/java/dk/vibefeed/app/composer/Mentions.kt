@@ -1,5 +1,6 @@
 package dk.vibefeed.app.composer
 
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** Én kandidat til en @-omtale, som web sender dem i photolib-beskeden. */
@@ -57,6 +58,28 @@ object Mentions {
         if (at < 0) return text
         val ud = text.substring(0, at) + "@" + handle + " "
         return if (ud.length > 280) text else ud
+    }
+
+    /**
+     * Kommentar-arkets mentionables er et ARRAY, ikke photolib-beskedens map af
+     * destinationer. Kandidater uden handle droppes, som i [parse].
+     */
+    fun parseListe(arr: JSONArray?): List<MentionCard> {
+        if (arr == null) return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            arr.optJSONObject(i)?.let { o ->
+                val handle = o.optString("handle")
+                if (handle.isBlank()) null else MentionCard(
+                    handle = handle,
+                    name = o.optString("name"),
+                    avatarUrl = o.optString("avatarUrl").takeIf { it.isNotBlank() },
+                    initials = o.optString("initials"),
+                    gradient = o.optJSONArray("gradient")?.let { g ->
+                        (0 until g.length()).map { g.optString(it) }
+                    } ?: emptyList(),
+                )
+            }
+        }
     }
 
     /** Læser mentionables-objektet fra web: nøgle er destination, værdi er kandidaterne. */

@@ -55,6 +55,8 @@ import dk.vibefeed.app.composer.ComposerModel
 import dk.vibefeed.app.composer.ComposerScreen
 import dk.vibefeed.app.composer.Purpose
 import dk.vibefeed.app.browser.PolitikSkaerm
+import dk.vibefeed.app.comments.CommentsModel
+import dk.vibefeed.app.comments.CommentsSheetHost
 import dk.vibefeed.app.composer.Uploader
 import dk.vibefeed.app.notif.VfNotifikationer
 import dk.vibefeed.app.pages.ListPageHost
@@ -124,6 +126,9 @@ class MainActivity : AppCompatActivity() {
 
     /** Liste-siden: Venner og Kredse med faner og søgning. */
     private val listPage = ListPageModel()
+
+    /** Kommentar-arket for minder. */
+    private val comments = CommentsModel()
 
     /** Sat når broen kan bære de native barer. Uden dem må __vfNative aldrig sættes. */
     private var nativeBars = false
@@ -462,7 +467,7 @@ class MainActivity : AppCompatActivity() {
             if (b.isSupported) {
                 setOf(
                     "__vfNative", "__vfPhotoLib", "__vfComposeCamera",
-                    "__vfGlassCard", "__vfListPage",
+                    "__vfGlassCard", "__vfListPage", "__vfComments",
                 )
             } else {
                 emptySet()
@@ -482,6 +487,7 @@ class MainActivity : AppCompatActivity() {
             "photolib" -> onPhotoLib(json)
             "sheet" -> onSheet(json)
             "listpage" -> onListPage(json)
+            "comments" -> onComments(json)
             // Web sender også beskeder appen aldrig skal gøre noget ved (fsheet, msheet,
             // ads, consent, creds). En ukendt type må aldrig kaste, kun ignoreres.
             else -> Unit
@@ -598,6 +604,12 @@ class MainActivity : AppCompatActivity() {
         if (listPage.open) showOverlay() else if (!composer.open) hideOverlay()
     }
 
+    /** Kommentar-arket. Samme regel: må ikke rive komposeren væk. */
+    private fun onComments(json: JSONObject) {
+        comments.apply(json)
+        if (comments.open) showOverlay() else if (!composer.open) hideOverlay()
+    }
+
     // ---------------------------------------------------------------- native skærme
 
     /**
@@ -660,6 +672,15 @@ class MainActivity : AppCompatActivity() {
                 bundIndhak = bottom,
                 onAction = { a -> bridge?.call("vfSheet", a) },
             )
+            // Kommentar-arket tegnes efter både barerne (de skjules af web med op til
+            // 120 ms forsinkelse) og glaskortet: på iPhone ligger bundarkene over kortet.
+            CommentsSheetHost(
+                model = comments,
+                blæk = ink,
+                overflade = bg,
+                bundIndhak = bottom,
+                onEvent = { obj -> bridge?.call("vfComments", obj) },
+            )
             if (composer.open) Composer(top, bottom)
 
             // Politik-arket tegner i sit eget vindue og ligger derfor altid øverst.
@@ -714,10 +735,14 @@ class MainActivity : AppCompatActivity() {
         overlay.visibility = View.VISIBLE
     }
 
-    /** Barerne, et åbent glaskort og liste-siden bliver liggende; kun komposeren forsvinder. */
+    /** Barerne og de åbne native flader bliver liggende; kun komposeren forsvinder. */
     private fun hideOverlay() {
         overlay.visibility =
-            if (nativeBars || sheet.request != null || listPage.open) View.VISIBLE else View.GONE
+            if (nativeBars || sheet.request != null || listPage.open || comments.open) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
     }
 
     // ---------------------------------------------------------------- tilbage
@@ -747,6 +772,15 @@ class MainActivity : AppCompatActivity() {
                 // i en handling der allerede er på vej.
                 if (sheet.request != null) {
                     if (sheet.lås()) bridge?.call("vfSheet", "__cancel")
+                    return
+                }
+                // Kommentar-arket: dismiss er en rundtur, og web ekkoer close. Svarer web
+                // ikke (opslaget kan være væk af web-cachen), lukker nødværnet lokalt,
+                // ellers føles tilbage-knappen død.
+                if (comments.open) {
+                    bridge?.call("vfComments", JSONObject()
+                        .put("kind", "dismiss").put("postId", comments.postId))
+                    overlay.postDelayed({ if (comments.open) comments.lukLokalt() }, 600)
                     return
                 }
                 // Liste-siden: glid ud først, dismiss bagefter (samme vej som pilen).
