@@ -116,6 +116,10 @@ fun NativeTabBar(
         animationSpec = tween(200),
         label = "tabAlpha",
     )
+    // Samme regel som kreds-baren: en usynlig bjælke skal HELT ud af hit-testen, ellers
+    // æder den webbens tryk i bunden (fx billedknappen i tanke-komposeren og chattens
+    // felt). compact glider selv af skærmen, men visible=false gjorde ikke.
+    if (skjult && alpha == 0f) return
     val valgt = faner.indexOf(model.active).coerceAtLeast(0)
 
     BoxWithConstraints(
@@ -215,6 +219,8 @@ fun NativeComposeButtons(
         animationSpec = tween(200),
         label = "fabAlpha",
     )
+    // Usynlige knapper skal helt ud af hit-testen, ellers æder de webbens tryk.
+    if (!vist && alpha == 0f) return
 
     Column(
         Modifier
@@ -284,6 +290,9 @@ fun NativeKredsBar(
         animationSpec = tween(180),
         label = "kredsAlpha",
     )
+    // En usynlig bar må ikke blive liggende i hit-testen: så æder den webbens tryk i
+    // toppen (fx tilbage-pilen på en åben web-side). Væk er væk, når faden er færdig.
+    if (!model.visible && alpha == 0f) return
 
     val vist = remember(model.items, søger, query) {
         if (!søger) model.items else {

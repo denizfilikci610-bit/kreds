@@ -489,7 +489,14 @@ private fun tagBillede(context: Context, capture: ImageCapture, model: ComposerM
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(result: ImageCapture.OutputFileResults) {
                 model.picked = Picked(Uri.fromFile(fil), isVideo = false)
-                model.step = Step.CROP
+                // Som på iPhone: en tanke uploader STRAKS, et minde og en story går direkte
+                // til billedteksten og beskæres automatisk efter motivets orientering ved Del.
+                if (model.purpose == Purpose.COMPOSE) {
+                    model.uploadStraks = true
+                } else {
+                    model.cropped = null
+                    model.step = Step.CAPTION
+                }
             }
 
             override fun onError(exc: ImageCaptureException) {
@@ -527,8 +534,12 @@ private fun startOptagelse(
                         model.videoUdsnit = null
                         model.picked = Picked(uri, isVideo = true, durationMs = varighed)
                         // Kamera-klip går aldrig gennem trim, og de beskæres automatisk
-                        // efter motivets orientering, som på iOS.
-                        model.step = Step.CAPTION
+                        // efter motivets orientering, som på iOS. En tanke uploader straks.
+                        if (model.purpose == Purpose.COMPOSE) {
+                            model.uploadStraks = true
+                        } else {
+                            model.step = Step.CAPTION
+                        }
                     }
                 }
             }

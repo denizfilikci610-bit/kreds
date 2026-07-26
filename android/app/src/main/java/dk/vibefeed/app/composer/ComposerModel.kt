@@ -92,6 +92,13 @@ class ComposerModel {
     /** Tændt mens web arbejder, så der ikke kan deles to gange. */
     var sharing by mutableStateOf(false)
 
+    /**
+     * En tanke (forCompose) springer beskærer og billedtekst over: mediet uploades STRAKS
+     * efter udløseren eller galleriets Videre, som på iPhone. Flaget beder skærmen om at
+     * kode og sende det valgte medie med det samme.
+     */
+    var uploadStraks by mutableStateOf(false)
+
     /** Det færdigt beskårne billede. Sat når beskæreren er brugt. */
     var cropped by mutableStateOf<android.graphics.Bitmap?>(null)
 
@@ -131,6 +138,7 @@ class ComposerModel {
         visTrim = false
         caption = ""
         sharing = false
+        uploadStraks = false
         pendingBytes = null
         open = true
     }
@@ -147,6 +155,7 @@ class ComposerModel {
         visTrim = false
         caption = ""
         sharing = false
+        uploadStraks = false
         pendingBytes = null
     }
 

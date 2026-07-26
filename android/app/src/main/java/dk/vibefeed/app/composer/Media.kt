@@ -90,7 +90,40 @@ object Media {
             out.toByteArray()
         }
 
-    /** Video sendes som den er. Trim og beskæring kommer i næste runde. */
+    /**
+     * Et tanke-billede (forCompose): INGEN beskæring, kun nedskalering til maks 1440 px
+     * på den lange led og JPEG 87, præcis som iOS. Web viser det uklippet i tanken.
+     */
+    fun prepareCompose(context: Context, uri: Uri): ByteArray? {
+        val bitmap = decodeOriented(context, uri, 1440) ?: return null
+        return ByteArrayOutputStream().use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 87, out)
+            out.toByteArray()
+        }
+    }
+
+    /** Billedets OPREJSTE mål (EXIF-rotationen regnet med), uden at afkode hele billedet. */
+    fun orientedBounds(context: Context, uri: Uri): Pair<Int, Int>? {
+        val resolver = context.contentResolver
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        if (bounds.outWidth <= 0) return null
+        val drejet = runCatching {
+            resolver.openInputStream(uri)?.use { stream ->
+                when (ExifInterface(stream).getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL
+                )) {
+                    ExifInterface.ORIENTATION_ROTATE_90,
+                    ExifInterface.ORIENTATION_ROTATE_270 -> true
+                    else -> false
+                }
+            } ?: false
+        }.getOrDefault(false)
+        return if (drejet) bounds.outHeight to bounds.outWidth
+        else bounds.outWidth to bounds.outHeight
+    }
+
+    /** Rå bytes, til medier der hverken skal klippes eller beskæres. */
     fun readBytes(context: Context, uri: Uri): ByteArray? =
         runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }
             .getOrNull()

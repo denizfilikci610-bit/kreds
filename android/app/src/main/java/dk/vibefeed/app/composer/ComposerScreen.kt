@@ -75,6 +75,34 @@ fun ComposerScreen(
     val context = LocalContext.current
     val cam = remember { CameraState() }
 
+    // Tankens "upload straks": intet beskærings- eller billedtekst-trin. Billeder
+    // nedskaleres til 1440/JPEG 87, videoer klippes KUN hvis trim-vinduet er kortere end
+    // klippet, ellers sendes de som de er, i egne mål, som på iPhone.
+    LaunchedEffect(model.uploadStraks) {
+        if (!model.uploadStraks) return@LaunchedEffect
+        val p = model.picked ?: run { model.uploadStraks = false; return@LaunchedEffect }
+        if (!p.isVideo) {
+            val bytes = withContext(Dispatchers.IO) { Media.prepareCompose(context, p.uri) }
+            model.uploadStraks = false
+            if (bytes != null) onShare(bytes, false, "", model.dest)
+            return@LaunchedEffect
+        }
+        val skalKlippes = model.videoVarighedMs > model.trimLaengdeMs + 50
+        if (!skalKlippes) {
+            val bytes = withContext(Dispatchers.IO) { Media.readBytes(context, p.uri) }
+            model.uploadStraks = false
+            if (bytes != null) onShare(bytes, true, "", model.dest)
+            return@LaunchedEffect
+        }
+        eksporterVideo(
+            model, context, p,
+            udsnitOgMaal = false, // kun klip: ingen beskæring, videoens egne mål
+        ) { bytes ->
+            model.uploadStraks = false
+            if (bytes != null) onShare(bytes, true, "", model.dest)
+        }
+    }
+
     CompositionLocalProvider(LocalSafeArea provides SafeArea(topPad, bottomPad)) {
         Box(
             Modifier.fillMaxSize()
@@ -132,6 +160,16 @@ fun ComposerScreen(
                     }
                 }
                 Step.CAPTION -> CaptionStep(model, context, baggrund, blæk, topPad, bottomPad, onShare)
+            }
+
+            // Tankens straks-upload: en rolig spinner over kameraet mens der kodes og sendes.
+            if (model.uploadStraks || (model.sharing && model.purpose == Purpose.COMPOSE)) {
+                Box(
+                    Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(color = BRAND, strokeWidth = 2.dp)
+                }
             }
         }
     }
@@ -323,6 +361,11 @@ private fun videre(model: ComposerModel, context: Context) {
     val v = model.valgt ?: return
     if (model.forbereder) return
     model.picked = v
+    // En tanke: intet beskærings-trin, billedet uploades straks (maks 1440, JPEG 87).
+    if (!v.isVideo && model.purpose == Purpose.COMPOSE) {
+        model.uploadStraks = true
+        return
+    }
     if (!v.isVideo) { model.step = Step.CROP; return }
 
     // Varigheden kender vi allerede fra MediaStore. Målene læses, så beskæreren og
@@ -338,13 +381,13 @@ private fun videre(model: ComposerModel, context: Context) {
     model.step = if (model.visTrim) Step.TRIM else { efterVideo(model); return }
 }
 
-/** Efter trim: en story eller en tanke går direkte videre, et minde skal beskæres. */
+/** Efter trim: en tanke uploader straks, en story går til billedteksten, et minde beskæres. */
 private fun efterVideo(model: ComposerModel) {
-    model.step = when {
-        model.purpose == Purpose.COMPOSE -> Step.CAPTION
-        model.isStory -> Step.CAPTION
-        else -> Step.VIDEOCROP
+    if (model.purpose == Purpose.COMPOSE) {
+        model.uploadStraks = true
+        return
     }
+    model.step = if (model.isStory) Step.CAPTION else Step.VIDEOCROP
 }
 
 /* ============================================================ Beskærer */
@@ -425,11 +468,27 @@ private fun CaptionStep(
                 if (arbejder || model.sharing) return@ComposerNavBar
                 arbejder = true
                 val færdig = model.cropped
+                if (valgt.isVideo) {
+                    // Video skal ALTID gennem eksporten: klip til trim-vinduet, brugerens
+                    // eller det automatiske udsnit, og målstørrelsen. Rå bytes var fejlen
+                    // der sendte et 30-sekunders klip uklippet.
+                    eksporterVideo(model, context, valgt) { bytes ->
+                        arbejder = false
+                        if (bytes != null) onShare(bytes, true, model.caption, model.dest)
+                    }
+                    return@ComposerNavBar
+                }
                 Thread {
                     val bytes = when {
-                        valgt.isVideo -> Media.readBytes(context, valgt.uri)
                         // Beskæreren har allerede lavet det endelige billede i det valgte format
                         færdig != null -> Media.encode(færdig, 88)
+                        // Kamera-foto: beskæres automatisk efter motivets orientering,
+                        // vandret motiv bliver liggende, ellers 4:5, som på iPhone.
+                        valgt.uri.scheme == "file" -> {
+                            val (bw, bh) = Media.orientedBounds(context, valgt.uri) ?: (1080 to 1350)
+                            val (w, h) = model.kameraTarget(bw, bh)
+                            Media.prepareImage(context, valgt.uri, w, h)
+                        }
                         else -> {
                             val (w, h) = model.target()
                             Media.prepareImage(context, valgt.uri, w, h)
@@ -437,7 +496,7 @@ private fun CaptionStep(
                     }
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
                         arbejder = false
-                        if (bytes != null) onShare(bytes, valgt.isVideo, model.caption, model.dest)
+                        if (bytes != null) onShare(bytes, false, model.caption, model.dest)
                     }
                 }.start()
             },
@@ -631,20 +690,23 @@ private fun eksporterVideo(
     model: ComposerModel,
     context: Context,
     valgt: Picked,
+    /** Falsk for en tanke: kun klip, ingen beskæring, videoens egne mål. */
+    udsnitOgMaal: Boolean = true,
     færdig: (ByteArray?) -> Unit,
 ) {
-    val (b, h) = if (model.videoUdsnit != null) {
-        // Brugeren har selv beskåret: målet følger det format der blev valgt
-        model.videoFormat.let { it.bredde to it.hoejde }
-    } else if (valgt.uri.scheme == "file") {
-        // Kamera-klip uden beskæring: vandret motiv bliver liggende, ellers 4:5
-        model.kameraTarget(model.videoBredde, model.videoHoejde)
-    } else {
-        model.target()
+    val (b, h) = when {
+        !udsnitOgMaal -> model.videoBredde to model.videoHoejde
+        model.videoUdsnit != null ->
+            // Brugeren har selv beskåret: målet følger det format der blev valgt
+            model.videoFormat.let { it.bredde to it.hoejde }
+        valgt.uri.scheme == "file" ->
+            // Kamera-klip uden beskæring: vandret motiv bliver liggende, ellers 4:5
+            model.kameraTarget(model.videoBredde, model.videoHoejde)
+        else -> model.target()
     }
 
     // Uden brugerudsnit laves et centreret dæk-udsnit, så intet strækkes
-    val udsnit = model.videoUdsnit
+    val udsnit = if (!udsnitOgMaal) null else model.videoUdsnit
         ?: VideoExport.daekUdsnit(model.videoBredde, model.videoHoejde, b, h)
 
     var svaret = false

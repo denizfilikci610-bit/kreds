@@ -84,6 +84,13 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val START_URL = "https://vibefeed.dk"
 
+        /**
+         * Web-fladens zoom. En Pixel er ~412 punkter bred mod iPhonens ~393, så uden
+         * justering står alt en anelse mindre end på iPhone. Skal holdes i sync med
+         * Z i assets/zoom.js. 1.0 slår zoomen fra.
+         */
+        const val VF_ZOOM = 1.06f
+
         /** Samme liste som ios/VibeFeed/WebView.swift: alt andet åbnes uden for appen. */
         val INTERNAL_HOSTS = setOf(
             "vibefeed.dk",
@@ -265,11 +272,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Punkter i Android er ikke det samme som CSS-pixels. Siden står på initial-scale=1,
-     * så én CSS-px er én dp, og indhakkene skal derfor divideres med skærmens tæthed.
+     * Punkter i Android er ikke det samme som CSS-pixels. Indhakkene divideres med
+     * skærmens tæthed, og derefter med zoom-faktoren: assets/zoom.js giver siden en
+     * smallere layout-bredde og skalerer den op, så én CSS-px er VF_ZOOM dp.
      */
     private fun pushSafeArea() {
-        val d = resources.displayMetrics.density
+        val d = resources.displayMetrics.density * VF_ZOOM
         fun css(v: Int) = (v / d).toInt()
         web.evaluateJavascript(
             "window.__vfInsets && window.__vfInsets(" +
@@ -907,8 +915,10 @@ class MainActivity : AppCompatActivity() {
     private fun injectScripts(view: WebView) {
         // safe-area.js FØRST: den skriver sidens egne env()-regler om, og de to andre
         // lag læner sig op ad de variabler den sætter.
-        val lag = if (nativeBars) listOf("safe-area.js", "back.js", "share.js")
-        else listOf("safe-area.js", "back.js", "compose-buttons.js", "share.js")
+        // zoom.js ALLERFØRST: den ændrer sidens layout-bredde, og safe-area.js' tal skal
+        // regnes i den nye skala (pushSafeArea deler med VF_ZOOM).
+        val lag = if (nativeBars) listOf("zoom.js", "safe-area.js", "back.js", "share.js")
+        else listOf("zoom.js", "safe-area.js", "back.js", "compose-buttons.js", "share.js")
         for (name in lag) {
             val js = runCatching {
                 assets.open(name).bufferedReader().use { it.readText() }
