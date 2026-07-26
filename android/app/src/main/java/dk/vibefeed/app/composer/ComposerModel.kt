@@ -10,7 +10,7 @@ import org.json.JSONObject
 enum class Purpose { MEMORY, COMPOSE, STORY }
 
 /** Trinnene i komposeren, samme rækkefølge som på iOS. */
-enum class Step { CAMERA, GALLERY, CAPTION }
+enum class Step { CAMERA, GALLERY, CROP, CAPTION }
 
 /** En kreds i destinations-vælgeren. */
 data class Feed(val id: String, val name: String)
@@ -50,6 +50,9 @@ class ComposerModel {
     /** Tændt mens web arbejder, så der ikke kan deles to gange. */
     var sharing by mutableStateOf(false)
 
+    /** Det færdigt beskårne billede. Sat når beskæreren er brugt. */
+    var cropped by mutableStateOf<android.graphics.Bitmap?>(null)
+
     /** Mediet holdes her indtil web sender upload-ordren. */
     var pendingBytes: ByteArray? = null
     var pendingMime: String = "image/jpeg"
@@ -75,6 +78,7 @@ class ComposerModel {
         } ?: Labels(emptyMap())
 
         picked = null
+        cropped = null
         caption = ""
         sharing = false
         pendingBytes = null
@@ -84,6 +88,7 @@ class ComposerModel {
     fun close() {
         open = false
         picked = null
+        cropped = null
         caption = ""
         sharing = false
         pendingBytes = null

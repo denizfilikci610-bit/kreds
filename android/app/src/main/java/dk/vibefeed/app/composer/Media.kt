@@ -77,6 +77,19 @@ object Media {
         }
     }
 
+    /**
+     * Henter billedet i en størrelse beskæreren kan arbejde med. Stort nok til at et udsnit
+     * stadig holder 1080 px på den lange led, lille nok til at kunne ligge i hukommelsen.
+     */
+    fun loadForCrop(context: Context, uri: Uri): Bitmap? = decodeOriented(context, uri, 2400)
+
+    /** Koder et færdigt beskåret billede som JPEG, klar til upload. */
+    fun encode(bitmap: Bitmap, kvalitet: Int = 90): ByteArray =
+        ByteArrayOutputStream().use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, kvalitet, out)
+            out.toByteArray()
+        }
+
     /** Video sendes som den er. Trim og beskæring kommer i næste runde. */
     fun readBytes(context: Context, uri: Uri): ByteArray? =
         runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }

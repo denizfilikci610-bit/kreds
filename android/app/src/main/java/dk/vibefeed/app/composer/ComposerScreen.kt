@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
@@ -74,6 +75,7 @@ fun ComposerScreen(
             when (model.step) {
                 Step.CAMERA -> CameraStep(model, onCancel, onDenied)
                 Step.GALLERY -> GalleryStep(model, onCancel, onDenied)
+                Step.CROP -> CropStep(model, context, topPad, bottomPad)
                 Step.CAPTION -> CaptionStep(model, context, onShare)
             }
         }
@@ -186,7 +188,7 @@ private fun tagBillede(context: Context, capture: ImageCapture, model: ComposerM
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(result: ImageCapture.OutputFileResults) {
                 model.picked = Picked(android.net.Uri.fromFile(fil), isVideo = false)
-                model.step = Step.CAPTION
+                model.step = Step.CROP
             }
 
             override fun onError(exc: ImageCaptureException) {
@@ -234,7 +236,9 @@ private fun GalleryStep(model: ComposerModel, onCancel: () -> Unit, onDenied: ()
                 Box(
                     Modifier.aspectRatio(1f).background(Color(0xFF1A1A1A)).clickable {
                         model.picked = item
-                        model.step = Step.CAPTION
+                        // Billeder skal beskæres, som på iOS. Video går direkte videre, indtil
+                        // video-beskæreren er bygget.
+                        model.step = if (item.isVideo) Step.CAPTION else Step.CROP
                     }
                 ) {
                     AsyncImage(
@@ -257,6 +261,46 @@ private fun GalleryStep(model: ComposerModel, onCancel: () -> Unit, onDenied: ()
     }
 }
 
+/* ============================================================ Beskærer */
+
+@Composable
+private fun CropStep(
+    model: ComposerModel,
+    context: Context,
+    topPad: Dp,
+    bottomPad: Dp,
+) {
+    val valgt = model.picked ?: return
+    var billede by remember(valgt.uri) { mutableStateOf<android.graphics.Bitmap?>(null) }
+
+    LaunchedEffect(valgt.uri) {
+        billede = withContext(Dispatchers.IO) { Media.loadForCrop(context, valgt.uri) }
+    }
+
+    val b = billede
+    if (b == null) {
+        Box(Modifier.fillMaxSize().background(Color.Black))
+        return
+    }
+
+    CropScreen(
+        billede = b.asImageBitmap(),
+        erStory = model.isStory,
+        startFormat = Format.STAAENDE,
+        titel = model.labels.or("fit", "Tilpas udsnittet"),
+        formatLabel = model.labels.or("fit", "Tilpas udsnittet"),
+        annullerLabel = model.labels.or("cancel", "Annuller"),
+        brugLabel = model.labels.or("next", "Videre"),
+        topPad = topPad,
+        bottomPad = bottomPad,
+        onCancel = { model.step = if (valgt.uri.scheme == "file") Step.CAMERA else Step.GALLERY },
+        onDone = { ud ->
+            model.cropped = ud
+            model.step = Step.CAPTION
+        },
+    )
+}
+
 /* ============================================================ Billedtekst */
 
 @Composable
@@ -272,7 +316,7 @@ private fun CaptionStep(
         Toplinje(
             titel = model.title,
             annuller = model.labels.or("cancel", "Annuller"),
-            onCancel = { model.step = if (valgt.uri.scheme == "file") Step.CAMERA else Step.GALLERY },
+            onCancel = { model.step = Step.CROP },
         )
 
         // Kreds-vælgeren ligger ØVERST, som ejeren bad om på iOS
@@ -300,12 +344,22 @@ private fun CaptionStep(
             Modifier.weight(1f).fillMaxWidth().padding(top = 12.dp),
             contentAlignment = Alignment.Center,
         ) {
-            AsyncImage(
-                model = valgt.uri,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize(),
-            )
+            val beskaaret = model.cropped
+            if (beskaaret != null) {
+                androidx.compose.foundation.Image(
+                    bitmap = beskaaret.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                AsyncImage(
+                    model = valgt.uri,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
 
         BasicTextField(
@@ -336,11 +390,14 @@ private fun CaptionStep(
                 .clickable(enabled = !arbejder && !model.sharing) {
                     arbejder = true
                     val (w, h) = model.target()
+                    val færdig = model.cropped
                     Thread {
-                        val bytes = if (valgt.isVideo) {
-                            Media.readBytes(context, valgt.uri)
-                        } else {
-                            Media.prepareImage(context, valgt.uri, w, h)
+                        val bytes = when {
+                            valgt.isVideo -> Media.readBytes(context, valgt.uri)
+                            // Beskæreren har allerede lavet det endelige billede i det
+                            // valgte format. Så skal det ikke beskæres én gang til.
+                            færdig != null -> Media.encode(færdig)
+                            else -> Media.prepareImage(context, valgt.uri, w, h)
                         }
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
                             arbejder = false
