@@ -218,7 +218,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
-            injectBackScript(view)
+            injectScripts(view)
         }
 
         override fun onReceivedError(
@@ -337,11 +337,21 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun injectBackScript(view: WebView) {
-        val js = runCatching {
-            assets.open("back.js").bufferedReader().use { it.readText() }
-        }.getOrNull() ?: return
-        view.evaluateJavascript(js, null)
+    /**
+     * De to stumper web-kode appen selv lægger oven på siden. De bor i assets og ikke i
+     * js/ på vibefeed.dk, fordi web-koden deles med iOS-appen i App Store.
+     *
+     * back.js gør tilbage-knappen til navigation i stedet for en udgang, og
+     * compose-buttons.js tegner de to flydende opret-knapper som iOS har i sin
+     * native fanebjælke, men som web-fanebjælken ikke har.
+     */
+    private fun injectScripts(view: WebView) {
+        for (name in listOf("back.js", "compose-buttons.js")) {
+            val js = runCatching {
+                assets.open(name).bufferedReader().use { it.readText() }
+            }.getOrNull() ?: continue
+            view.evaluateJavascript(js, null)
+        }
     }
 
     // ---------------------------------------------------------------- filvalg
