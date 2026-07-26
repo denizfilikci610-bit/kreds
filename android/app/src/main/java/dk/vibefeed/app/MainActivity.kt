@@ -33,6 +33,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
+import dk.vibefeed.app.bridge.VfBridge
+import org.json.JSONObject
 import java.io.File
 
 /**
@@ -72,6 +74,9 @@ class MainActivity : AppCompatActivity() {
     /** Systemets indhak, som siden får at vide gennem window.__vfInsets. */
     private var safeArea: Insets = Insets.NONE
 
+    /** Besked-broen til web, den samme kontrakt som iOS bruger. */
+    private var bridge: VfBridge? = null
+
     private val filePicker =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             deliverFiles(result.resultCode, result.data)
@@ -90,6 +95,7 @@ class MainActivity : AppCompatActivity() {
         applySystemBars()
         applyThemeColors()
         configureWebView()
+        installBridge()
         registerBackHandling()
 
         if (savedInstanceState == null) {
@@ -342,6 +348,36 @@ class MainActivity : AppCompatActivity() {
     private fun showError() {
         web.visibility = View.GONE
         errorView.visibility = View.VISIBLE
+    }
+
+    // ---------------------------------------------------------------- broen til web
+
+    /**
+     * Slår besked-broen til, den samme som iOS bruger. Flagene fortæller web hvilke skærme
+     * appen kan overtage, og de må KUN indeholde det vi rent faktisk betjener: lover vi noget
+     * vi ikke svarer på, står web og venter for evigt.
+     *
+     * __vfNative er den farligste af dem. Den får js/main.js til at sætte body.native, og så
+     * skjuler css/app.css BÅDE fanebjælken og kreds-baren, fordi iOS leverer dem nativt. Den
+     * må derfor først med den dag begge findes native på Android.
+     */
+    private fun installBridge() {
+        bridge = VfBridge(
+            web = web,
+            allowedOrigins = INTERNAL_HOSTS.map { "https://$it" }.toSet(),
+            onMessage = ::onBridgeMessage,
+        )
+        bridge?.install(emptySet())
+    }
+
+    private fun onBridgeMessage(type: String, json: JSONObject) {
+        // Endnu ingen native skærme at sende beskederne videre til. Ukendte typer må aldrig
+        // kaste, kun ignoreres, præcis som Swift gør.
+        if (BuildConfig.DEBUG) {
+            // Kun feltnavne. Beskeder som creds bærer et enheds-token, og det har intet
+            // at gøre i enhedens log.
+            android.util.Log.d("VibeFeed", "bro: $type felter=${json.keys().asSequence().toList()}")
+        }
     }
 
     // ---------------------------------------------------------------- tilbage

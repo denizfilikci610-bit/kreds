@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 // Signeringen læses fra ~/.gradle/gradle.properties, ALDRIG fra repoet. Så ligger hverken
@@ -69,6 +70,7 @@ android {
 
     buildFeatures {
         buildConfig = true
+        compose = true
     }
 }
 
@@ -80,4 +82,26 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.browser:browser:1.8.0")
+
+    // De native skærme. SwiftUI-koden på iOS oversætter næsten linje for linje til Compose.
+    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
+    implementation(platform("androidx.compose:compose-bom:2026.03.01"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-core")
+
+    // Kameraet i minde- og story-komposeren
+    implementation("androidx.camera:camera-core:1.5.3")
+    implementation("androidx.camera:camera-camera2:1.5.3")
+    implementation("androidx.camera:camera-lifecycle:1.5.3")
+    implementation("androidx.camera:camera-video:1.5.3")
+    implementation("androidx.camera:camera-view:1.5.3")
+
+    // Miniaturer i galleri-gitteret
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Upload direkte til den URL web udleverer
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
