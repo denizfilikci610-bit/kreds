@@ -33,9 +33,20 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dk.vibefeed.app.bars.KredsBarModel
+import dk.vibefeed.app.bars.NativeComposeButtons
+import dk.vibefeed.app.bars.NativeKredsBar
+import dk.vibefeed.app.bars.NativeTabBar
+import dk.vibefeed.app.bars.TabBarModel
 import dk.vibefeed.app.bridge.VfBridge
 import dk.vibefeed.app.composer.ComposerModel
 import dk.vibefeed.app.composer.ComposerScreen
@@ -45,14 +56,13 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * VibeFeed på Android er den samme app som på iOS: én WebView på det live site.
- * Al logik bor i web-koden på vibefeed.dk, og denne skal leverer kun de fire ting
- * et WebView ikke kan selv: tilbage-navigation, filvalg, ruter for eksterne links
- * og systemets indhak omkring indholdet.
+ * VibeFeed på Android er den samme app som på iOS: én WebView på det live site plus
+ * et lag native skærme ovenpå. Al forretningslogik og alle 32 sprog bor i web-koden på
+ * vibefeed.dk, og de to sider taler sammen over den samme besked-bro som iOS bruger.
  *
- * Vi sætter med vilje INGEN window.__vf-flag. De flag fortæller web-koden at der
- * findes native erstatninger, og fx __vfNative ville skjule både fanebjælken og
- * kreds-baren (css/app.css body.native) uden at give noget i stedet.
+ * Appen leverer: navigation (fanebjælke og kreds-bar), medie-komposeren med kamera og
+ * galleri, filvalg for webbens egne felter, ruter for eksterne links, systemets indhak
+ * og tilbage-knappen.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -89,6 +99,16 @@ class MainActivity : AppCompatActivity() {
 
     /** Den native medie-komposer (minder og stories). */
     private val composer = ComposerModel()
+
+    /** De to native barer, drevet af web over broen. */
+    private val tabBar = TabBarModel()
+    private val kredsBar = KredsBarModel()
+
+    /** Sat når broen kan bære de native barer. Uden dem må __vfNative aldrig sættes. */
+    private var nativeBars = false
+
+    /** Brugerens sprogvalg, meldt af web i creds-beskeden. Styrer den native søgetekst. */
+    private var lang = "da"
 
     private val filePicker =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -382,24 +402,26 @@ class MainActivity : AppCompatActivity() {
             onMessage = ::onBridgeMessage,
         )
         bridge = b
-        // ⚠️ INGEN capabilities endnu, og det er en bevidst beslutning.
-        //
-        // Den native medie-komposer er færdig og virker: den åbner, henter fra galleriet,
-        // tager billeder og sender vfMemory af sted. Men RETURVEJEN findes ikke uden
-        // __vfNative. window.vfMemory, vfMemoryUploaded, vfMemoryUploadFailed, vfMemoryCancel
-        // og vfMemoryFallback defineres alle INDE i `if(window.__vfNative)` i js/main.js:71.
-        // Uden det flag kan komposeren åbne, men aldrig gøre sig færdig, og så står brugeren
-        // med en spinner der ikke stopper.
-        //
-        // __vfNative kan til gengæld først sættes når BÅDE fanebjælken og kreds-baren findes
-        // native, for css/app.css skjuler dem begge i samme øjeblik flaget er sat. De to barer
-        // er altså ikke bare pynt: de er nøglen der låser hele retur-fladen op.
-        b.install(emptySet())
+        // __vfNative er nøglen: den skjuler web-barerne (css/app.css:957) OG definerer hele
+        // retur-fladen, window.vfTab, vfKreds, vfMemory og resten, i js/main.js:71. Den må
+        // derfor først sættes nu, hvor både fanebjælken og kreds-baren findes native.
+        b.install(
+            if (b.isSupported) {
+                setOf("__vfNative", "__vfPhotoLib", "__vfComposeCamera")
+            } else {
+                emptySet()
+            }
+        )
+        nativeBars = b.isSupported
         overlay.setContent { NativeOverlay() }
+        if (nativeBars) overlay.visibility = View.VISIBLE
     }
 
     private fun onBridgeMessage(type: String, json: JSONObject) {
         when (type) {
+            "tab" -> tabBar.apply(json)
+            "kreds" -> kredsBar.apply(json)
+            "creds" -> lang = json.optString("lang").ifBlank { lang }
             "photolib" -> onPhotoLib(json)
             // Web sender også beskeder appen aldrig skal gøre noget ved (fsheet, msheet,
             // ads, consent, creds). En ukendt type må aldrig kaste, kun ignoreres.
@@ -443,14 +465,56 @@ class MainActivity : AppCompatActivity() {
 
     // ---------------------------------------------------------------- native skærme
 
+    /**
+     * De native skærme, lagt oven på webviewet i samme fuldskærms-koordinatsystem som på iOS.
+     * Alt der ikke er en bar eller et ark lader trykket gå videre ned i webviewet.
+     */
     @Composable
     private fun NativeOverlay() {
-        if (!composer.open) return
         val d = resources.displayMetrics.density
+        val top = (safeArea.top / d).dp
+        val bottom = (safeArea.bottom / d).dp
+        val ink = Color(ContextCompat.getColor(this, R.color.vf_ink))
+        val bg = Color(ContextCompat.getColor(this, R.color.vf_bg))
+
+        Box(Modifier.fillMaxSize()) {
+            if (nativeBars) {
+                NativeKredsBar(
+                    model = kredsBar,
+                    ink = ink,
+                    surface = bg,
+                    background = bg,
+                    topInset = top,
+                    søgTekst = if (lang == "da") "Søg i dine kredse …" else "Search your circles …",
+                    onTap = { id -> bridge?.call("vfKreds", id) },
+                )
+                Box(Modifier.align(Alignment.BottomCenter)) {
+                    NativeTabBar(
+                        model = tabBar,
+                        ink = ink,
+                        surface = bg,
+                        bottomInset = bottom,
+                        onTap = { id -> bridge?.call("vfTab", id) },
+                    )
+                }
+                Box(Modifier.align(Alignment.BottomEnd)) {
+                    NativeComposeButtons(
+                        model = tabBar,
+                        bottomInset = bottom,
+                        onTap = { id -> bridge?.call("vfTab", id) },
+                    )
+                }
+            }
+            if (composer.open) Composer(top, bottom)
+        }
+    }
+
+    @Composable
+    private fun Composer(top: Dp, bottom: Dp) {
         ComposerScreen(
             model = composer,
-            topPad = (safeArea.top / d).dp,
-            bottomPad = (safeArea.bottom / d).dp,
+            topPad = top,
+            bottomPad = bottom,
             onShare = { bytes, isVideo, caption, dest ->
                 composer.pendingBytes = bytes
                 composer.sharing = true
@@ -481,8 +545,9 @@ class MainActivity : AppCompatActivity() {
         overlay.visibility = View.VISIBLE
     }
 
+    /** Barerne bliver liggende; kun komposeren forsvinder. */
     private fun hideOverlay() {
-        overlay.visibility = View.GONE
+        overlay.visibility = if (nativeBars) View.VISIBLE else View.GONE
     }
 
     // ---------------------------------------------------------------- tilbage
@@ -510,6 +575,13 @@ class MainActivity : AppCompatActivity() {
                         web.goBack()
                         return@evaluateJavascript
                     }
+                    // Web-fanebjælken er skjult af body.native, så back.js kan ikke selv
+                    // skifte fane. Står vi et andet sted end feedet, fører tilbage derhen.
+                    if (nativeBars && tabBar.active != "feed") {
+                        tabBar.active = "feed"
+                        bridge?.call("vfTab", "feed")
+                        return@evaluateJavascript
+                    }
                     // Vi er på forsiden. Læg appen i baggrunden i stedet for at lukke
                     // den, så sessionen og hele siden stadig er varm næste gang.
                     moveTaskToBack(true)
@@ -529,7 +601,9 @@ class MainActivity : AppCompatActivity() {
     private fun injectScripts(view: WebView) {
         // safe-area.js FØRST: den skriver sidens egne env()-regler om, og de to andre
         // lag læner sig op ad de variabler den sætter.
-        for (name in listOf("safe-area.js", "back.js", "compose-buttons.js")) {
+        val lag = if (nativeBars) listOf("safe-area.js", "back.js")
+        else listOf("safe-area.js", "back.js", "compose-buttons.js")
+        for (name in lag) {
             val js = runCatching {
                 assets.open(name).bufferedReader().use { it.readText() }
             }.getOrNull() ?: continue
