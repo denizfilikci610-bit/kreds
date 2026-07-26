@@ -4,6 +4,4 @@
          og siden er den samme farve fra første billede. -->
     <color name="vf_bg">#FAF9F6</color>
     <color name="vf_ink">#161616</color>
-    <!-- Ikonets baggrund, taget direkte fra icon-1024.png -->
-    <color name="vf_icon_bg">#D76147</color>
 </resources>

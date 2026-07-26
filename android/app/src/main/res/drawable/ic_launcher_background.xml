@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Samme vandrette gradient som app-ikonet på iOS. Den ligger som baggrundslag i det
+     adaptive ikon, så gradienten fylder hele fladen uanset hvilken form launcheren
+     maskerer med, mens selve V'et bor i forgrundslaget inde i den sikre zone. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="0"
+        android:endColor="#FF914D"
+        android:startColor="#FF3131"
+        android:type="linear" />
+</shape>
