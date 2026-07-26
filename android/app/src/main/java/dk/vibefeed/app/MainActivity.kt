@@ -61,6 +61,8 @@ import dk.vibefeed.app.composer.Uploader
 import dk.vibefeed.app.notif.VfNotifikationer
 import dk.vibefeed.app.pages.ListPageHost
 import dk.vibefeed.app.pages.ListPageModel
+import dk.vibefeed.app.post.PostPageHost
+import dk.vibefeed.app.post.PostPageModel
 import dk.vibefeed.app.sheets.GlassSheetHost
 import dk.vibefeed.app.sheets.SheetModel
 import org.json.JSONObject
@@ -129,6 +131,9 @@ class MainActivity : AppCompatActivity() {
 
     /** Kommentar-arket for minder. */
     private val comments = CommentsModel()
+
+    /** Opslags-siden for tanker. */
+    private val postPage = PostPageModel()
 
     /** Sat når broen kan bære de native barer. Uden dem må __vfNative aldrig sættes. */
     private var nativeBars = false
@@ -467,7 +472,7 @@ class MainActivity : AppCompatActivity() {
             if (b.isSupported) {
                 setOf(
                     "__vfNative", "__vfPhotoLib", "__vfComposeCamera",
-                    "__vfGlassCard", "__vfListPage", "__vfComments",
+                    "__vfGlassCard", "__vfListPage", "__vfComments", "__vfPostPage",
                 )
             } else {
                 emptySet()
@@ -488,6 +493,8 @@ class MainActivity : AppCompatActivity() {
             "sheet" -> onSheet(json)
             "listpage" -> onListPage(json)
             "comments" -> onComments(json)
+            "postpage" -> onPostPage(json)
+            "share" -> onShare(json)
             // Web sender også beskeder appen aldrig skal gøre noget ved (fsheet, msheet,
             // ads, consent, creds). En ukendt type må aldrig kaste, kun ignoreres.
             else -> Unit
@@ -610,6 +617,30 @@ class MainActivity : AppCompatActivity() {
         if (comments.open) showOverlay() else if (!composer.open) hideOverlay()
     }
 
+    /** Opslags-siden. Et close kan komme uopfordret (opslaget forsvandt, logout). */
+    private fun onPostPage(json: JSONObject) {
+        postPage.apply(json)
+        if (postPage.open) showOverlay() else if (!composer.open) hideOverlay()
+    }
+
+    /**
+     * navigator.share-shimmen (assets/share.js): åbn Androids dele-ark med det indhold
+     * web ville have delt gennem iPhonens navigator.share.
+     */
+    private fun onShare(json: JSONObject) {
+        val tekst = listOf(json.optString("text"), json.optString("url"))
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
+        if (tekst.isBlank()) return
+        val del = Intent(Intent.ACTION_SEND)
+            .setType("text/plain")
+            .putExtra(Intent.EXTRA_TEXT, tekst)
+        json.optString("title").takeIf { it.isNotBlank() }?.let {
+            del.putExtra(Intent.EXTRA_SUBJECT, it)
+        }
+        runCatching { startActivity(Intent.createChooser(del, null)) }
+    }
+
     // ---------------------------------------------------------------- native skærme
 
     /**
@@ -661,6 +692,16 @@ class MainActivity : AppCompatActivity() {
                 topIndhak = top,
                 bundIndhak = bottom,
                 onEvent = { obj -> bridge?.call("vfListPage", obj) },
+            )
+            // Opslags-siden ligger UNDER glaskortet: ⋯ på andres opslag skal kunne lægge
+            // menuen OVENPÅ siden, ellers er den død (web lukker bevidst ikke siden).
+            PostPageHost(
+                model = postPage,
+                blæk = ink,
+                baggrund = bg,
+                topIndhak = top,
+                bundIndhak = bottom,
+                onEvent = { obj -> bridge?.call("vfPostPage", obj) },
             )
             // Glaskortet ligger OVER barerne (scrimen skal dæmpe dem) men UNDER komposeren,
             // præcis som på iPhone. Det må IKKE ligge inde i if (nativeBars).
@@ -738,7 +779,9 @@ class MainActivity : AppCompatActivity() {
     /** Barerne og de åbne native flader bliver liggende; kun komposeren forsvinder. */
     private fun hideOverlay() {
         overlay.visibility =
-            if (nativeBars || sheet.request != null || listPage.open || comments.open) {
+            if (nativeBars || sheet.request != null || listPage.open ||
+                comments.open || postPage.open
+            ) {
                 View.VISIBLE
             } else {
                 View.GONE
@@ -783,6 +826,11 @@ class MainActivity : AppCompatActivity() {
                     overlay.postDelayed({ if (comments.open) comments.lukLokalt() }, 600)
                     return
                 }
+                // Opslags-siden: glid ud først, dismiss bagefter, som chevronen.
+                if (postPage.open) {
+                    postPage.exit()
+                    return
+                }
                 // Liste-siden: glid ud først, dismiss bagefter (samme vej som pilen).
                 if (listPage.open) {
                     listPage.exit()
@@ -822,8 +870,8 @@ class MainActivity : AppCompatActivity() {
     private fun injectScripts(view: WebView) {
         // safe-area.js FØRST: den skriver sidens egne env()-regler om, og de to andre
         // lag læner sig op ad de variabler den sætter.
-        val lag = if (nativeBars) listOf("safe-area.js", "back.js")
-        else listOf("safe-area.js", "back.js", "compose-buttons.js")
+        val lag = if (nativeBars) listOf("safe-area.js", "back.js", "share.js")
+        else listOf("safe-area.js", "back.js", "compose-buttons.js", "share.js")
         for (name in lag) {
             val js = runCatching {
                 assets.open(name).bufferedReader().use { it.readText() }

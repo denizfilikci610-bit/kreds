@@ -86,6 +86,13 @@ object VfIcons {
     /** Notifikations-fanens "klokke" ER appens hjerte, så aliaserne siger det de er. */
     val Heart get() = Bell
     val HeartOutline get() = BellOutline
+
+    /** Papirflyet, samme geometri som web-appens dele-ikon. */
+    val Send = VfIcon(
+        fyldt = emptyList(),
+        streg = listOf("M22 2 11 13", "M22 2 15 22 11 13 2 9 22 2"),
+    )
+    val Check = VfIcon(fyldt = emptyList(), streg = listOf("M5 12l5 5L20 7"))
     val Photo = VfIcon(
         fyldt = listOf("M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm1.6 12h12.8l-4-5.2-3.1 3.9-2.1-2.5L5.6 17ZM8 10.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"),
         streg = emptyList(),

@@ -49,23 +49,23 @@ data class CommentLabels(
     val delConfirm: String = "",
 )
 
-class CommentsModel {
+class CommentsModel : CommentHost {
 
-    var open by mutableStateOf(false)
+    override var open by mutableStateOf(false)
         private set
-    var postId by mutableStateOf("")
+    override var postId by mutableStateOf("")
         private set
     var title by mutableStateOf("")
         private set
-    var canPost by mutableStateOf(false)
+    override var canPost by mutableStateOf(false)
         private set
-    var emoji by mutableStateOf<List<String>>(emptyList())
+    override var emoji by mutableStateOf<List<String>>(emptyList())
         private set
-    var comments by mutableStateOf<List<CommentRow>>(emptyList())
+    override var comments by mutableStateOf<List<CommentRow>>(emptyList())
         private set
-    var mentionables by mutableStateOf<List<MentionCard>>(emptyList())
+    override var mentionables by mutableStateOf<List<MentionCard>>(emptyList())
         private set
-    var labels by mutableStateOf(CommentLabels())
+    override var labels by mutableStateOf(CommentLabels())
         private set
 
     /** Engangs: deep-linkets kommentar-id. Hvert efterfølgende snapshot nulstiller det. */
@@ -77,18 +77,18 @@ class CommentsModel {
 
     // ---- Lokal composer-tilstand. Bor i modellen så den overlever rekomposition,
     // men aldrig i snapshottet: web kender den ikke.
-    var text by mutableStateOf("")
-    var replyingToId by mutableStateOf<String?>(null)
-    var replyingToHandle by mutableStateOf("")
+    override var text by mutableStateOf("")
+    override var replyingToId by mutableStateOf<String?>(null)
+    override var replyingToHandle by mutableStateOf("")
 
     /** To-trins slet: id'et der er armeret ("Slet?"), falder efter 3 s og ved snapshots. */
-    var deleteArmId by mutableStateOf<String?>(null)
+    override var deleteArmId by mutableStateOf<String?>(null)
 
     /** Bumpes når Svar skal rejse tastaturet. */
-    var focusToken by mutableIntStateOf(0)
+    override var focusToken by mutableIntStateOf(0)
 
     /** Bumpes efter egen afsendelse, så listen ruller til bunden. */
-    var scrollToken by mutableIntStateOf(0)
+    override var scrollToken by mutableIntStateOf(0)
 
     fun apply(json: JSONObject) {
         if (json.opt("close") == true) {
