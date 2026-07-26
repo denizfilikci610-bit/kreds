@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.json.JSONObject
 
-private val BRAND = Color(0xFFE0402F)
+internal val BRAND = Color(0xFFE0402F)
 
 /* ============================================================ tilstand */
 

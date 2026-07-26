@@ -55,6 +55,8 @@ import dk.vibefeed.app.composer.ComposerModel
 import dk.vibefeed.app.composer.ComposerScreen
 import dk.vibefeed.app.composer.Purpose
 import dk.vibefeed.app.composer.Uploader
+import dk.vibefeed.app.sheets.GlassSheetHost
+import dk.vibefeed.app.sheets.SheetModel
 import org.json.JSONObject
 import java.io.File
 
@@ -112,6 +114,9 @@ class MainActivity : AppCompatActivity() {
     /** De to native barer, drevet af web over broen. */
     private val tabBar = TabBarModel()
     private val kredsBar = KredsBarModel()
+
+    /** Glaskortet: appens ti handlings-menuer, drevet af web over broen. */
+    private val sheet = SheetModel()
 
     /** Sat når broen kan bære de native barer. Uden dem må __vfNative aldrig sættes. */
     private var nativeBars = false
@@ -416,7 +421,7 @@ class MainActivity : AppCompatActivity() {
         // derfor først sættes nu, hvor både fanebjælken og kreds-baren findes native.
         b.install(
             if (b.isSupported) {
-                setOf("__vfNative", "__vfPhotoLib", "__vfComposeCamera")
+                setOf("__vfNative", "__vfPhotoLib", "__vfComposeCamera", "__vfGlassCard")
             } else {
                 emptySet()
             }
@@ -432,6 +437,7 @@ class MainActivity : AppCompatActivity() {
             "kreds" -> kredsBar.apply(json)
             "creds" -> lang = json.optString("lang").ifBlank { lang }
             "photolib" -> onPhotoLib(json)
+            "sheet" -> onSheet(json)
             // Web sender også beskeder appen aldrig skal gøre noget ved (fsheet, msheet,
             // ads, consent, creds). En ukendt type må aldrig kaste, kun ignoreres.
             else -> Unit
@@ -470,6 +476,20 @@ class MainActivity : AppCompatActivity() {
             composer.start(json)
             showOverlay()
         }
+    }
+
+    /**
+     * Glaskortet. Web ejer flowet: den poster enten det næste kort eller close, og kortet
+     * lukker sig aldrig selv.
+     *
+     * Fokus skal ryddes når et kort ankommer: root er polstret med tastaturets højde, så et
+     * åbent tastatur ville skubbe kortet for højt op. Chat-menuens "rediger" sætter selv
+     * fokus tilbage bagefter, så intet går tabt.
+     */
+    private fun onSheet(json: JSONObject) {
+        sheet.apply(json)
+        if (json.opt("close") != true) web.clearFocus()
+        if (sheet.request != null) showOverlay() else hideOverlay()
     }
 
     // ---------------------------------------------------------------- native skærme
@@ -514,6 +534,16 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
             }
+            // Glaskortet ligger OVER barerne (scrimen skal dæmpe dem) men UNDER komposeren,
+            // præcis som på iPhone. Det må IKKE ligge inde i if (nativeBars).
+            GlassSheetHost(
+                model = sheet,
+                blæk = ink,
+                overflade = bg,
+                topIndhak = top,
+                bundIndhak = bottom,
+                onAction = { a -> bridge?.call("vfSheet", a) },
+            )
             if (composer.open) Composer(top, bottom)
         }
     }
@@ -556,9 +586,10 @@ class MainActivity : AppCompatActivity() {
         overlay.visibility = View.VISIBLE
     }
 
-    /** Barerne bliver liggende; kun komposeren forsvinder. */
+    /** Barerne og et åbent glaskort bliver liggende; kun komposeren forsvinder. */
     private fun hideOverlay() {
-        overlay.visibility = if (nativeBars) View.VISIBLE else View.GONE
+        overlay.visibility =
+            if (nativeBars || sheet.request != null) View.VISIBLE else View.GONE
     }
 
     // ---------------------------------------------------------------- tilbage
@@ -576,6 +607,13 @@ class MainActivity : AppCompatActivity() {
                     composer.close()
                     hideOverlay()
                     bridge?.call("vfMemoryCancel")
+                    return
+                }
+                // Glaskortet: tilbage svarer til et tryk på scrimen. Web lukker kortet.
+                // Gennem samme lås som knapperne, så tilbage ikke kan sende __cancel oven
+                // i en handling der allerede er på vej.
+                if (sheet.request != null) {
+                    if (sheet.lås()) bridge?.call("vfSheet", "__cancel")
                     return
                 }
                 web.evaluateJavascript(
