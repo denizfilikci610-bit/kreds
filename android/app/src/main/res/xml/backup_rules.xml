@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Login-sessionen bor i WebViewets localStorage. Den må ikke følge med i en
+         sikkerhedskopi til en anden telefon: så ville man vågne op logget ind på
+         en enhed serveren aldrig har set. Man logger ind igen, som på iOS. -->
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="file" path="." />
+</full-backup-content>

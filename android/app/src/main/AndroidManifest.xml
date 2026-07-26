@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      INTERNET er den eneste tilladelse appen har brug for.
+
+      Kamera og fotobibliotek klares BEVIDST uden tilladelser: billeder hentes gennem
+      systemets egen fotovælger, og kameraet åbnes med ACTION_IMAGE_CAPTURE, som en
+      fremmed app (kamera-appen) udfører for os. Erklærer man CAMERA i manifestet,
+      begynder Android at kræve den tilladelse også for den intent, så erklæringen
+      ville gøre det værre, ikke bedre.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Kameraet er valgfrit: appen virker fint på enheder uden -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <application
+        android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="false"
+        android:theme="@style/Theme.VibeFeed">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|locale|layoutDirection">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+              App Links: bekræftelses- og nulstillingsmails peger på vibefeed.dk, og med
+              en verificeret .well-known/assetlinks.json på sitet åbner de i appen i
+              stedet for i Chrome. Filen kan først laves når Play har genereret app-
+              signeringsnøglen, så indtil da fejler verifikationen stille og linkene
+              åbner i browseren, hvor de virker præcis som før.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="vibefeed.dk" />
+                <data android:scheme="https" android:host="www.vibefeed.dk" />
+            </intent-filter>
+        </activity>
+
+        <!-- Midlertidig fil til kamera-optagelser, saa kamera-appen kan skrive resultatet -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+    <!-- Android 11+ kraever at vi erklaerer hvilke fremmede apps vi vil kunne kalde -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.VIDEO_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.provider.action.PICK_IMAGES" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.GET_CONTENT" />
+            <data android:mimeType="*/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+    </queries>
+</manifest>

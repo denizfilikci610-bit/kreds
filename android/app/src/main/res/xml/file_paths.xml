@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Kun mappen kamera-appen skriver sit resultat til. Intet andet af appens
+         data må kunne deles gennem FileProvideren. -->
+    <cache-path name="captures" path="captures/" />
+</paths>

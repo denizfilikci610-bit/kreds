@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VibeFeed</string>
+    <string name="offline">VibeFeed could not be reached. Check your connection.</string>
+    <string name="retry">Try again</string>
+</resources>
