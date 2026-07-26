@@ -522,6 +522,8 @@ class MainActivity : AppCompatActivity() {
     private fun Composer(top: Dp, bottom: Dp) {
         ComposerScreen(
             model = composer,
+            baggrund = Color(ContextCompat.getColor(this, R.color.vf_bg)),
+            blæk = Color(ContextCompat.getColor(this, R.color.vf_ink)),
             topPad = top,
             bottomPad = bottom,
             onShare = { bytes, isVideo, caption, dest ->

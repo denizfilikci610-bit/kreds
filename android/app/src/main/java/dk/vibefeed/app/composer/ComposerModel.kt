@@ -48,6 +48,15 @@ class ComposerModel {
 
     /** Billedbiblioteket, hentet én gang. Kameraets genvej viser det nyeste som miniature. */
     var seneste by mutableStateOf<List<Picked>>(emptyList())
+
+    /** Det markerede medie i galleriet. Først ved Videre går flowet videre. */
+    var valgt by mutableStateOf<Picked?>(null)
+
+    /** Tændt mens et valgt medie hentes. Gitteret fryses imens, så det rigtige medie følger med. */
+    var forbereder by mutableStateOf(false)
+
+    /** Kandidater til @-omtaler, pr. destination. Følger den valgte kreds. */
+    var mentionables by mutableStateOf<Map<String, List<MentionCard>>>(emptyMap())
     var caption by mutableStateOf("")
 
     /** Tændt mens web arbejder, så der ikke kan deles to gange. */
@@ -76,12 +85,16 @@ class ComposerModel {
             }
         } ?: emptyList()
 
+        mentionables = Mentions.parse(json.optJSONObject("mentionables"))
+
         labels = json.optJSONObject("labels")?.let { o ->
             Labels(o.keys().asSequence().associateWith { o.optString(it) })
         } ?: Labels(emptyMap())
 
         picked = null
+        valgt = null
         cropped = null
+        forbereder = false
         caption = ""
         sharing = false
         pendingBytes = null
@@ -91,6 +104,8 @@ class ComposerModel {
     fun close() {
         open = false
         picked = null
+        valgt = null
+        forbereder = false
         cropped = null
         caption = ""
         sharing = false
@@ -113,4 +128,8 @@ class ComposerModel {
 
     val shareLabel: String
         get() = if (isStory) labels.or("shareStory", "Del") else labels.or("shareMemory", "Del")
+
+    /** Kandidaterne der gælder den valgte destination, med fald tilbage til hele kredsen. */
+    val aktuelleMentions: List<MentionCard>
+        get() = mentionables[dest] ?: mentionables["all"] ?: emptyList()
 }
