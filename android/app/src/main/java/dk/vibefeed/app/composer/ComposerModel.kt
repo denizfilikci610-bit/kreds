@@ -45,6 +45,9 @@ class ComposerModel {
     var labels by mutableStateOf(Labels(emptyMap()))
 
     var picked by mutableStateOf<Picked?>(null)
+
+    /** Billedbiblioteket, hentet én gang. Kameraets genvej viser det nyeste som miniature. */
+    var seneste by mutableStateOf<List<Picked>>(emptyList())
     var caption by mutableStateOf("")
 
     /** Tændt mens web arbejder, så der ikke kan deles to gange. */

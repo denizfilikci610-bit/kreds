@@ -66,6 +66,7 @@ fun ComposerScreen(
     onDenied: () -> Unit,
 ) {
     val context = LocalContext.current
+    val cam = remember { CameraState() }
 
     // Appen tegner kant til kant, og Compose kender ikke systemets indhak, fordi
     // MainActivity selv har taget dem. Derfor får skærmen dem her, så knapperne ikke
@@ -73,7 +74,14 @@ fun ComposerScreen(
     CompositionLocalProvider(LocalSafeArea provides SafeArea(topPad, bottomPad)) {
         Box(Modifier.fillMaxSize().background(SORT)) {
             when (model.step) {
-                Step.CAMERA -> CameraStep(model, onCancel, onDenied)
+                Step.CAMERA -> CameraStep(
+                    model = model,
+                    cam = cam,
+                    topPad = topPad,
+                    bottomPad = bottomPad,
+                    onCancel = onCancel,
+                    onGallery = { model.step = Step.GALLERY },
+                )
                 Step.GALLERY -> GalleryStep(model, onCancel, onDenied)
                 Step.CROP -> CropStep(model, context, topPad, bottomPad)
                 Step.CAPTION -> CaptionStep(model, context, onShare)
@@ -86,117 +94,6 @@ fun ComposerScreen(
 data class SafeArea(val top: Dp, val bottom: Dp)
 
 val LocalSafeArea = androidx.compose.runtime.compositionLocalOf { SafeArea(0.dp, 0.dp) }
-
-/* ============================================================ Kamera */
-
-@Composable
-private fun CameraStep(model: ComposerModel, onCancel: () -> Unit, onDenied: () -> Unit) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    var granted by remember { mutableStateOf(harTilladelse(context, Manifest.permission.CAMERA)) }
-    var capture by remember { mutableStateOf<ImageCapture?>(null) }
-    var back by remember { mutableStateOf(true) }
-
-    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        granted = ok
-        // Nægtet kamera er ikke enden: galleriet virker stadig, præcis som på iOS.
-        if (!ok) model.step = Step.GALLERY
-    }
-    LaunchedEffect(Unit) { if (!granted) ask.launch(Manifest.permission.CAMERA) }
-
-    Box(Modifier.fillMaxSize()) {
-        if (granted) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { ctx ->
-                    PreviewView(ctx).also { view ->
-                        view.scaleType = PreviewView.ScaleType.FILL_CENTER
-                    }
-                },
-                update = { view ->
-                    val future = ProcessCameraProvider.getInstance(context)
-                    future.addListener({
-                        val provider = future.get()
-                        val preview = Preview.Builder().build()
-                            .also { it.surfaceProvider = view.surfaceProvider }
-                        val imageCapture = ImageCapture.Builder()
-                            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                            .build()
-                        val selector = if (back) CameraSelector.DEFAULT_BACK_CAMERA
-                        else CameraSelector.DEFAULT_FRONT_CAMERA
-                        runCatching {
-                            provider.unbindAll()
-                            provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture)
-                            capture = imageCapture
-                        }
-                    }, ContextCompat.getMainExecutor(context))
-                },
-            )
-        }
-
-        Toplinje(
-            titel = model.title,
-            annuller = model.labels.or("cancel", "Annuller"),
-            onCancel = onCancel,
-        )
-
-        Column(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = LocalSafeArea.current.bottom + 40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            // Minde eller story, samme vælger som iOS har under udløseren
-            if (model.purpose != Purpose.COMPOSE) {
-                Row(
-                    Modifier.padding(bottom = 22.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Tilstand(model.labels.or("modeMemory", "Minde"), !model.isStory) {
-                        model.isStory = false
-                    }
-                    Tilstand(model.labels.or("modeStory", "Story"), model.isStory) {
-                        model.isStory = true
-                    }
-                }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RundKnap("🖼", 52.dp) { model.step = Step.GALLERY }
-                Spacer(Modifier.width(34.dp))
-                Box(
-                    Modifier.size(78.dp).clip(CircleShape)
-                        .border(4.dp, Color.White, CircleShape)
-                        .padding(6.dp).clip(CircleShape).background(Color.White)
-                        .clickable(enabled = capture != null) {
-                            capture?.let { tagBillede(context, it, model) }
-                        }
-                )
-                Spacer(Modifier.width(34.dp))
-                RundKnap("↻", 52.dp) { back = !back }
-            }
-        }
-    }
-}
-
-private fun tagBillede(context: Context, capture: ImageCapture, model: ComposerModel) {
-    val fil = File(context.cacheDir, "capture_${System.nanoTime()}.jpg")
-    val output = ImageCapture.OutputFileOptions.Builder(fil).build()
-    capture.takePicture(
-        output,
-        ContextCompat.getMainExecutor(context),
-        object : ImageCapture.OnImageSavedCallback {
-            override fun onImageSaved(result: ImageCapture.OutputFileResults) {
-                model.picked = Picked(android.net.Uri.fromFile(fil), isVideo = false)
-                model.step = Step.CROP
-            }
-
-            override fun onError(exc: ImageCaptureException) {
-                // Slår optagelsen fejl, bliver vi i kameraet, så brugeren kan prøve igen
-            }
-        },
-    )
-}
 
 /* ============================================================ Galleri */
 
@@ -216,7 +113,10 @@ private fun GalleryStep(model: ComposerModel, onCancel: () -> Unit, onDenied: ()
     }
     LaunchedEffect(Unit) { if (!granted) ask.launch(medieTilladelser()) }
     LaunchedEffect(granted) {
-        if (granted) items = withContext(Dispatchers.IO) { Media.recent(context) }
+        if (granted) {
+            items = withContext(Dispatchers.IO) { Media.recent(context) }
+            model.seneste = items
+        }
     }
 
     Column(Modifier.fillMaxSize().background(SORT)) {
