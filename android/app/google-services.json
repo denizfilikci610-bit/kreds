@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "969250860162",
+    "project_id": "vibefeed-5cfd2",
+    "storage_bucket": "vibefeed-5cfd2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:969250860162:android:4694e04b4e86fd03ad989b",
+        "android_client_info": {
+          "package_name": "dk.vibefeed.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC_9id55w7dOmkFRCBZzdA-jW-bMwFvM0g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:969250860162:android:5daa258ade8f84a3ad989b",
+        "android_client_info": {
+          "package_name": "dk.vibefeed.app.debug"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC_9id55w7dOmkFRCBZzdA-jW-bMwFvM0g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
