@@ -578,13 +578,17 @@ private fun CaptionStep(
             Spacer(Modifier.height(bottomPad))
         } else {
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).imePadding()) {
-                BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 14.dp)) {
-                    Box(
-                        Modifier.fillMaxWidth().height(this@BoxWithConstraints.maxHeight * 0.40f),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Preview(model, valgt, Modifier.fillMaxSize())
-                    }
+                // Højden SKAL komme fra skærmen: inde i en scroll-kolonne er maxHeight
+                // uendelig, så en procent af den kollapsede forhåndsvisningen til nul.
+                val skærmHøjde = androidx.compose.ui.platform.LocalConfiguration
+                    .current.screenHeightDp.dp
+                Box(
+                    Modifier.fillMaxWidth()
+                        .padding(top = 14.dp)
+                        .height(skærmHøjde * 0.40f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Preview(model, valgt, Modifier.fillMaxSize())
                 }
 
                 // TextFieldValue, ikke String: ellers hopper markøren til position 0
