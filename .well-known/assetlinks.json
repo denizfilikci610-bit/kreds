@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "dk.vibefeed.app",
+      "sha256_cert_fingerprints": [
+        "F4:5D:A9:48:14:2D:F5:15:C9:F8:84:EF:BB:97:89:4D:AF:4B:B3:58:6B:75:5D:D2:D0:AE:C0:1C:40:34:A7:E5"
+      ]
+    }
+  }
+]

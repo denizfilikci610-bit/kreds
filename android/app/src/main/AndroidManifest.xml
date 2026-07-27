@@ -73,11 +73,18 @@
             </intent-filter>
 
             <!--
-              App Links: bekræftelses- og nulstillingsmails peger på vibefeed.dk, og med
-              en verificeret .well-known/assetlinks.json på sitet åbner de i appen i
-              stedet for i Chrome. Filen kan først laves når Play har genereret app-
-              signeringsnøglen, så indtil da fejler verifikationen stille og linkene
-              åbner i browseren, hvor de virker præcis som før.
+              App Links: bekræftelses- og nulstillingsmails peger på vibefeed.dk, og
+              .well-known/assetlinks.json på sitet bærer fingeraftrykket fra Play App
+              Signing, så de åbner i appen i stedet for i Chrome.
+
+              Verifikationen lykkes KUN for udgaver Google har signeret, altså dem der
+              kommer gennem Play. En lokalt bygget udgave er signeret med en anden nøgle,
+              så dér fejler den stille og linkene åbner i browseren, hvor de virker som før.
+
+              Modsat iOS kan et Android-intent-filter ikke filtrere på forespørgsels-
+              parametre, så filteret fanger hele vibefeed.dk og ikke kun auth-links.
+              Det er harmløst: appen ER det site, og linkFrom lader kun interne
+              adresser passere ind i webviewet.
             -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
