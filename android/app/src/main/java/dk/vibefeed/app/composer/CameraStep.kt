@@ -328,7 +328,7 @@ fun CameraStep(
                 Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IkonKnap("✕") { onCancel() }
+                IkonKnapIkon(dk.vibefeed.app.bars.VfIcons.Close) { onCancel() }
                 Spacer(Modifier.weight(1f))
                 if (cam.recording) {
                     Row(
@@ -345,7 +345,10 @@ fun CameraStep(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                IkonKnap(if (cam.flashOn) "⚡" else "⚡̸") {
+                IkonKnapIkon(
+                    if (cam.flashOn) dk.vibefeed.app.bars.VfIcons.Bolt
+                    else dk.vibefeed.app.bars.VfIcons.BoltSlash
+                ) {
                     cam.flashOn = !cam.flashOn
                     // Midt i en optagelse ER blitzen lygten, så den skal følge med straks
                     if (cam.recording) kamera?.cameraControl?.enableTorch(cam.flashOn)
@@ -407,8 +410,8 @@ fun CameraStep(
                 Spacer(Modifier.weight(1f))
                 // Vend-knappen er død mens der optages: et kameraskift midt i en
                 // optagelse ville rive sessionen ned under Recorderen.
-                IkonKnap("⟳") {
-                    if (cam.recording) return@IkonKnap
+                IkonKnapIkon(dk.vibefeed.app.bars.VfIcons.Flip) {
+                    if (cam.recording) return@IkonKnapIkon
                     cam.back = !cam.back
                     cam.zoom = 1f
                 }
@@ -519,6 +522,18 @@ private fun IkonKnap(tegn: String, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(tegn, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** Samme kapsel, men med et TEGNET ikon: emoji og tekst-glyffer hører ikke hjemme her. */
+@Composable
+private fun IkonKnapIkon(ikon: dk.vibefeed.app.bars.VfIcon, onClick: () -> Unit) {
+    Box(
+        Modifier.size(42.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.28f))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        dk.vibefeed.app.bars.VfIcon(ikon, Color.White, 20.dp)
     }
 }
 

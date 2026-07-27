@@ -93,6 +93,29 @@ object VfIcons {
         streg = listOf("M22 2 11 13", "M22 2 15 22 11 13 2 9 22 2"),
     )
     val Check = VfIcon(fyldt = emptyList(), streg = listOf("M5 12l5 5L20 7"))
+
+    /** Kameraets blitz: fyldt lyn som iOS' bolt.fill. */
+    val Bolt = VfIcon(
+        fyldt = listOf("M13 2 3 14h9l-1 8 10-12h-9l1-8z"),
+        streg = emptyList(),
+    )
+
+    /** Blitz slået fra: lynet med en skrå streg igennem, som iOS' bolt.slash.fill. */
+    val BoltSlash = VfIcon(
+        fyldt = listOf("M13 2 3 14h9l-1 8 10-12h-9l1-8z"),
+        streg = listOf("M4 3 20 21"),
+    )
+
+    /** Vend kamera: to buer med pile, som iOS' skift-kamera-symbol. */
+    val Flip = VfIcon(
+        fyldt = emptyList(),
+        streg = listOf(
+            "M20 8.6A8.4 8.4 0 0 0 5.4 6.8L4 8.4",
+            "M4 3.5v4.9h4.9",
+            "M4 15.4a8.4 8.4 0 0 0 14.6 1.8l1.4-1.6",
+            "M20 20.5v-4.9h-4.9",
+        ),
+    )
     val Photo = VfIcon(
         fyldt = listOf("M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm1.6 12h12.8l-4-5.2-3.1 3.9-2.1-2.5L5.6 17ZM8 10.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"),
         streg = emptyList(),
