@@ -53,7 +53,10 @@ android {
         applicationId = "dk.vibefeed.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        // Play HUSKER hvert versionsnummer der er uploadet, ogsaa selvom udrulningen blev
+        // afbrudt. Nummeret skal derfor OP ved hver ny fil, ellers afvises den.
+        // 1 = foerste upload til Internal testing (27. juli 2026).
+        versionCode = 2
         versionName = "1.0"
         resourceConfigurations += listOf("en", "da")
     }
