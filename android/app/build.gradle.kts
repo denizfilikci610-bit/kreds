@@ -55,8 +55,9 @@ android {
         targetSdk = 36
         // Play HUSKER hvert versionsnummer der er uploadet, ogsaa selvom udrulningen blev
         // afbrudt. Nummeret skal derfor OP ved hver ny fil, ellers afvises den.
-        // 1 = foerste upload til Internal testing (27. juli 2026).
-        versionCode = 2
+        // 1 = afbrudt foerste forsoeg, 2 = foerste upload til Internal testing,
+        // 3 = politik-siden kunne ikke scrolles (27. juli 2026).
+        versionCode = 3
         versionName = "1.0"
         resourceConfigurations += listOf("en", "da")
     }

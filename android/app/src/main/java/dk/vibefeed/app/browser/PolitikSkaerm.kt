@@ -8,23 +8,20 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebChromeClient
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,11 +36,17 @@ import androidx.compose.ui.viewinterop.AndroidView
 import dk.vibefeed.app.R
 import dk.vibefeed.app.ui.VfPress
 import dk.vibefeed.app.ui.vfPress
-import kotlinx.coroutines.launch
 
 /**
  * I-app-fremviseren til politik- og vilkårssiderne, modstykket til iOS' pageSheet med
  * den bevidst indskrænkede browser (InAppBrowser.swift).
+ *
+ * FULDSKÆRM, ikke et ModalBottomSheet. Arket slugte trækket: Material3-arket driver sin
+ * egen træk-gestus, og en AndroidView-WebView deltager ikke i Compose' nested scroll, så
+ * et swipe i teksten flyttede siden ~15 px og snappede tilbage. Politikken kunne altså
+ * ikke læses. Materiale 1.4.0 har ingen sheetGesturesEnabled at slå fra, så fladen er nu
+ * en almindelig fuldskærms-side som appens øvrige native skærme. Den lukkes med Færdig,
+ * med systemets tilbage-knap, eller ved at et link fører videre ind i appen.
  *
  * Reglerne for links, oversat fra iOS:
  * - Sprogskifte-links (siderne peger på hinandens sprogudgaver) bliver i arket.
@@ -54,7 +57,6 @@ import kotlinx.coroutines.launch
 private val POLITIK_SIDER = setOf("privacy.html", "privatliv.html", "terms.html", "vilkaar.html")
 
 @SuppressLint("SetJavaScriptEnabled")
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PolitikSkaerm(
     url: String,
@@ -64,16 +66,10 @@ fun PolitikSkaerm(
     onLuk: () -> Unit,
     onEksternt: (Uri) -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = rememberCoroutineScope()
     var titel by remember { mutableStateOf("") }
     var webRef by remember { mutableStateOf<WebView?>(null) }
 
-    // Luk med animation: hide() er suspend, og lukningen må først ske BAGEFTER,
-    // ellers hopper arket væk uden bevægelse.
-    val lukPaent: () -> Unit = {
-        scope.launch { sheetState.hide() }.invokeOnCompletion { onLuk() }
-    }
+    val lukPaent: () -> Unit = { onLuk() }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -82,15 +78,16 @@ fun PolitikSkaerm(
         }
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onLuk,
-        sheetState = sheetState,
-        dragHandle = null,
-        shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp),
-        containerColor = baggrund,
-        // Arket tegner i sit eget vindue og arver ikke edge-to-edge, så indhakket
-        // kommer fra aktivitetens safeArea, ikke fra WindowInsets herinde.
-        modifier = Modifier.padding(top = topIndhak + 10.dp),
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(baggrund)
+            // Siden SKAL sluge tryk, ellers ruller feedet under den.
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) {}
+            .padding(top = topIndhak),
     ) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().height(56.dp)) {
