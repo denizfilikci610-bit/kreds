@@ -238,6 +238,15 @@ class MainActivity : AppCompatActivity() {
         // bag systembjælkerne skal følge med i hånden. Selve siden klarer sig selv
         // gennem prefers-color-scheme.
         applyThemeColors()
+        // zoom.js fryser layout-bredden til indlæsningens screen.width. Telefonen er
+        // portræt-låst, men skifter skærmen alligevel størrelse (foldable, skrivebords-
+        // tilstand), skal viewporten regnes om, ellers står siden i forkert skala.
+        web.evaluateJavascript(
+            "(function(){var m=document.querySelector('meta[name=\"viewport\"]');" +
+                "if(m){m.setAttribute('content','width='+Math.round(screen.width/$VF_ZOOM)+" +
+                "', user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content');}})()",
+            null,
+        )
     }
 
     override fun onPause() {
@@ -404,11 +413,22 @@ class MainActivity : AppCompatActivity() {
             return true
         }
 
+        // Chromium kalder ALTID onPageFinished efter onReceivedError for samme
+        // navigation, så rydningen skal kende fejlen, ellers blinkede fejlskærmen
+        // væk igen og efterlod en tom side uden Prøv igen-knap.
+        private var fejlede = false
+
+        override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+            fejlede = false
+        }
+
         override fun onPageFinished(view: WebView, url: String?) {
-            // En vellykket indlæsning SKAL rydde en tidligere fejlskærm, som iOS'
-            // didFinish sætter failed=false. Ellers stod skærmen der for evigt.
-            errorView.visibility = View.GONE
-            web.visibility = View.VISIBLE
+            // En vellykket indlæsning rydder en tidligere fejlskærm, som iOS' didFinish
+            // sætter failed=false. En FEJLET gør ikke.
+            if (!fejlede) {
+                errorView.visibility = View.GONE
+                web.visibility = View.VISIBLE
+            }
             injectScripts(view)
         }
 
@@ -420,7 +440,10 @@ class MainActivity : AppCompatActivity() {
             // Kun hvis det er selve siden der fejler. Et enkelt billede der ikke kan
             // hentes må ikke smide en fejlskærm op over en app der kører fint, og en
             // AFBRUDT indlæsning (reload midt i en anden, ERROR_UNKNOWN) er ikke en fejl.
-            if (request.isForMainFrame && error.errorCode != ERROR_UNKNOWN) showError()
+            if (request.isForMainFrame && error.errorCode != ERROR_UNKNOWN) {
+                fejlede = true
+                showError()
+            }
         }
 
         override fun onRenderProcessGone(
@@ -470,8 +493,10 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         openOutside(url)
                     }
-                    // Aldrig rive et WebView ned midt i dets eget callback.
-                    v.post { v.destroy() }
+                    // Aldrig rive et WebView ned midt i dets eget callback, men heller
+                    // aldrig via v.post: snifferen er ikke i view-træet, så dens egen
+                    // kø tømmes aldrig, og hvert _blank-link lækkede et helt WebView.
+                    web.post { v.destroy() }
                     return true
                 }
             }
@@ -551,6 +576,9 @@ class MainActivity : AppCompatActivity() {
                     "__vfNative", "__vfPhotoLib", "__vfComposeCamera",
                     "__vfGlassCard", "__vfListPage", "__vfComments", "__vfPostPage",
                     "__vfEsheet",
+                    // Sidst tændte flag: chat-besked-menuen går native med emoji-rækken.
+                    // Rækken har været bygget og klar i GlassCard.kt hele tiden.
+                    "__vfSheetEmojis",
                 )
             } else {
                 emptySet()
@@ -651,11 +679,23 @@ class MainActivity : AppCompatActivity() {
     /** Egen action og extras, aldrig en data-URI, så App Links-filteret ikke forveksles. */
     private fun tapFrom(intent: Intent?) {
         if (intent?.action != VfNotifikationer.ACTION_TAP) return
-        // Genåbning fra recents/launcher GENLEVERER taskens oprindelige intent. Uden de to
-        // værn her deep-linkede appen til det gamle opslag ved hver genskabelse: iOS kan
-        // ikke genafspille et tap (payloaden bor kun i hukommelsen i selve tap-øjeblikket).
+        // Genåbning fra recents/launcher GENLEVERER taskens oprindelige intent. Uden
+        // værnene her deep-linkede appen til det gamle opslag ved hver genskabelse: iOS
+        // kan ikke genafspille et tap (payloaden bor kun i hukommelsen i tap-øjeblikket).
         if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
         val payload = intent.getStringExtra(VfNotifikationer.EXTRA_PAYLOAD) ?: return
+        // Hvert tap bærer et unikt id og må kun forbruges ÉN gang. removeExtra dækker
+        // kun den lokale Intent-instans; taskens baseIntent genleveres med extras
+        // intakte ved relaunch fra launcher-ikonet efter procesdød, og dér er det kun
+        // det varigt gemte id der kan skelne gammelt fra nyt.
+        // Id'erne tælles monotont op per notifikation, så alt der ikke er NYERE end det
+        // sidst forbrugte er en genlevering.
+        val tapId = intent.getLongExtra(VfNotifikationer.EXTRA_TAP_ID, 0L)
+        if (tapId != 0L) {
+            val p = getSharedPreferences("vf_notif", MODE_PRIVATE)
+            if (tapId <= p.getLong("vf_forbrugt_tap", 0L)) return
+            p.edit().putLong("vf_forbrugt_tap", tapId).apply()
+        }
         // Forbrugt er forbrugt: en senere genlevering af samme intent skal være tom.
         intent.removeExtra(VfNotifikationer.EXTRA_PAYLOAD)
         // En nyere payload afløser en uleveret ældre og får sit EGET friske budget.
@@ -790,7 +830,10 @@ class MainActivity : AppCompatActivity() {
                     // Nødværn: ekkoer web aldrig close (reload-vindue, opslag væk), må
                     // siden ikke stå usynligt "åben" og æde alle tilbage-tryk.
                     if (obj.optString("kind") == "dismiss") {
-                        overlay.postDelayed({ if (postPage.open) postPage.lukLokalt() }, 800)
+                        val g = postPage.gen
+                        overlay.postDelayed(
+                            { if (postPage.open && postPage.gen == g) postPage.lukLokalt() }, 800
+                        )
                     }
                 },
             )
@@ -802,7 +845,17 @@ class MainActivity : AppCompatActivity() {
                 baggrund = bg,
                 topIndhak = top,
                 bundIndhak = bottom,
-                onEvent = { obj -> bridge?.call("vfListPage", obj) },
+                onEvent = { obj ->
+                    bridge?.call("vfListPage", obj)
+                    // Samme nødværn som de andre glidende sider: ekkoer web aldrig
+                    // close, må siden ikke stå usynligt åben og æde alle tilbage-tryk.
+                    if (obj.optString("kind") == "dismiss") {
+                        val g = listPage.gen
+                        overlay.postDelayed(
+                            { if (listPage.open && listPage.gen == g) listPage.lukLokalt() }, 800
+                        )
+                    }
+                },
             )
             // Glaskortet ligger OVER barerne (scrimen skal dæmpe dem) men UNDER komposeren,
             // præcis som på iPhone. Det må IKKE ligge inde i if (nativeBars).
@@ -836,7 +889,10 @@ class MainActivity : AppCompatActivity() {
                     // Samme nødværn som tilbage-knappen har: chevron og swipe må heller
                     // ikke kunne efterlade en usynligt åben side hvis web tier.
                     if (obj.optString("kind") == "dismiss") {
-                        overlay.postDelayed({ if (esheet.open) esheet.lukLokalt() }, 1200)
+                        val g = esheet.gen
+                        overlay.postDelayed(
+                            { if (esheet.open && esheet.gen == g) esheet.lukLokalt() }, 1200
+                        )
                     }
                 },
                 onAvatar = { dataUrl -> bridge?.call("vfAvatar", dataUrl) },
@@ -880,6 +936,11 @@ class MainActivity : AppCompatActivity() {
                     .put("forCompose", composer.purpose == Purpose.COMPOSE)
                     .put("isStory", composer.isStory)
                 bridge?.call("vfMemory", obj)
+            },
+            onFejl = {
+                // Kodning/eksport fejlede FØR upload. Web viser sin fejl-toast og ekkoer
+                // "err" tilbage, som slukker spinneren, samme kanal som en fejlet upload.
+                bridge?.call("vfMemoryUploadFailed")
             },
             onCancel = {
                 composer.close()
@@ -945,7 +1006,10 @@ class MainActivity : AppCompatActivity() {
                 if (comments.open) {
                     bridge?.call("vfComments", JSONObject()
                         .put("kind", "dismiss").put("postId", comments.postId))
-                    overlay.postDelayed({ if (comments.open) comments.lukLokalt() }, 600)
+                    val g = comments.gen
+                    overlay.postDelayed(
+                        { if (comments.open && comments.gen == g) comments.lukLokalt() }, 600
+                    )
                     return
                 }
                 // Opslags-siden: glid ud først, dismiss bagefter, som chevronen.
@@ -967,7 +1031,10 @@ class MainActivity : AppCompatActivity() {
                         esheet.deleteStep -> esheet.deleteStep = false
                         else -> {
                             esheet.exit()
-                            overlay.postDelayed({ if (esheet.open) esheet.lukLokalt() }, 1200)
+                            val g = esheet.gen
+                            overlay.postDelayed(
+                                { if (esheet.open && esheet.gen == g) esheet.lukLokalt() }, 1200
+                            )
                         }
                     }
                     return

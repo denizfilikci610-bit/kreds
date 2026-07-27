@@ -91,6 +91,11 @@ class EsheetModel {
     var exitTick by mutableIntStateOf(0)
         private set
 
+    /** Generation: bumpes ved hvert åbn/luk, så et gammelt nødværn aldrig kan
+     *  ramme en NY session der blev åbnet efter at timeren blev armeret. */
+    var gen: Int = 0
+        private set
+
     fun exit() {
         exitTick++
     }
@@ -99,6 +104,7 @@ class EsheetModel {
     fun apply(json: JSONObject) {
         if (json.opt("close") == true) {
             open = false
+            gen += 1
             deleteStep = false
             return
         }
@@ -168,6 +174,7 @@ class EsheetModel {
         deleteStep = false
 
         open = true
+        gen += 1
     }
 
     /** Fletter: hver nøgle falder tilbage på den nuværende værdi. */
@@ -184,6 +191,7 @@ class EsheetModel {
     /** Nødværnet når web ikke ekkoer close inden for ~1200 ms. Bevidst afvigelse fra iOS. */
     fun lukLokalt() {
         open = false
+        gen += 1
         deleteStep = false
     }
 }

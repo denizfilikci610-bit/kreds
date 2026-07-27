@@ -90,11 +90,17 @@ class CommentsModel : CommentHost {
     /** Bumpes efter egen afsendelse, så listen ruller til bunden. */
     override var scrollToken by mutableIntStateOf(0)
 
+    /** Generation: bumpes ved hvert åbn/luk, så et gammelt nødværn aldrig kan
+     *  ramme en NY session der blev åbnet efter at timeren blev armeret. */
+    var gen: Int = 0
+        private set
+
     fun apply(json: JSONObject) {
         if (json.opt("close") == true) {
             // Uden denne rydning genopstod et gammelt "Svarer @bruger" plus udkast ved
             // genåbning af SAMME minde. Close rører intet af det øvrige indhold.
             open = false
+            gen += 1
             text = ""
             replyingToId = null
             replyingToHandle = ""
@@ -174,6 +180,7 @@ class CommentsModel : CommentHost {
         deleteArmId = null
 
         open = true
+        gen += 1
     }
 
     /**
@@ -182,6 +189,7 @@ class CommentsModel : CommentHost {
      */
     fun lukLokalt() {
         open = false
+        gen += 1
         text = ""
         replyingToId = null
         replyingToHandle = ""

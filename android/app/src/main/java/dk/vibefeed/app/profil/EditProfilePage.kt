@@ -143,7 +143,9 @@ fun EditProfilePageHost(
                 cropBillede = null
                 dragX.snapTo(breddePx) // nulstil eksplicit ved hver åbning
                 dragX.animateTo(0f, tween(280, easing = EaseOut))
-            } else if (synlig && dragX.value == 0f) {
+            } else if (synlig) {
+                // Også midt i ind-animationen: kravet om dragX == 0 lod ellers siden
+                // fryse halvvejs på skærmen når close ankom tidligt.
                 dragX.animateTo(breddePx, tween(280, easing = EaseOut))
                 synlig = false
             }
@@ -207,7 +209,13 @@ fun EditProfilePageHost(
                                 scope.launch { dragX.animateTo(0f, spring(0.85f, 440f)) }
                             }
                         },
-                        onDragCancel = { iGang = false },
+                        onDragCancel = {
+                            // Et annulleret træk fjedrer tilbage, ellers står siden forskudt
+                            if (iGang) {
+                                iGang = false
+                                scope.launch { dragX.animateTo(0f, spring(0.85f, 440f)) }
+                            }
+                        },
                     )
                 },
         ) {
@@ -515,7 +523,9 @@ private fun SideIndhold(
             // Brugernavn: låst, mentions og venskaber peger på det.
             if (model.handle.isNotEmpty()) {
                 FormRaekke(model.handleLabel, blæk, sidste = false) {
-                    Text("@${model.handle}", fontSize = 16.sp, color = sekundær)
+                    // Råt, uden @: snapshottet leverer handlet nøgent, og sådan viser
+                    // både web og iPhone det her.
+                    Text(model.handle, fontSize = 16.sp, color = sekundær)
                 }
             }
 
@@ -670,17 +680,18 @@ private fun SletTrin(model: EsheetModel, blæk: Color, onEvent: (JSONObject) -> 
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        // vfPress FORREST: ellers skalerer kun teksten mens den røde kapsel står stille
         Box(
             Modifier
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth()
                 .alpha(if (klar) 1f else 0.45f)
-                .clip(RoundedCornerShape(14.dp))
-                .background(BRAND)
                 .vfPress(VfPress.POP, enabled = klar) {
                     model.deleting = true
                     onEvent(JSONObject().put("kind", "delete"))
                 }
+                .clip(RoundedCornerShape(14.dp))
+                .background(BRAND)
                 .padding(vertical = 14.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -823,12 +834,13 @@ private fun Segment(
     onTap: () -> Unit,
 ) {
     val form = RoundedCornerShape(12.dp)
+    // vfPress FORREST så hele pillen skalerer, ikke kun teksten
     Box(
         modifier
+            .vfPress(VfPress.CHIP, onClick = onTap)
             .clip(form)
             .background(if (valgt) blæk else Color.Transparent)
             .border(1.5.dp, if (valgt) Color.Transparent else blæk.copy(alpha = 0.18f), form)
-            .vfPress(VfPress.CHIP, onClick = onTap)
             .padding(vertical = 11.dp),
         contentAlignment = Alignment.Center,
     ) {

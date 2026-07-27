@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -248,18 +249,25 @@ fun PostPageHost(
                 fremhævMål = null
             }
 
+            // Første komposition tæller IKKE: tokens ryddes ikke ved close, så en
+            // genåbning af siden ville ellers auto-scrolle med det samme.
+            var sidsteScrollToken by remember { mutableIntStateOf(model.scrollToken) }
             LaunchedEffect(model.scrollToken) {
-                if (model.scrollToken > 0 && model.comments.isNotEmpty()) {
+                if (model.scrollToken == sidsteScrollToken) return@LaunchedEffect
+                sidsteScrollToken = model.scrollToken
+                if (model.comments.isNotEmpty()) {
                     listState.animateScrollToItem(model.comments.lastIndex + 1)
                 }
             }
 
-            // Nyt opslag mens siden er åben: til tops, uden ny glid-ind.
+            // Nyt opslag mens siden er åben: til tops, uden ny glid-ind. Samme
+            // første-kompositions-værn: freshToken nulstilles aldrig i modellen.
+            var sidsteFreshToken by remember { mutableIntStateOf(model.freshToken) }
             LaunchedEffect(model.freshToken) {
-                if (model.freshToken > 0) {
-                    listState.scrollToItem(0)
-                    dragX.snapTo(0f)
-                }
+                if (model.freshToken == sidsteFreshToken) return@LaunchedEffect
+                sidsteFreshToken = model.freshToken
+                listState.scrollToItem(0)
+                dragX.snapTo(0f)
             }
 
             LaunchedEffect(model.deleteArmId) {
@@ -299,7 +307,12 @@ fun PostPageHost(
                         blæk = blæk,
                         fremhævAlpha = if (række.id == fremhævet) fremhævAlpha.value else 0f,
                         armet = model.deleteArmId == række.id,
-                        onProfil = { send("profile") { it.put("handle", række.handle) } },
+                        onProfil = {
+                            // Tom handle krydser aldrig broen (slettet konto)
+                            if (række.handle.isNotBlank()) {
+                                send("profile") { it.put("handle", række.handle) }
+                            }
+                        },
                         onSvar = {
                             model.replyingToId = række.id
                             model.replyingToHandle = række.handle
@@ -343,7 +356,9 @@ private fun OpslagsBlok(
     ) {
         Box(
             Modifier.vfPress(VfPress.CARD) {
-                send("profile") { it.put("handle", post.handle) }
+                if (post.handle.isNotBlank()) {
+                    send("profile") { it.put("handle", post.handle) }
+                }
             },
         ) {
             VfGlassAvatar(post.avatarUrl, post.initials, post.gradient, 40.dp)
@@ -410,7 +425,9 @@ private fun OpslagsBlok(
                                             ),
                                         ),
                                     ) {
-                                        send("mention") { it.put("handle", m) }
+                                        if (m.isNotBlank()) {
+                                            send("mention") { it.put("handle", m) }
+                                        }
                                     }
                                 ) { append("@$m") }
                             } else {

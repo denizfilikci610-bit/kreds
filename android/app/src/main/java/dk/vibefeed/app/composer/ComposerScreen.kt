@@ -70,6 +70,7 @@ fun ComposerScreen(
     topPad: Dp,
     bottomPad: Dp,
     onShare: (bytes: ByteArray, isVideo: Boolean, caption: String, dest: String) -> Unit,
+    onFejl: () -> Unit,
     onCancel: () -> Unit,
     onDenied: () -> Unit,
 ) {
@@ -83,7 +84,13 @@ fun ComposerScreen(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
         if (medieAdgang(context) != Adgang.NÆGTET) {
-            Thread { model.seneste = Media.recent(context) }.start()
+            Thread {
+                val liste = Media.recent(context)
+                // Compose-tilstand skrives kun fra hovedtråden
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    model.seneste = liste
+                }
+            }.start()
         }
     }
     LaunchedEffect(model.open) {
@@ -95,25 +102,39 @@ fun ComposerScreen(
         }
     }
 
-    // Tankens "upload straks": intet beskærings- eller billedtekst-trin. Billeder
-    // nedskaleres til 1440/JPEG 87. Videoer går ALTID gennem eksporten som på iPhone,
-    // også uden klip: re-encodningen til H.264/AAC er en del af kontrakten, en rå fil
-    // fra galleriet kunne være HEVC eller noget andet feedet ikke kan afspille.
+    // Tankens "upload straks": intet beskærings- eller billedtekst-trin i UI'et.
+    // GALLERI-medier sendes ubeskåret (1440/JPEG 87, video kun klippet i egne mål).
+    // KAMERA-medier beskæres derimod til den viste 4:5-ramme, præcis som iOS: brugeren
+    // komponerede motivet inde i rammen, så tanken må ikke vise det der lå udenfor.
+    // Video går ALTID gennem eksporten: re-encodningen til H.264/AAC er en del af
+    // kontrakten, en rå galleri-fil kunne være HEVC som feedet ikke kan afspille.
     LaunchedEffect(model.uploadStraks) {
         if (!model.uploadStraks) return@LaunchedEffect
         val p = model.picked ?: run { model.uploadStraks = false; return@LaunchedEffect }
+        val fraKamera = p.uri.scheme == "file"
         if (!p.isVideo) {
-            val bytes = withContext(Dispatchers.IO) { Media.prepareCompose(context, p.uri) }
+            val bytes = withContext(Dispatchers.IO) {
+                if (fraKamera) {
+                    val (bw, bh) = Media.orientedBounds(context, p.uri) ?: (1080 to 1350)
+                    val (w, h) = model.kameraTarget(bw, bh)
+                    Media.prepareImage(context, p.uri, w, h)
+                } else {
+                    Media.prepareCompose(context, p.uri)
+                }
+            }
             model.uploadStraks = false
             if (bytes != null && model.open) onShare(bytes, false, "", model.dest)
+            else if (bytes == null) onFejl()
             return@LaunchedEffect
         }
         eksporterVideo(
             model, context, p,
-            udsnitOgMaal = false, // kun klip: ingen beskæring, videoens egne mål
+            // Kamera-video: klip OG beskæring til rammen (kameraTarget). Galleri: kun klip.
+            udsnitOgMaal = fraKamera,
         ) { bytes ->
             model.uploadStraks = false
             if (bytes != null && model.open) onShare(bytes, true, "", model.dest)
+            else if (bytes == null && model.open) onFejl()
         }
     }
 
@@ -173,13 +194,21 @@ fun ComposerScreen(
                         )
                     }
                 }
-                Step.CAPTION -> CaptionStep(model, context, baggrund, blæk, topPad, bottomPad, onShare)
+                Step.CAPTION ->
+                    CaptionStep(model, context, baggrund, blæk, topPad, bottomPad, onShare, onFejl)
             }
 
             // Tankens straks-upload: en rolig spinner over kameraet mens der kodes og sendes.
+            // Overlayet SLUGER alle tryk: uden pointerInput faldt de igennem til udløseren
+            // og galleriet nedenunder, midt i en igangværende upload.
             if (model.uploadStraks || (model.sharing && model.purpose == Purpose.COMPOSE)) {
                 Box(
-                    Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)),
+                    Modifier.fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.45f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) {},
                     contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator(color = BRAND, strokeWidth = 2.dp)
@@ -473,6 +502,7 @@ private fun CaptionStep(
     topPad: Dp,
     bottomPad: Dp,
     onShare: (ByteArray, Boolean, String, String) -> Unit,
+    onFejl: () -> Unit,
 ) {
     val valgt = model.picked ?: return
     var arbejder by remember { mutableStateOf(false) }
@@ -503,6 +533,9 @@ private fun CaptionStep(
             onAction = {
                 if (arbejder || model.sharing) return@ComposerNavBar
                 arbejder = true
+                // Vagten bor på MODELLEN som på iOS: et lokalt remember-flag forsvandt
+                // med composablen, så Del + Annuller + Del igen kunne give TO opslag.
+                model.sharing = true
                 val færdig = model.cropped
                 if (valgt.isVideo) {
                     // Video skal ALTID gennem eksporten: klip til trim-vinduet, brugerens
@@ -512,6 +545,9 @@ private fun CaptionStep(
                         arbejder = false
                         if (bytes != null && model.open) {
                             onShare(bytes, true, model.caption, model.dest)
+                        } else {
+                            model.sharing = false
+                            if (model.open) onFejl()
                         }
                     }
                     return@ComposerNavBar
@@ -538,6 +574,9 @@ private fun CaptionStep(
                         // må det sene resultat ALDRIG poste et opslag.
                         if (bytes != null && model.open) {
                             onShare(bytes, false, model.caption, model.dest)
+                        } else {
+                            model.sharing = false
+                            if (bytes == null && model.open) onFejl()
                         }
                     }
                 }.start()
@@ -804,10 +843,11 @@ private fun eksporterVideo(
     val udsnit = if (!udsnitOgMaal || storyUdenBeskæring) null else model.videoUdsnit
         ?: VideoExport.daekUdsnit(model.videoBredde, model.videoHoejde, b, h)
 
-    // Et sent resultat fra en lukket (eller lukket og genåbnet) komposer smides væk
+    // Et sent resultat fra en lukket (eller lukket og genåbnet) komposer SLUGES helt:
+    // selv en null-levering ville mutere den nye sessions tilstand i callbackens hale.
     val seq = model.reqSeq
     val lever: (ByteArray?) -> Unit = { bytes ->
-        færdig(if (model.reqSeq == seq) bytes else null)
+        if (model.reqSeq == seq) færdig(bytes)
     }
 
     var svaret = false

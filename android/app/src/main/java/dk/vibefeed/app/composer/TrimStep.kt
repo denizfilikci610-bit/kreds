@@ -66,7 +66,14 @@ fun TrimStep(
             repeatMode = Player.REPEAT_MODE_ONE
         }
     }
-    DisposableEffect(Unit) { onDispose { afspiller.release() } }
+    DisposableEffect(Unit) {
+        onDispose {
+            // Forlades trinnet midt i et træk (finger to rammer Videre/Annuller),
+            // må scrubber-flaget ikke blive hængende og fryse næste besøg.
+            model.scrubber = false
+            afspiller.release()
+        }
+    }
 
     // Løkken låses til det valgte vindue gennem klipningen, men KUN når der ikke
     // scrubbes: under trækket ville hvert delta ellers genopbygge afspilleren og

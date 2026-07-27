@@ -132,11 +132,23 @@ class ListPageModel {
      * data opdateres, så brugerens faneskift og søgetekst overlever en gen-push (fx den
      * optimistiske Anmod-flipning).
      */
+    /** Generation: bumpes ved hvert åbn/luk, så et gammelt nødværn aldrig kan
+     *  ramme en NY session der blev åbnet efter at timeren blev armeret. */
+    var gen: Int = 0
+        private set
+
+    /** Nødværnet: lukker lokalt når web aldrig ekkoer close (reload-vindue). */
+    fun lukLokalt() {
+        open = false
+        gen += 1
+    }
+
     fun apply(json: JSONObject) {
         if (json.opt("close") == true) {
             // Luk nulstiller KUN open og query. Titel, faner, labels og begge datasæt
             // bliver stående, så en gen-åbning af samme side ikke blinker.
             open = false
+            gen += 1
             query = ""
             return
         }
@@ -204,6 +216,7 @@ class ListPageModel {
         }
 
         open = true
+        gen += 1
     }
 }
 
@@ -305,7 +318,13 @@ fun ListPageHost(
                                 }
                             }
                         },
-                        onDragCancel = { iGang = false },
+                        onDragCancel = {
+                            // Et annulleret træk fjedrer tilbage, ellers står siden forskudt
+                            if (iGang) {
+                                iGang = false
+                                scope.launch { dragX.animateTo(0f, spring(0.85f, 440f)) }
+                            }
+                        },
                     )
                 },
         ) {

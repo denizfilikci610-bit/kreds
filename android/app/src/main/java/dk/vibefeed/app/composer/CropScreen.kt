@@ -24,6 +24,8 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import dk.vibefeed.app.ui.VfPress
+import dk.vibefeed.app.ui.vfPress
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -109,9 +111,13 @@ fun CropScreen(
             val dæk = max(rammeBredde / imgB, rammeHoejde / imgH)
             val t = dæk * zoom
 
+            // Læser zoom ved KALDSTID: gestus-coroutinen holder en gammel klem-lukning
+            // (pointerInput genstarter kun ved nyt billede), og en frosset t klemte
+            // panoreringen efter zoomens GAMLE grænser.
             fun klem(o: Offset): Offset {
-                val maxX = max(0f, (imgB * t - rammeBredde) / 2f)
-                val maxY = max(0f, (imgH * t - rammeHoejde) / 2f)
+                val tt = dæk * zoom
+                val maxX = max(0f, (imgB * tt - rammeBredde) / 2f)
+                val maxY = max(0f, (imgH * tt - rammeHoejde) / 2f)
                 return Offset(min(maxX, max(-maxX, o.x)), min(maxY, max(-maxY, o.y)))
             }
 
@@ -281,9 +287,13 @@ fun ProfilCropScreen(
             val dæk = max(rammeBredde / imgB, rammeHoejde / imgH)
             val t = dæk * zoom
 
+            // Læser zoom ved KALDSTID: gestus-coroutinen holder en gammel klem-lukning
+            // (pointerInput genstarter kun ved nyt billede), og en frosset t klemte
+            // panoreringen efter zoomens GAMLE grænser.
             fun klem(o: Offset): Offset {
-                val maxX = max(0f, (imgB * t - rammeBredde) / 2f)
-                val maxY = max(0f, (imgH * t - rammeHoejde) / 2f)
+                val tt = dæk * zoom
+                val maxX = max(0f, (imgB * tt - rammeBredde) / 2f)
+                val maxY = max(0f, (imgH * tt - rammeHoejde) / 2f)
                 return Offset(min(maxX, max(-maxX, o.x)), min(maxY, max(-maxY, o.y)))
             }
 
@@ -477,15 +487,17 @@ fun FormatIkonPublic(f: Format, farve: Color) {
 
 @androidx.compose.runtime.Composable
 fun CropKnapPublic(tekst: String, primær: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    // vfPress FORREST så hele pillen skalerer, og ingen Material-ripple: Brug = POP,
+    // Annuller = FADE, som specens knap-tabel kræver.
     Box(
         modifier
+            .vfPress(if (primær) VfPress.POP else VfPress.FADE) { onClick() }
             .clip(CircleShape)
             .background(if (primær) BRAND else Color.White.copy(alpha = 0.14f))
             .then(
                 if (primær) Modifier
                 else Modifier.border(1.dp, Color.White.copy(alpha = 0.16f), CircleShape)
             )
-            .clickable { onClick() }
             .padding(vertical = 15.dp),
         contentAlignment = Alignment.Center,
     ) {

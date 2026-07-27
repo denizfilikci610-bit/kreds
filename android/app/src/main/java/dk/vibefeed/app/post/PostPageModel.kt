@@ -87,6 +87,11 @@ class PostPageModel : CommentHost {
     var exitTick by mutableIntStateOf(0)
         private set
 
+    /** Generation: bumpes ved hvert åbn/luk, så et gammelt nødværn aldrig kan
+     *  ramme en NY session der blev åbnet efter at timeren blev armeret. */
+    var gen: Int = 0
+        private set
+
     fun exit() {
         exitTick++
     }
@@ -102,6 +107,7 @@ class PostPageModel : CommentHost {
         if (json.opt("close") == true) {
             // Kun open, udkast og svar-mål. token, postId, post og comments bliver stående.
             open = false
+            gen += 1
             text = ""
             replyingToId = null
             replyingToHandle = ""
@@ -230,11 +236,13 @@ class PostPageModel : CommentHost {
         deleteArmId = null
 
         open = true
+        gen += 1
     }
 
     /** Nødværnet, samme rydning som close-grenen. */
     fun lukLokalt() {
         open = false
+        gen += 1
         text = ""
         replyingToId = null
         replyingToHandle = ""

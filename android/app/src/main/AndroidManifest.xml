@@ -37,8 +37,11 @@
     <!-- Kameraet er valgfrit: appen virker fint på enheder uden -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!-- allowBackup=false: login-sessionen bor i WebView'ets localStorage, og reglerne i
+         backup_rules kan ikke udelukke WebView-mapperne pålideligt. En session må aldrig
+         følge med i cloud-backup eller enhedsoverførsel, samme holdning som på iPhone. -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
@@ -57,6 +60,12 @@
             android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|fontScale|locale|layoutDirection">
+
+            <!-- Android 16 ignorerer portræt-låsen på skærme over 600 dp uden denne
+                 opt-out. Hele fladen (kamera-rammen, zoom.js, barerne) er portræt. -->
+            <property
+                android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
+                android:value="true" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

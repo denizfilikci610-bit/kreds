@@ -104,10 +104,15 @@ fun CameraStep(
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
     var provider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
+    // Sat til falsk ved dispose: kamera-futuren kan blive færdig EFTER at trinnet er
+    // forladt, og en binding dér ville genåbne kameraet bag om oprydningen.
+    val trinLever = remember { booleanArrayOf(true) }
+
     // Forlader man kamera-trinnet (galleri, beskærer, luk), SKAL sessionen slippes:
     // ellers holder appen kameraet (og privatlivs-prikken) åbent i baggrunden.
     DisposableEffect(Unit) {
         onDispose {
+            trinLever[0] = false
             runCatching { optagelse?.stop() }
             optagelse = null
             runCatching { kamera?.cameraControl?.enableTorch(false) }
@@ -238,6 +243,12 @@ fun CameraStep(
                     val future = ProcessCameraProvider.getInstance(context)
                     future.addListener({
                         val p = runCatching { future.get() }.getOrNull() ?: return@addListener
+                        // Trinnet kan være forladt mens futuren arbejdede: bind ALDRIG
+                        // efter dispose, det genåbnede kameraet i baggrunden.
+                        if (!trinLever[0]) {
+                            runCatching { p.unbindAll() }
+                            return@addListener
+                        }
                         provider = p
                         val preview = Preview.Builder().build()
                             .also { it.surfaceProvider = view.surfaceProvider }
@@ -612,13 +623,19 @@ private fun startOptagelse(
     val måOptageLyd = ContextCompat.checkSelfPermission(
         context, Manifest.permission.RECORD_AUDIO
     ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    // Stoppes optagelsen af dispose-oprydningen (luk/tilbage midt i en optagelse),
+    // leverer CameraX stadig Finalize bagefter: den må ikke sende en LUKKET komposer
+    // videre til billedteksten.
+    val seq = model.reqSeq
     return runCatching {
         videoUd.output.prepareRecording(context, output)
             .apply { if (måOptageLyd) withAudioEnabled() }
             .start(ContextCompat.getMainExecutor(context)) { event ->
                 if (event is VideoRecordEvent.Finalize) {
                     onFærdig()
-                    if (!event.hasError()) {
+                    if (model.reqSeq != seq || !model.open) {
+                        fil.delete()
+                    } else if (!event.hasError()) {
                         val uri = Uri.fromFile(fil)
                         // Målene skal læses, ellers kan eksporten ikke regne udsnittet ud
                         val (b, h, varighed) = VideoExport.mål(context, uri)
@@ -630,6 +647,8 @@ private fun startOptagelse(
                         model.visTrim = false // nedtællingen har allerede holdt den under 6 sekunder
                         model.videoUdsnit = null
                         model.picked = Picked(uri, isVideo = true, durationMs = varighed)
+                        // Rester fra et tidligere BILLEDE må ikke overleve som preview
+                        model.cropped = null
                         // Kamera-klip går aldrig gennem trim, og de beskæres automatisk
                         // efter motivets orientering, som på iOS. En tanke uploader straks.
                         if (model.purpose == Purpose.COMPOSE) {

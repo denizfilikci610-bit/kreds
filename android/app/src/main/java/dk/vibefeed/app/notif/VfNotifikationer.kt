@@ -42,6 +42,7 @@ object VfNotifikationer {
     const val KANAL = "vf_default"
     const val ACTION_TAP = "dk.vibefeed.app.NOTIF"
     const val EXTRA_PAYLOAD = "vf_payload"
+    const val EXTRA_TAP_ID = "vf_tap_id"
     const val POLL_ARBEJDE = "vf_poll"
 
     private const val PREFS = "vf_notif"
@@ -222,6 +223,10 @@ object VfNotifikationer {
         val tap = Intent(ctx, MainActivity::class.java)
             .setAction(ACTION_TAP)
             .putExtra(EXTRA_PAYLOAD, payloadJson)
+            // Unikt id: et tap må kun FORBRUGES én gang. Taskens baseIntent genleveres
+            // ved relaunch (launcher-ikon efter procesdød), og uden id'et deep-linkede
+            // den gamle payload igen og igen.
+            .putExtra(EXTRA_TAP_ID, id.toLong())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val pending = PendingIntent.getActivity(
             ctx,

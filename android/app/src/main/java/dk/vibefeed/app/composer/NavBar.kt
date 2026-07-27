@@ -45,13 +45,16 @@ fun ComposerNavBar(
             Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Annuller er DØD mens der arbejdes: at bakke ud midt i en eksport kunne
+            // ellers give to opslag (gå tilbage, frem, Del igen mens eksport 1 kører).
             Text(
                 annullerLabel,
-                color = blæk,
+                color = blæk.copy(alpha = if (arbejder) 0.4f else 1f),
                 fontSize = 16.sp,
                 modifier = Modifier.clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
+                    enabled = !arbejder,
                 ) { onCancel() },
             )
             Spacer(Modifier.weight(1f))

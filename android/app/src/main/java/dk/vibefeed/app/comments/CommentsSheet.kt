@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.platform.LocalDensity
 import dk.vibefeed.app.ui.vfSkjulTastaturVedTraek
 import androidx.compose.ui.text.font.FontWeight
@@ -123,42 +124,48 @@ fun CommentsSheetHost(
                     ) {},
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // Grebet, det ENESTE træk-følsomme sted. dragY følger fingeren nedad og
-                // fjedrer ALTID tilbage til 0; selv når trækket lukker, glider arket på
-                // plads og forsvinder først når web ekkoer close.
+                // Grebet, det ENESTE træk-følsomme sted. Trækfladen er ARKETS FULDE
+                // bredde (kapslen er kun pynt i midten), som iOS' contentShape, og
+                // flick måles i ægte dp/s med VelocityTracker: sidste-frame-deltaet
+                // var frame-rate-afhængigt og dobbelt så følsomt ved 120 Hz.
+                // dragY fjedrer ALTID tilbage til 0; selv når trækket lukker, glider
+                // arket på plads og forsvinder først når web ekkoer close.
                 Box(
                     Modifier
+                        .fillMaxWidth()
                         .padding(top = 8.dp, bottom = 6.dp)
                         .pointerInput(Unit) {
                             var akk = 0f
-                            var sidsteDelta = 0f
-                            // Flick-tærsklen i DP, ikke rå pixels: 16 rå px var tre
-                            // gange for følsomt på en density-3-skærm.
-                            val flick16 = 16.dp.toPx()
+                            val fart = androidx.compose.ui.input.pointer.util.VelocityTracker()
+                            val flick1000 = 1000.dp.toPx()
                             detectDragGestures(
-                                onDragStart = { akk = 0f; sidsteDelta = 0f },
+                                onDragStart = { akk = 0f; fart.resetTracking() },
                                 onDrag = { change, delta ->
                                     change.consume()
                                     akk += delta.y
-                                    sidsteDelta = delta.y
+                                    fart.addPointerInputChange(change)
                                     scope.launch { dragY.snapTo(max(0f, akk)) }
                                 },
                                 onDragEnd = {
-                                    // Flick nedad tæller som luk, ligesom iOS' forudsagte
-                                    // slutposition. 16 dp per frame ved 60 Hz er ~1000 dp/s.
-                                    if (dragY.value > luk110 || sidsteDelta > flick16) dismiss()
+                                    val v = fart.calculateVelocity().y
+                                    if (dragY.value > luk110 || v > flick1000) dismiss()
                                     scope.launch { dragY.animateTo(0f, spring(0.85f, 440f)) }
                                 },
                                 onDragCancel = {
                                     scope.launch { dragY.animateTo(0f, spring(0.85f, 440f)) }
                                 },
                             )
-                        }
-                        .width(38.dp)
-                        .height(5.dp)
-                        .clip(CircleShape)
-                        .background(blæk.copy(alpha = 0.28f)),
-                )
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .width(38.dp)
+                            .height(5.dp)
+                            .clip(CircleShape)
+                            .background(blæk.copy(alpha = 0.28f)),
+                    )
+                }
 
                 Text(
                     text = model.title.ifBlank { "…" },

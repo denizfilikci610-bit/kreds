@@ -232,9 +232,10 @@ fun KommentarComposer(
     }
 
     // Hårstregen ligger på composerens ABSOLUTTE overkant som iOS' overlay, derfor
-    // ingen top-polstring på selve Column'en.
+    // ingen top-polstring på selve Column'en. Bund-indhakket ligger på hele composeren,
+    // UBETINGET som på iOS: også en ren læser (emoji-bar uden felt) skal fri af kanten.
     Column(
-        Modifier.fillMaxWidth().padding(bottom = 10.dp),
+        Modifier.fillMaxWidth().padding(bottom = 10.dp + bundPolstring),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(Modifier.fillMaxWidth().height(0.5.dp).background(blæk.copy(alpha = 0.1f)))
@@ -333,8 +334,7 @@ fun KommentarComposer(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = bundPolstring),
+                    .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {

@@ -8,11 +8,15 @@ plugins {
 // Firebase-konsollen). Indtil da bygger appen fint uden, og notifikationerne kommer
 // gennem kvarters-pollen i stedet. Pluginet må derfor kun anvendes når filen findes.
 //
-// ⚠️ DEPLOY-RÆKKEFØLGE, ufravigelig: FCM-grenen i supabase/functions/send-push SKAL være
-// deployet FØR denne fil lægges ind. Ellers registrerer appen et FCM-token, send-push
-// poster det til APNs, får BadDeviceToken og rydder tokenet SERVER-side, mens klienten
-// beholder det LOKALT og derfor slår kvarters-pollen fra. Resultat: hverken push eller
-// poll, i fuld tavshed, på alle Android-enheder.
+// Server-siden ER klar: send-push v43 (i repoet, deployet) har FCM-grenen og vælger
+// platform per device_tokens-række, og register-push v25 udleder platformen af
+// token-formatet. Det eneste der mangler er filen her plus FCM_SERVICE_ACCOUNT-
+// hemmeligheden i Supabase.
+//
+// ⚠️ VIGTIGT når filen hentes: registrér BÅDE dk.vibefeed.app OG dk.vibefeed.app.debug
+// som Android-apps i Firebase-konsollen og hent en google-services.json med begge
+// klienter. Debug-varianten har applicationIdSuffix ".debug", og pluginet fejler hårdt
+// på assembleDebug hvis pakkenavnet ikke findes i filen.
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
 }
