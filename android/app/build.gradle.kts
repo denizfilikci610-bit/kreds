@@ -57,7 +57,8 @@ android {
         // afbrudt. Nummeret skal derfor OP ved hver ny fil, ellers afvises den.
         // 1 = afbrudt foerste forsoeg, 2 = foerste upload til Internal testing,
         // 3 = politik-siden kunne ikke scrolles (27. juli 2026).
-        versionCode = 3
+        // 4 = foerste upload til CLOSED testing (27. juli 2026). 3 var allerede brugt.
+        versionCode = 4
         versionName = "1.0"
         resourceConfigurations += listOf("en", "da")
     }
