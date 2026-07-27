@@ -70,6 +70,7 @@ import dk.vibefeed.app.ui.EaseOut
 import dk.vibefeed.app.ui.VfGlassAvatar
 import dk.vibefeed.app.ui.VfPress
 import dk.vibefeed.app.ui.vfPress
+import dk.vibefeed.app.ui.vfSkjulTastaturVedTraek
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -267,7 +268,11 @@ fun PostPageHost(
                 if (model.open && model.deleteArmId == armet) model.deleteArmId = null
             }
 
-            LazyColumn(state = listState, modifier = Modifier.weight(1f).fillMaxWidth()) {
+            // Træk nedad i tråden gemmer tastaturet, som på iPhone
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f).fillMaxWidth().vfSkjulTastaturVedTraek(),
+            ) {
                 item(key = "__post") {
                     model.post?.let { OpslagsBlok(it, blæk, model, send) }
                 }

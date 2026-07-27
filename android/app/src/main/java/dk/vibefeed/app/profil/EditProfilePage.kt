@@ -84,6 +84,7 @@ import dk.vibefeed.app.ui.EaseOut
 import dk.vibefeed.app.ui.VfGlassAvatar
 import dk.vibefeed.app.ui.VfPress
 import dk.vibefeed.app.ui.vfPress
+import dk.vibefeed.app.ui.vfSkjulTastaturVedTraek
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -388,6 +389,8 @@ private fun SideIndhold(
         Column(
             Modifier
                 .fillMaxSize()
+                // Træk nedad gemmer tastaturet, som på iPhone
+                .vfSkjulTastaturVedTraek()
                 .verticalScroll(rememberScrollState())
                 .imePadding(),
         ) {
@@ -623,6 +626,7 @@ private fun SletTrin(model: EsheetModel, blæk: Color, onEvent: (JSONObject) -> 
     Column(
         Modifier
             .fillMaxSize()
+            .vfSkjulTastaturVedTraek()
             .verticalScroll(rememberScrollState())
             .imePadding()
             .padding(top = 24.dp),

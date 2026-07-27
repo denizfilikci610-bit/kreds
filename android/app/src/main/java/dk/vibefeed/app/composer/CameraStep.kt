@@ -441,7 +441,10 @@ private fun UdløserKnap(
             .clip(CircleShape)
             .border(5.dp, ringFarve, CircleShape)
             .alpha(if (aktiv) 1f else 0.4f)
-            .pointerInput(aktiv, optager) {
+            // KUN nøglet på aktiv. Var optager med i nøglen, genstartede pointerInput i
+            // samme øjeblik optagelsen begyndte, og coroutinen der ventede på slippet
+            // blev annulleret: at slippe fingeren stoppede derfor ALDRIG optagelsen.
+            .pointerInput(aktiv) {
                 if (!aktiv) return@pointerInput
                 detectTapGestures(
                     onPress = {
@@ -451,8 +454,12 @@ private fun UdløserKnap(
                             onFoto()
                         } else {
                             onStart()
-                            tryAwaitRelease()
-                            onStop()
+                            try {
+                                tryAwaitRelease()
+                            } finally {
+                                // Stop OGSÅ hvis gestussen annulleres af systemet
+                                onStop()
+                            }
                         }
                     },
                 )

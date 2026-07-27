@@ -360,6 +360,26 @@ class MainActivity : AppCompatActivity() {
         web.isVerticalScrollBarEnabled = false
         web.isHorizontalScrollBarEnabled = false
 
+        // Træk NEDAD mens tastaturet er oppe gemmer det, som WKWebView gør af sig selv
+        // på iPhone (interactive dismiss). Siden scroller i sin egen #app-container, så
+        // WebViewets scroll-lyttere ser aldrig noget: derfor en berørings-lytter.
+        // Lytteren returnerer altid false og stjæler INTET fra sidens egne gestus.
+        var nedY = 0f
+        web.setOnTouchListener { _, ev ->
+            when (ev.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> nedY = ev.y
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    if (imeBottom > 0 &&
+                        ev.y - nedY > 48 * resources.displayMetrics.density
+                    ) {
+                        WindowInsetsControllerCompat(window, web)
+                            .hide(WindowInsetsCompat.Type.ime())
+                    }
+                }
+            }
+            false
+        }
+
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true)
 

@@ -43,6 +43,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import dk.vibefeed.app.ui.vfSkjulTastaturVedTraek
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -243,7 +244,11 @@ private fun Tråd(
         return
     }
 
-    LazyColumn(state = listState, modifier = modifier.fillMaxWidth()) {
+    LazyColumn(
+        state = listState,
+        // Træk nedad i tråden gemmer tastaturet, som på iPhone
+        modifier = modifier.fillMaxWidth().vfSkjulTastaturVedTraek(),
+    ) {
         items(model.comments.size, key = { model.comments[it].id }) { i ->
             val række = model.comments[i]
             KommentarRække(
