@@ -106,7 +106,6 @@ struct WebView: UIViewRepresentable {
 
         model.webView = webView
         // Let the ad manager call back into the page (fill/collapse slots).
-        AdsManager.shared.setWebView(webView)
         // Kold start via universal link: load linket (auth-landing) i stedet for bare forsiden
         webView.load(URLRequest(url: model.pendingDeepLink ?? vibefeedURL))
         model.pendingDeepLink = nil

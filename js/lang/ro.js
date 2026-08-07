@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "Alege limba · Choose language",
 
-  "consent.title": "Reclame & confidențialitate",
-  "consent.text": "VibeFeed afișează reclame. Alege dacă pot fi personalizate. Nu poți refuza reclamele, doar personalizarea. Îți poți schimba alegerea oricând la Editează profilul.",
   "consent.policy": "Politica de confidențialitate",
-  "consent.personal": "OK, și reclame personalizate",
-  "consent.limited": "Doar nepersonalizate",
 
-  "ad.label": "Reclamă",
-  "ad.sponsored": "Sponsorizat",
 
-  "ep.privacy": "Confidențialitate",
-  "ep.ads_personal": "Reclame personalizate",
-  "ep.ads_limited": "Doar nepersonalizate",
 
   "signup.accept": "Creând un profil accepți {terms} și {link} noastre",
   "signup.policy": "politica de confidențialitate",

@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "Kies taal · Choose language",
 
-  "consent.title": "Advertensies & privaatheid",
-  "consent.text": "VibeFeed wys advertensies. Kies of hulle persoonlik mag wees. Jy kan nie advertensies afkies nie, net die verpersoonliking. Jy kan jou keuse enige tyd onder Redigeer profiel verander.",
   "consent.policy": "Privaatheidsbeleid",
-  "consent.personal": "OK, ook persoonlike advertensies",
-  "consent.limited": "Net nie-persoonlike advertensies",
 
-  "ad.label": "Advertensie",
-  "ad.sponsored": "Geborg",
 
-  "ep.privacy": "Privaatheid",
-  "ep.ads_personal": "Persoonlike advertensies",
-  "ep.ads_limited": "Net nie-persoonlike",
 
   "signup.accept": "Deur 'n profiel te skep aanvaar jy ons {terms} en {link}",
   "signup.policy": "privaatheidsbeleid",

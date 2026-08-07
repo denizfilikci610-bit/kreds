@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "언어 선택 · Choose language",
 
-  "consent.title": "광고와 개인정보",
-  "consent.text": "VibeFeed는 광고를 보여줘요. 맞춤형 광고를 허용할지 선택하세요. 광고 자체는 끌 수 없고 맞춤 설정만 선택할 수 있어요. 언제든지 프로필 편집에서 변경할 수 있어요.",
   "consent.policy": "개인정보 처리방침",
-  "consent.personal": "좋아요, 맞춤형 광고도 허용",
-  "consent.limited": "비맞춤형만",
 
-  "ad.label": "광고",
-  "ad.sponsored": "스폰서",
 
-  "ep.privacy": "개인정보",
-  "ep.ads_personal": "맞춤형 광고",
-  "ep.ads_limited": "비맞춤형만",
 
   "signup.accept": "계정을 만들면 {terms}과 {link}에 동의하는 거예요",
   "signup.policy": "개인정보 처리방침",

@@ -361,11 +361,6 @@
       <div class="ep-langrow">
         <select class="langsel" data-langsel aria-label="Sprog / Language"></select>
       </div>
-      <div class="fs-label" id="ep-adslabel" data-i18n="ep.privacy">Privatliv</div>
-      <div class="ep-langrow" id="ep-adsrow">
-        <button class="langchip" id="ads-personal" type="button" data-i18n="ep.ads_personal">Personlige reklamer</button>
-        <button class="langchip" id="ads-limited" type="button" data-i18n="ep.ads_limited">Kun ikke-personlige</button>
-      </div>
       <div class="ep-policyrow">
         <a data-policy-link href="/privatliv.html" target="_blank" rel="noopener" data-i18n="consent.policy">Privatlivspolitik</a>
       </div>
@@ -588,22 +583,8 @@
     </div>
   </div>
 
-  <!-- Reklame-samtykke: vises som ARK over feedet ved FØRSTE besøg efter login/oprettelse
-       (sproget gættes automatisk fra enheden — DA/EN-knappen sidder på login-skærmen) -->
-  <div class="consentview as-sheet" id="consentview" role="dialog" aria-modal="true" aria-label="Reklamer & privatliv" data-i18n-aria="consent.title">
-    <div class="consent-inner">
-      <div class="wordmark">VibeFeed<span class="prik">.</span></div>
-      <div class="consent-title" data-i18n="consent.title">Reklamer & privatliv</div>
-      <p class="consent-text" data-i18n="consent.text">VibeFeed viser reklamer. Vælg om de må være personlige. Du kan ikke fravælge reklamer, kun personaliseringen. Du kan altid ændre dit valg under Rediger profil.</p>
-      <a class="consent-policy" data-policy-link href="/privatliv.html" target="_blank" rel="noopener" data-i18n="consent.policy">Privatlivspolitik</a>
-      <button class="consent-btn primary" id="consent-personal" type="button" data-i18n="consent.personal">OK, også personlige reklamer</button>
-      <button class="consent-btn" id="consent-limited" type="button" data-i18n="consent.limited">Kun ikke-personlige reklamer</button>
-    </div>
-  </div>
-
   <!-- Invitations-ark: vises én gang for en ny bruger lige efter oprettelse, og kan altid
-       åbnes igen fra profilen. Deler bevidst stil med reklame-arket ovenfor, så de to ark
-       ser ens ud (derfor .consentview .as-sheet og consent-klasserne her). -->
+       åbnes igen fra profilen. (.consentview/.consent-* er arkets delte stilklasser.) -->
   <div class="consentview as-sheet" id="inviteview" role="dialog" aria-modal="true" aria-label="Inviter dine venner" data-i18n-aria="invite.title">
     <div class="consent-inner">
       <div class="consent-title" data-i18n="invite.title">Inviter dine venner</div>

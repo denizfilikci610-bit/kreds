@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "Elegir idioma · Choose language",
 
-  "consent.title": "Publicidad y privacidad",
-  "consent.text": "VibeFeed muestra publicidad. Elige si puede ser personalizada. No puedes rechazar la publicidad, solo la personalización. Puedes cambiar tu elección en cualquier momento en Editar perfil.",
   "consent.policy": "Política de privacidad",
-  "consent.personal": "OK, también publicidad personalizada",
-  "consent.limited": "Solo no personalizada",
 
-  "ad.label": "Publicidad",
-  "ad.sponsored": "Patrocinado",
 
-  "ep.privacy": "Privacidad",
-  "ep.ads_personal": "Publicidad personalizada",
-  "ep.ads_limited": "Solo no personalizada",
 
   "signup.accept": "Al crear un perfil aceptas nuestros {terms} y nuestra {link}",
   "signup.policy": "política de privacidad",

@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "選擇語言 · Choose language",
 
-  "consent.title": "廣告與隱私",
-  "consent.text": "VibeFeed 會顯示廣告。請選擇是否允許個人化。廣告無法關閉，只能選擇是否個人化。你隨時可以在「編輯個人檔案」裡更改。",
   "consent.policy": "隱私權政策",
-  "consent.personal": "好，允許個人化廣告",
-  "consent.limited": "只要非個人化廣告",
 
-  "ad.label": "廣告",
-  "ad.sponsored": "贊助內容",
 
-  "ep.privacy": "隱私",
-  "ep.ads_personal": "個人化廣告",
-  "ep.ads_limited": "僅非個人化",
 
   "signup.accept": "建立帳號即表示你接受我們的{terms}和{link}",
   "signup.policy": "隱私權政策",

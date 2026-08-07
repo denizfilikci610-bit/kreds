@@ -62,9 +62,6 @@ struct VibeFeedApp: App {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
-                // No-op indtil web'en har meldt adsLive:true (kill-switch i js/ads.js);
-                // først derefter tæller samtykke, SDK-init og ATT overhovedet.
-                AdsManager.shared.appDidBecomeActive()
                 // Åbning = notifikationer "set": nulstil app-ikonets badge (lokalt + server)
                 NotifManager.shared.appDidBecomeActive()
             case .background:
@@ -114,7 +111,6 @@ struct ContentView: View {
                     .background(vfBackground)
                 }
 
-                InlineAdsOverlay()
             }
             .ignoresSafeArea()
 

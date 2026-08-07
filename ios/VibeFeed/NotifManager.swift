@@ -50,21 +50,6 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
                 scheduleRefresh()
                 sendPushRegistration() // if a push token already arrived, register it now
             }
-        case "adsLive":
-            // Reklamernes hovedkontakt bor i web'en (js/ads.js → ADS_LIVE) og meldes
-            // ved hver boot. false (eller aldrig meldt) = Appodeal starter ikke, og
-            // ATT-dialogen kommer aldrig. Gemmes bevidst ikke: hver start begynder slukket.
-            let live = (dict["value"] as? Bool) ?? false
-            Task { @MainActor in AdsManager.shared.setAdsLive(live) }
-        case "consent":
-            // "personal" (personalized ads allowed) or "limited" (non-personalized
-            // only). Persisted for the ad SDK; AdsManager is notified so it can
-            // start ads on first choice (or request ATT on an upgrade at runtime).
-            if let value = dict["value"] as? String {
-                let normalized = value == "personal" ? "personal" : "limited"
-                UserDefaults.standard.set(normalized, forKey: "vf_consent")
-                Task { @MainActor in AdsManager.shared.applyConsent(normalized) }
-            }
         case "tab":
             // The web mirrors its tab state so the native Liquid Glass bar stays in sync
             // (active tab, notification dot, scroll-compact, and hidden while an overlay is up).
@@ -105,41 +90,6 @@ final class NotifManager: NSObject, WKScriptMessageHandler {
         case "logout":
             UserDefaults.standard.removeObject(forKey: secretKey)
             UserDefaults.standard.removeObject(forKey: lastCheckKey)
-        case "rewarded":
-            // The user chose to watch a rewarded video to earn +20 like-capacity.
-            // Native shows it; on full watch it calls back window.VibeFeedAds.rewardEarned.
-            if (dict["action"] as? String) == "show" {
-                Task { @MainActor in AdsManager.shared.showRewarded() }
-            }
-        case "ads":
-            // The web feed reports the on-screen positions of its sponsored slots
-            // so the native MRECs can be laid over them. Slot values are plain
-            // numbers/strings (Sendable), so we can hop to the ad actor cleanly.
-            let action = dict["action"] as? String
-
-            // Lightweight per-frame scroll update: just the feed's scroll offset, so
-            // native can glide the already-placed ads with the feed at full frame rate.
-            if action == "scroll" {
-                let scrollY = ((dict["scrollY"] as? NSNumber)?.doubleValue) ?? 0
-                Task { @MainActor in AdsManager.shared.updateScroll(scrollY: CGFloat(scrollY)) }
-                break
-            }
-
-            guard action == "layout" else { break }
-            let scrolling = (dict["scrolling"] as? Bool) ?? false
-            let scrollY = ((dict["scrollY"] as? NSNumber)?.doubleValue) ?? 0
-            let raw = (dict["slots"] as? [[String: Any]]) ?? []
-            let slots: [AdSlot] = raw.compactMap { s in
-                guard let id = s["id"] as? String,
-                      let x = (s["x"] as? NSNumber)?.doubleValue,
-                      let y = (s["y"] as? NSNumber)?.doubleValue,
-                      let w = (s["w"] as? NSNumber)?.doubleValue,
-                      let h = (s["h"] as? NSNumber)?.doubleValue else { return nil }
-                return AdSlot(id: id, x: CGFloat(x), y: CGFloat(y), w: CGFloat(w), h: CGFloat(h))
-            }
-            Task { @MainActor in
-                AdsManager.shared.updateLayout(slots: slots, scrolling: scrolling, scrollY: CGFloat(scrollY))
-            }
         default:
             break
         }

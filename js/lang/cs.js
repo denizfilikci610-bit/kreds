@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "Vybrat jazyk · Choose language",
 
-  "consent.title": "Reklamy a soukromí",
-  "consent.text": "VibeFeed zobrazuje reklamy. Vyber, jestli smí být personalizované. Reklamy nelze vypnout, jen personalizaci. Volbu můžeš kdykoli změnit v Upravit profil.",
   "consent.policy": "Zásady ochrany soukromí",
-  "consent.personal": "OK, i personalizované reklamy",
-  "consent.limited": "Jen nepersonalizované",
 
-  "ad.label": "Reklama",
-  "ad.sponsored": "Sponzorováno",
 
-  "ep.privacy": "Soukromí",
-  "ep.ads_personal": "Personalizované reklamy",
-  "ep.ads_limited": "Jen nepersonalizované",
 
   "signup.accept": "Vytvořením profilu souhlasíš s našimi {terms} a {link}",
   "signup.policy": "zásadami ochrany soukromí",

@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "Pilih bahasa · Choose language",
 
-  "consent.title": "Iklan & privasi",
-  "consent.text": "VibeFeed memaparkan iklan. Pilih sama ada ia boleh diperibadikan. Anda tidak boleh menolak iklan, hanya pemperibadian. Anda boleh mengubah pilihan pada bila-bila masa di Sunting profil.",
   "consent.policy": "Dasar privasi",
-  "consent.personal": "OK, iklan diperibadikan juga",
-  "consent.limited": "Hanya bukan peribadi",
 
-  "ad.label": "Iklan",
-  "ad.sponsored": "Tajaan",
 
-  "ep.privacy": "Privasi",
-  "ep.ads_personal": "Iklan diperibadikan",
-  "ep.ads_limited": "Hanya bukan peribadi",
 
   "signup.accept": "Dengan mencipta profil anda menerima {terms} dan {link} kami",
   "signup.policy": "dasar privasi",

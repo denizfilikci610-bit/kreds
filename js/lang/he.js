@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "בחר שפה · Choose language",
 
-  "consent.title": "פרסומות ופרטיות",
-  "consent.text": "VibeFeed מציג פרסומות. בחר אם הן יכולות להיות מותאמות אישית. אי אפשר לוותר על פרסומות, רק על ההתאמה האישית. אפשר לשנות את הבחירה בכל עת בעריכת פרופיל.",
   "consent.policy": "מדיניות פרטיות",
-  "consent.personal": "בסדר, גם פרסומות מותאמות אישית",
-  "consent.limited": "רק לא מותאמות",
 
-  "ad.label": "פרסומת",
-  "ad.sponsored": "ממומן",
 
-  "ep.privacy": "פרטיות",
-  "ep.ads_personal": "פרסומות מותאמות אישית",
-  "ep.ads_limited": "רק לא מותאמות",
 
   "signup.accept": "ביצירת פרופיל אתה מקבל את {terms} ואת {link} שלנו",
   "signup.policy": "מדיניות הפרטיות",

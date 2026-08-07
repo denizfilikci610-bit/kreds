@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "Pilih bahasa · Choose language",
 
-  "consent.title": "Iklan & privasi",
-  "consent.text": "VibeFeed menampilkan iklan. Pilih apakah iklan boleh dipersonalisasi. Kamu tidak bisa menolak iklan, hanya personalisasinya. Kamu bisa mengubah pilihanmu kapan saja di Edit profil.",
   "consent.policy": "Kebijakan privasi",
-  "consent.personal": "OK, iklan personalisasi juga boleh",
-  "consent.limited": "Hanya non-personalisasi",
 
-  "ad.label": "Iklan",
-  "ad.sponsored": "Bersponsor",
 
-  "ep.privacy": "Privasi",
-  "ep.ads_personal": "Iklan personalisasi",
-  "ep.ads_limited": "Hanya non-personalisasi",
 
   "signup.accept": "Dengan membuat profil kamu menyetujui {terms} dan {link} kami",
   "signup.policy": "kebijakan privasi",

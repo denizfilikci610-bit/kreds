@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "اختر اللغة · Choose language",
 
-  "consent.title": "الإعلانات والخصوصية",
-  "consent.text": "يعرض VibeFeed إعلانات. اختر إن كان يمكن تخصيصها. لا يمكنك رفض الإعلانات، فقط التخصيص. يمكنك تغيير اختيارك في أي وقت من تعديل الملف الشخصي.",
   "consent.policy": "سياسة الخصوصية",
-  "consent.personal": "حسنًا، الإعلانات المخصصة أيضًا",
-  "consent.limited": "غير المخصصة فقط",
 
-  "ad.label": "إعلان",
-  "ad.sponsored": "برعاية",
 
-  "ep.privacy": "الخصوصية",
-  "ep.ads_personal": "إعلانات مخصصة",
-  "ep.ads_limited": "غير المخصصة فقط",
 
   "signup.accept": "بإنشائك حسابًا فأنت توافق على {terms} و{link} الخاصة بنا",
   "signup.policy": "سياسة الخصوصية",

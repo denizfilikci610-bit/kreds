@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "Dil seç · Choose language",
 
-  "consent.title": "Reklamlar ve gizlilik",
-  "consent.text": "VibeFeed reklam gösterir. Kişiselleştirilmiş olup olamayacaklarını seç. Reklamları reddedemezsin, sadece kişiselleştirmeyi. Seçimini istediğin zaman Profili düzenle bölümünden değiştirebilirsin.",
   "consent.policy": "Gizlilik politikası",
-  "consent.personal": "Tamam, kişiselleştirilmiş reklamlar da olsun",
-  "consent.limited": "Sadece kişiselleştirilmemiş",
 
-  "ad.label": "Reklam",
-  "ad.sponsored": "Sponsorlu",
 
-  "ep.privacy": "Gizlilik",
-  "ep.ads_personal": "Kişiselleştirilmiş reklamlar",
-  "ep.ads_limited": "Sadece kişiselleştirilmemiş",
 
   "signup.accept": "Profil oluşturarak {terms} ve {link} kabul etmiş olursun",
   "signup.policy": "gizlilik politikamızı",

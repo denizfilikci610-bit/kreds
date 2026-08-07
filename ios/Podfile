@@ -1,9 +1,7 @@
 # VibeFeed iOS — no third-party pods.
 #
-# The Appodeal/AdMob ad SDK was removed 2026-07-24 to resolve an App Review
-# AppTrackingTransparency finding: VibeFeed ships with no ads and no tracking, so
-# the binary must not link any framework that references AppTrackingTransparency.
-# If ads are reintroduced later, re-add the Appodeal pods + their spec sources here.
+# VibeFeed shows no ads and does not track users. The binary must not link any
+# advertising framework, and must not reference AppTrackingTransparency.
 
 platform :ios, '17.0'
 

@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "Chọn ngôn ngữ · Choose language",
 
-  "consent.title": "Quảng cáo & quyền riêng tư",
-  "consent.text": "VibeFeed hiển thị quảng cáo. Chọn xem chúng có được cá nhân hóa hay không. Bạn không thể tắt quảng cáo, chỉ tắt được phần cá nhân hóa. Bạn có thể đổi lựa chọn bất cứ lúc nào trong Chỉnh sửa trang cá nhân.",
   "consent.policy": "Chính sách quyền riêng tư",
-  "consent.personal": "OK, cả quảng cáo cá nhân hóa",
-  "consent.limited": "Chỉ quảng cáo không cá nhân hóa",
 
-  "ad.label": "Quảng cáo",
-  "ad.sponsored": "Được tài trợ",
 
-  "ep.privacy": "Quyền riêng tư",
-  "ep.ads_personal": "Quảng cáo cá nhân hóa",
-  "ep.ads_limited": "Chỉ không cá nhân hóa",
 
   "signup.accept": "Khi tạo tài khoản, bạn chấp nhận {terms} và {link} của chúng tôi",
   "signup.policy": "chính sách quyền riêng tư",

@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "言語を選択 · Choose language",
 
-  "consent.title": "広告とプライバシー",
-  "consent.text": "VibeFeedは広告を表示します。パーソナライズを許可するか選んでください。広告自体はオフにできず、パーソナライズのみ選べます。選択はいつでも「プロフィールを編集」で変更できます。",
   "consent.policy": "プライバシーポリシー",
-  "consent.personal": "OK、パーソナライズ広告も許可",
-  "consent.limited": "非パーソナライズのみ",
 
-  "ad.label": "広告",
-  "ad.sponsored": "スポンサー",
 
-  "ep.privacy": "プライバシー",
-  "ep.ads_personal": "パーソナライズ広告",
-  "ep.ads_limited": "非パーソナライズのみ",
 
   "signup.accept": "アカウントを作成すると、{terms}と{link}に同意したことになります",
   "signup.policy": "プライバシーポリシー",

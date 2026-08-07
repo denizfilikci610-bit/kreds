@@ -33,9 +33,6 @@ final class EsheetModel: ObservableObject {
     @Published var langDaLabel = ""
     @Published var langs: [[String]] = []     // [[kode, eget navn]] — alle appens sprog (fra web)
     @Published var langEnLabel = ""
-    @Published var privacyLabel = ""
-    @Published var adsPersonalLabel = ""
-    @Published var adsLimitedLabel = ""
     @Published var policyLabel = ""
     var policyUrl = "" // sat af apply(); ikke UI-bundet
     @Published var saveLabel = ""
@@ -63,10 +60,7 @@ final class EsheetModel: ObservableObject {
     @Published var bio = ""
     @Published var share = true
     @Published var lang = "da"
-    @Published var consent = "personal"
-    /// Reklame-valget vises kun når reklamer faktisk kører (web'ens ADS_LIVE).
     /// Ældre web uden feltet → false, altså skjult; det er den sikre vej.
-    @Published var adsOn = false
     @Published var pickedAvatar: UIImage?      // preview of a newly-picked photo (uploaded on Save)
     @Published var saving = false
     @Published var deleting = false
@@ -96,8 +90,7 @@ final class EsheetModel: ObservableObject {
         activityLabel = str(dict, "activityLabel"); shareLabel = str(dict, "shareLabel"); shareNote = str(dict, "shareNote")
         langLabel = str(dict, "langLabel"); langDaLabel = str(dict, "langDaLabel"); langEnLabel = str(dict, "langEnLabel")
         if let ls = dict["langs"] as? [[String]] { langs = ls } // fuld sprogliste (32) fra web → Menu-picker
-        privacyLabel = str(dict, "privacyLabel"); adsPersonalLabel = str(dict, "adsPersonalLabel")
-        adsLimitedLabel = str(dict, "adsLimitedLabel"); policyLabel = str(dict, "policyLabel")
+        policyLabel = str(dict, "policyLabel")
         policyUrl = str(dict, "policyUrl") // absolut URL fra web (sprogafhængig); tom på ældre web → fallback
         saveLabel = str(dict, "saveLabel"); deleteOpenLabel = str(dict, "deleteOpenLabel")
         useLabel = str(dict, "useLabel").isEmpty ? "OK" : str(dict, "useLabel") // ældre web → fallback
@@ -108,8 +101,6 @@ final class EsheetModel: ObservableObject {
         name = str(dict, "name"); bio = str(dict, "bio")
         share = (dict["share"] as? Bool) ?? true
         lang = str(dict, "lang").isEmpty ? "da" : str(dict, "lang")
-        consent = str(dict, "consent").isEmpty ? "personal" : str(dict, "consent")
-        adsOn = (dict["adsOn"] as? Bool) ?? false
         pickedAvatar = nil; saving = false; deleting = false; deleteStep = false
         open = true
     }
@@ -127,11 +118,10 @@ final class EsheetModel: ObservableObject {
         saving = true
         send(["kind": "save",
               "name": name.trimmingCharacters(in: .whitespacesAndNewlines),
-              "bio": bio, "share": share, "lang": lang, "consent": consent])
+              "bio": bio, "share": share, "lang": lang])
     }
     func dismiss() { send(["kind": "dismiss"]) }
     func chooseLang(_ v: String) { lang = v }
-    func chooseConsent(_ v: String) { consent = v }
     /// Åbner privatlivspolitikken i i-app-browseren OVENPÅ siden — brugeren bliver i
     /// appen, og de stagede ændringer består. (window.open over broen blokeres af WKWebView,
     /// og en navigation væk fra index.html ville dræbe SPA'en under siden.)
@@ -381,10 +371,6 @@ struct EditProfilePage: View {
                     .buttonStyle(.plain)
                 } else {
                     segments([("da", model.langDaLabel), ("en", model.langEnLabel)], selected: model.lang) { model.chooseLang($0) }
-                }
-                if model.adsOn { // reklame-valget findes kun når reklamer kører
-                    sectionLabel(model.privacyLabel)
-                    segments([("personal", model.adsPersonalLabel), ("limited", model.adsLimitedLabel)], selected: model.consent) { model.chooseConsent($0) }
                 }
                 Button { model.openPolicy() } label: {
                     Text(model.policyLabel).font(.system(size: 13, weight: .semibold)).underline()

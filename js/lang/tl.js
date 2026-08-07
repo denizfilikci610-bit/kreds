@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "Pumili ng wika · Choose language",
 
-  "consent.title": "Mga ad at privacy",
-  "consent.text": "Nagpapakita ng ads ang VibeFeed. Piliin kung puwede silang maging personalized. Hindi mo matatanggihan ang ads, ang personalization lang. Puwede mong baguhin ang pili mo anumang oras sa I-edit ang profile.",
   "consent.policy": "Patakaran sa privacy",
-  "consent.personal": "OK, pati personalized na ads",
-  "consent.limited": "Non-personalized lang",
 
-  "ad.label": "Ad",
-  "ad.sponsored": "Sponsored",
 
-  "ep.privacy": "Privacy",
-  "ep.ads_personal": "Personalized na ads",
-  "ep.ads_limited": "Non-personalized lang",
 
   "signup.accept": "Sa paggawa ng profile, tinatanggap mo ang aming {terms} at {link}",
   "signup.policy": "patakaran sa privacy",

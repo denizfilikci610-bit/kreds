@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "Valitse kieli · Choose language",
 
-  "consent.title": "Mainokset & yksityisyys",
-  "consent.text": "VibeFeed näyttää mainoksia. Valitse, saavatko ne olla yksilöityjä. Et voi kieltäytyä mainoksista, vain yksilöinnistä. Voit muuttaa valintaasi milloin tahansa kohdassa Muokkaa profiilia.",
   "consent.policy": "Tietosuojakäytäntö",
-  "consent.personal": "OK, myös yksilöidyt mainokset",
-  "consent.limited": "Vain ei-yksilöidyt",
 
-  "ad.label": "Mainos",
-  "ad.sponsored": "Sponsoroitu",
 
-  "ep.privacy": "Yksityisyys",
-  "ep.ads_personal": "Yksilöidyt mainokset",
-  "ep.ads_limited": "Vain ei-yksilöidyt",
 
   "signup.accept": "Luomalla profiilin hyväksyt {terms} ja {link}",
   "signup.policy": "tietosuojakäytäntömme",

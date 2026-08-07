@@ -2,10 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- VibeFeed sporer ikke. Reklamer er slukket via den fælles kill-switch
-	     (ADS_LIVE i js/ads.js): reklame-SDK'et initialiseres ikke, og der bliver
-	     aldrig bedt om sporingstilladelse. Tændes reklamer igen en dag, skal
-	     NSPrivacyTracking og App Privacy-mærkaterne rettes samtidig. -->
+	<!-- VibeFeed viser ingen reklamer og sporer ikke brugere. Appen indeholder
+	     intet reklame-SDK, hverken native eller i web-laget, og beder aldrig om
+	     sporingstilladelse. -->
 	<key>NSPrivacyTracking</key>
 	<false/>
 	<key>NSPrivacyTrackingDomains</key>

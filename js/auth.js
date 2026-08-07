@@ -1,7 +1,7 @@
 import { sb, recoveryMode, setRecoveryMode } from "./config.js";
 import { t, getLang, setLang, policyURL, termsURL } from "./i18n.js";
 import { me, setMe, state, FRIEND_SINCE, pv, expandedCmts, clearComposers, setCfilePid } from "./store.js";
-import { el, registerProfile, toast, getConsent, showConsentGate } from "./helpers.js";
+import { el, registerProfile, toast } from "./helpers.js";
 import { loadFriends, loadFeeds, loadPosts, feedById, renderFeedbar, renderKredshead, renderFeed, switchTab, closePostEdit, closePostMenu, closeReportMenu, resetFeedbarSearch, resetTapState, resetBarHide, clearUnseenFeeds } from "./feed.js";
 import { renderComposeDest, closeCompose, clearPendingImg, ta, updateRing, canPost, resetPoll } from "./compose.js";
 import { setOwnUI, renderStories, resetDeleteUI, closeEditSheet, closeProfile, closeActivitySheet, closeListSheet, closeNativeListPage, resetSaved, closeUnfriendMenu, closeBlockMenu } from "./profile.js";
@@ -9,7 +9,6 @@ import { closeFeedSheet, closeMemberSheet } from "./kredse.js";
 import { closeNativePostPage } from "./comments.js";
 import { resetChat, refreshChatUnread } from "./chat.js";
 import { closeLightbox } from "./lightbox.js";
-import { ADS_LIVE } from "./ads.js";
 import { subscribeRealtime, unsubscribeRealtime } from "./realtime.js";
 import { refreshNotifDot } from "./notifications.js";
 import { resetSearch } from "./search.js";
@@ -103,7 +102,7 @@ export async function pushNativeCreds(){
       secret = data;
       localStorage.setItem("vf_device_secret", secret);
     }
-    if(me && me.id === uid) window.webkit.messageHandlers.vibefeed.postMessage({ type:"creds", secret:secret, userId: me.id, lang: getLang(), consent: getConsent() });
+    if(me && me.id === uid) window.webkit.messageHandlers.vibefeed.postMessage({ type:"creds", secret:secret, userId: me.id, lang: getLang() });
   }catch(_e){ /* aldrig lade broen vælte web-appen */ }
 }
 /* Best effort: tilbagekald token + giv appen besked. Kaldes FØR signOut (session i live)
@@ -162,11 +161,6 @@ export async function boot(session){
   hideAuth();
   hideSplash(); // appen står nu færdig på rette fane + kreds → fad splashen væk
   pushNativeCreds(); // fire-and-forget — kun i WKWebView'en
-  // Reklame-valget: ark over feedet ved FØRSTE besøg efter login/oprettelse.
-  // Vises KUN når reklamer faktisk er tændt (ADS_LIVE, den fælles kill-switch i
-  // ads.js) — ellers ville vi bede om samtykke til noget der ikke findes.
-  // Ingen await — arket er modalt (inert) og styrer sig selv.
-  if(ADS_LIVE && !getConsent()) showConsentGate();
   // Ny bruger: spørg ÉN gang om at invitere sine folk. Uden venner er feedet tomt, og
   // så er der ingen grund til at komme igen. Samme knap ligger blivende på profilen.
   maybeShowInviteSheet();

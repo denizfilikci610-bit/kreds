@@ -72,28 +72,6 @@ export function richText(s){
     return pre+'<button class="mention" data-u="'+hh+'">@'+hh+'</button>'+rest;
   });
 }
-/* ================= Reklame-samtykke (ark over feedet — første besøg efter login) =================
-   Modal for alvor: appen bag arket gøres inert, og valget SKAL træffes før arket lukker.
-   Flyttet fra førstegangs-gaten (før login) til efter boot — reklamerne starter først,
-   når valget er truffet (AdsManager venter på consent). */
-export function showConsentGate(){
-  return new Promise(function(resolve){
-    const gv = el("consentview");
-    gv.classList.add("on");
-    el("app").inert = true;
-    const first = gv.querySelector("#consent-personal");
-    if(first) first.focus();
-    gv.addEventListener("click", function onPick(e){
-      const b = e.target.closest("#consent-personal, #consent-limited");
-      if(!b) return;
-      setConsent(b.id === "consent-personal" ? "personal" : "limited");
-      gv.classList.remove("on");
-      gv.removeEventListener("click", onPick);
-      el("app").inert = false;
-      resolve();
-    });
-  });
-}
 export function fmtTime(iso){
   const d = new Date(iso);
   const s = Math.max(0, (Date.now() - d.getTime())/1000);
@@ -226,24 +204,3 @@ export function toast(msg){
 
 export const HEART_SVG = '<svg viewBox="0 0 24 24"><path class="stroke" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
 
-/* ================= Reklame-samtykke (per enhed, localStorage vf_consent) =================
-   "personal" = personaliserede reklamer OK · "limited" = kun ikke-personlige.
-   Ændringer postes til den native bro (kun i iOS-appen — no-op i browsere). */
-const CONSENT_KEY = "vf_consent";
-export function getConsent(){
-  try{
-    const v = localStorage.getItem(CONSENT_KEY);
-    return (v === "personal" || v === "limited") ? v : null;
-  }catch(_e){ return null; }
-}
-export function pushConsentToBridge(v){
-  try{
-    if(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vibefeed)
-      window.webkit.messageHandlers.vibefeed.postMessage({ type:"consent", value:v });
-  }catch(_e){ /* broen må aldrig vælte web-appen */ }
-}
-export function setConsent(v){
-  if(v !== "personal" && v !== "limited") return;
-  try{ localStorage.setItem(CONSENT_KEY, v); }catch(_e){}
-  pushConsentToBridge(v);
-}

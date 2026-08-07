@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "Velg språk · Choose language",
 
-  "consent.title": "Reklame & personvern",
-  "consent.text": "VibeFeed viser reklame. Velg om den kan være personlig. Du kan ikke velge bort reklame, bare personaliseringen. Du kan alltid endre valget ditt under Rediger profil.",
   "consent.policy": "Personvernerklæring",
-  "consent.personal": "OK, også personlig reklame",
-  "consent.limited": "Bare ikke-personlig reklame",
 
-  "ad.label": "Reklame",
-  "ad.sponsored": "Sponset",
 
-  "ep.privacy": "Personvern",
-  "ep.ads_personal": "Personlig reklame",
-  "ep.ads_limited": "Bare ikke-personlig",
 
   "signup.accept": "Ved å opprette en profil godtar du våre {terms} og vår {link}",
   "signup.policy": "personvernerklæring",

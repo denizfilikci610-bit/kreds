@@ -12,7 +12,6 @@ import { loadNotifs, setNotifDot } from "./notifications.js";
 import { scheduleRefetch } from "./realtime.js";
 import { mapPoll, pollHTML, votePoll } from "./polls.js";
 import { openLightbox, lbSync, SOUND_ON_SVG, SOUND_OFF_SVG } from "./lightbox.js";
-import { AD_EVERY, adsEnabled, adSlotHTML, reportAdLayout, initAds } from "./ads.js";
 import { reconcile, keepMedia } from "./reconcile.js";
 
 /* Bredde på feedets billeder (px). Kameraet gemmer minder i 1080 px bredde, så 1080 er
@@ -490,16 +489,8 @@ export function renderFeed(){
   /* Ingen fastgøring: alle opslag (inkl. den officielle profil) flyder kronologisk */
   const items = state.posts;
   if(items.length){
-    /* Flet reklame-kort ind efter hver AD_EVERY opslag (kun i appen + med samtykke).
-       Ikke efter det allersidste opslag, så feedet ikke slutter på en reklame. */
-    const withAds = adsEnabled();
-    let adIdx = 0;
-    items.forEach(function(p, idx){
+    items.forEach(function(p){
       cards.push({ key: "p:"+p.id, html: postHTML(p) });
-      if(withAds && (idx + 1) % AD_EVERY === 0 && (idx + 1) < items.length){
-        const i = adIdx++;
-        cards.push({ key: "ad:"+i, html: adSlotHTML(i) });
-      }
     });
   } else if(!noFriends){
     cards.push({ key: "empty-kreds",
@@ -520,8 +511,6 @@ export function renderFeed(){
     const nf = el("feed").querySelector('.cbox[data-id="'+fpid+'"] .cfield');
     if(nf){ nf.focus(); try{ nf.setSelectionRange(selS, selE); }catch(_){} }
   }
-  /* Nye annonce-huller er i DOM'en nu — fortæl native hvor de sidder. */
-  reportAdLayout();
 }
 
 /* ================= Nye opslag i feedet (NY-mærke) =================
@@ -1506,7 +1495,6 @@ el("app").addEventListener("scroll", appScrolled, { passive:true });
 document.addEventListener("visibilitychange", function(){ if(!document.hidden) ensureFeedVideos(); });
 window.addEventListener("pageshow", function(){ ensureFeedVideos(); });
 document.addEventListener("touchend", function(){ ensureFeedVideos(); }, { passive:true });
-initAds(); // reklamer i feedet (no-op uden for iOS-appen)
 el("feedbar").addEventListener("click", function(e){
   if(e.target.closest(".fbseek")){
     kseek.on = true;

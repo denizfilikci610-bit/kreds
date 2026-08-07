@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "انتخاب زبان · Choose language",
 
-  "consent.title": "تبلیغات و حریم خصوصی",
-  "consent.text": "VibeFeed تبلیغات نشان می‌دهد. انتخاب کن که شخصی‌سازی شوند یا نه. نمی‌توانی تبلیغات را رد کنی، فقط شخصی‌سازی را. هر وقت خواستی می‌توانی در ویرایش پروفایل انتخابت را عوض کنی.",
   "consent.policy": "سیاست حریم خصوصی",
-  "consent.personal": "باشه، تبلیغات شخصی‌سازی‌شده هم",
-  "consent.limited": "فقط غیرشخصی",
 
-  "ad.label": "تبلیغ",
-  "ad.sponsored": "حمایت‌شده",
 
-  "ep.privacy": "حریم خصوصی",
-  "ep.ads_personal": "تبلیغات شخصی‌سازی‌شده",
-  "ep.ads_limited": "فقط غیرشخصی",
 
   "signup.accept": "با ساختن پروفایل، {terms} و {link} ما را می‌پذیری",
   "signup.policy": "سیاست حریم خصوصی",

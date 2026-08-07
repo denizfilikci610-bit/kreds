@@ -1,6 +1,6 @@
 import { sb, OFFICIAL_HANDLE } from "./config.js";
 import { me, state, FRIEND_SINCE, pv, curTab, expandedCmts } from "./store.js";
-import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, getConsent, setConsent, imgUrl, ini } from "./helpers.js";
+import { el, esc, avaHTML, user, toast, uuid, registerProfile, fmtTime, imgUrl, ini } from "./helpers.js";
 import { t, setLang, getLang, policyURL, LANGS } from "./i18n.js";
 import { postHTML, postQuery, mapPost, setTabIcons, renderFeed, snapVideos, restoreVideos, loadFriends, loadPosts, clampMemCaps, applyFeedSound, switchTab, setFeed, feedById, POST_SELECT, GRID_IMG_W } from "./feed.js";
 import { openNativePostPage, rerenderPostCmts } from "./comments.js";
@@ -8,7 +8,6 @@ import { openCompose, openStoryCamera } from "./compose.js";
 import { openStoryViewer } from "./stories.js";
 import { renderSearch, refreshSearchAfterFriendAdd } from "./search.js";
 import { resetApp, showAuth, nativeLogout } from "./auth.js";
-import { ADS_LIVE } from "./ads.js";
 import { shareInvite } from "./invite.js";
 
 /* ================= Bobler-række ================= */
@@ -201,18 +200,6 @@ export function closeEditSheet(){
 }
 function epCan(){ el("ep-save").disabled = !el("ep-name").value.trim(); }
 
-/* ---- Reklame-samtykke (Privatliv-chips i Rediger profil) ----
-   Hele rækken forsvinder når reklamer er slukket (ADS_LIVE i ads.js) — der er
-   intet at vælge imellem. Privatlivspolitik-linket bliver stående. */
-function syncAdsChips(){
-  const row = el("ep-adsrow"), lab = el("ep-adslabel");
-  if(row) row.style.display = ADS_LIVE ? "" : "none";
-  if(lab) lab.style.display = ADS_LIVE ? "" : "none";
-  const c = getConsent();
-  el("ads-personal").classList.toggle("on", c === "personal");
-  el("ads-limited").classList.toggle("on", c === "limited");
-}
-
 /* ================= Rediger profil — native glas-sheet (app'en) =================
    "Gem gør alt": navn/bio/aktivitet/sprog/samtykke + et evt. valgt foto samles og
    committes FØRST når man trykker Gem. Web'en ejer alle mutationer; native staged'er. */
@@ -235,7 +222,6 @@ function epheetSnapshot(){
     activityLabel: t("ep.activity"), shareLabel: t("ep.share"), shareNote: t("ep.share_note"),
     langLabel: t("ep.lang"), langDaLabel: "Dansk", langEnLabel: "English", // (ældre builds: da/en-segmenter)
     langs: Object.keys(LANGS).map(function(c){ return [c, LANGS[c]]; }), // nye builds: fuld sprogliste (Menu-picker)
-    privacyLabel: t("ep.privacy"), adsPersonalLabel: t("ep.ads_personal"), adsLimitedLabel: t("ep.ads_limited"),
     policyLabel: t("consent.policy"),
     // Absolut, sprogafhængig URL — native åbner den selv i Safari (window.open over broen
     // blokeres af WKWebView, og en navigation væk fra index.html ville dræbe SPA'en)
@@ -246,9 +232,7 @@ function epheetSnapshot(){
     name: me ? (me.name || "") : "",
     bio: me ? (me.bio || "") : "",
     share: me ? (me.show_activity !== false) : true,
-    lang: getLang(),
-    consent: getConsent(),
-    adsOn: ADS_LIVE // false = skjul hele reklame-valget i den native sheet
+    lang: getLang()
   };
 }
 function meAvatarCard(){
@@ -348,10 +332,6 @@ async function nativeEsheetSave(obj){
     if(newPath) me.avatar_path = newPath;
     if(newBanner) me.banner_path = newBanner;
     registerProfile(me);
-    if(ADS_LIVE){ // slukkede reklamer må ikke sætte et samtykke brugeren aldrig blev spurgt om
-      const newConsent = obj.consent === "limited" ? "limited" : "personal";
-      if(newConsent !== getConsent()) setConsent(newConsent); // per-enhed; poster til ad-broen
-    }
     epStagedAvatar = null;
     epStagedBanner = null;
     window.__vfEsheetPush({ close: true });
@@ -974,7 +954,6 @@ el("editprof").addEventListener("click", function(){
   el("ep-file").value = "";
   el("ep-bprev").innerHTML = me.banner_path ? '<img src="' + esc(imgUrl(me.banner_path)) + '" alt="">' : "";
   el("ep-bfile").value = "";
-  syncAdsChips();
   resetDeleteUI();
   epCan();
   el("scrim").classList.add("on");
@@ -1008,9 +987,6 @@ el("ep-save").addEventListener("click", async function(){
 });
 /* ---- Sprog (per enhed — gemmes i localStorage, ikke i profilen) ---- */
 /* Sprogvalget i web-arket sker via select[data-langsel] (i18n.js lytter selv) */
-/* ---- Reklame-samtykke (per enhed — setConsent poster også til den native bro) ---- */
-el("ads-personal").addEventListener("click", function(){ setConsent("personal"); syncAdsChips(); });
-el("ads-limited").addEventListener("click", function(){ setConsent("limited"); syncAdsChips(); });
 /* ---- Profil-banner (browser: uploades straks ved valg, som profilbilledet) ---- */
 el("ep-banner").addEventListener("click", function(){ el("ep-bfile").click(); });
 el("ep-bfile").addEventListener("change", function(){

@@ -468,18 +468,9 @@ export default {
 
   "lang.title": "选择语言 · Choose language",
 
-  "consent.title": "广告与隐私",
-  "consent.text": "VibeFeed 会展示广告。请选择是否允许个性化。广告无法关闭，只能选择是否个性化。你随时可以在「编辑个人主页」里更改。",
   "consent.policy": "隐私政策",
-  "consent.personal": "好，允许个性化广告",
-  "consent.limited": "只要非个性化广告",
 
-  "ad.label": "广告",
-  "ad.sponsored": "赞助内容",
 
-  "ep.privacy": "隐私",
-  "ep.ads_personal": "个性化广告",
-  "ep.ads_limited": "仅非个性化",
 
   "signup.accept": "创建账号即表示你接受我们的{terms}和{link}",
   "signup.policy": "隐私政策",
